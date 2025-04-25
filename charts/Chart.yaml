@@ -1,0 +1,8 @@
+apiVersion: v2
+name: abridge-coder
+type: application
+
+dependencies:
+  - name: coder
+    version: "2.20.0"  # Specify the version you want to use
+    repository: "https://helm.coder.com/v2"
