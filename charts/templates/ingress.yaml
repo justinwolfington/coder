@@ -8,9 +8,6 @@ metadata:
     kubernetes.io/ingress.class: "gce-internal"
     networking.gke.io/load-balancer-type: "Internal"
     kubernetes.io/ingress.allow-http: "true"
-    nginx.ingress.kubernetes.io/proxy-connect-timeout: "1000s"
-    nginx.ingress.kubernetes.io/proxy-send-timeout: "1000s"
-    nginx.ingress.kubernetes.io/proxy-read-timeout: "1000s"
 spec:
   rules:
   - http:
