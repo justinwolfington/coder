@@ -33,8 +33,6 @@ coder:
 
     service:
       type: ClusterIP
-      annotations:
-        cloud.google.com/neg: '{"ingress": true}'
 
     #tls:
     #  secretNames:
