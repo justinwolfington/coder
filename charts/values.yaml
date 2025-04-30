@@ -51,8 +51,6 @@ coder:
             # application's requirements.
             cpu: 0.5
     env:
-      - name: CODER_PG_CONNECTION_URL
-        value: "postgres://$(DB_USER):$(DB_PASSWORD)@localhost:5432/$(DB_NAME)"
       - name: DB_USER
         value: "coder"
       - name: DB_NAME
@@ -62,6 +60,8 @@ coder:
           secretKeyRef:
             name: coder-db-password
             key: DB_PASSWORD
+      - name: CODER_PG_CONNECTION_URL
+        value: "postgres://$(DB_USER):$(DB_PASSWORD)@localhost:5432/$(DB_NAME)?sslmode=disable"
       # For production deployments, we recommend configuring your own GitHub
       # OAuth2 provider and disabling the default one.
       - name: CODER_OAUTH2_GITHUB_DEFAULT_PROVIDER_ENABLE
