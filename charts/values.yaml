@@ -18,7 +18,7 @@ coder:
         args:
           # If connecting from a VPC-native GKE cluster, you can use the
           # following flag to have the proxy connect over private IP
-          # - "--private-ip"
+          - "--private-ip"
 
           # If you are not connecting with Automatic IAM, you can delete
           # the following flag.
