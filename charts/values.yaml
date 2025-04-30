@@ -22,7 +22,7 @@ coder:
 
           # If you are not connecting with Automatic IAM, you can delete
           # the following flag.
-          - "--auto-iam-authn"
+          # - "--auto-iam-authn"
 
           # Enable structured logging with LogEntry format:
           - "--structured-logs"
@@ -74,6 +74,10 @@ coder:
 
     service:
       type: ClusterIP
+    
+    serviceAccount:
+      annotations:
+        iam.gke.io/gcp-service-account: 'coder-app@client-dev-e301d.iam.gserviceaccount.com'
 
     #tls:
     #  secretNames:
