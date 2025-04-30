@@ -52,7 +52,7 @@ coder:
             cpu: 0.5
     env:
       - name: CODER_PG_CONNECTION_URL
-        value: "postgres://$(DB_USER):$(DB_PASSWORD)@localhost:5432/$(DB_NAME)?sslmode=require"
+        value: "postgres://$(DB_USER):$(DB_PASSWORD)@localhost:5432/$(DB_NAME)"
       - name: DB_USER
         value: "coder"
       - name: DB_NAME
