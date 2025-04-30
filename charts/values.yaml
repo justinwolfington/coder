@@ -52,7 +52,7 @@ coder:
             cpu: 0.5
     env:
       - name: DB_USER
-        value: "coder"
+        value: "postgres"
       - name: DB_NAME
         value: "coder"
       - name: DB_PASSWORD
