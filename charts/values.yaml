@@ -22,7 +22,7 @@ coder:
 
           # If you are not connecting with Automatic IAM, you can delete
           # the following flag.
-          # - "--auto-iam-authn"
+          - "--auto-iam-authn"
 
           # Enable structured logging with LogEntry format:
           - "--structured-logs"
