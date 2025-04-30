@@ -51,6 +51,8 @@ coder:
             # application's requirements.
             cpu: 0.5
     env:
+      - name: TEST
+        value: "test"
       - name: DB_USER
         value: "postgres"
       - name: DB_NAME
