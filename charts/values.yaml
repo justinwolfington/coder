@@ -68,6 +68,8 @@ coder:
       # OAuth2 provider and disabling the default one.
       - name: CODER_OAUTH2_GITHUB_DEFAULT_PROVIDER_ENABLE
         value: "false"
+      - name: CODER_BLOCK_DIRECT
+        value: "true"
 
       # (Optional) For production deployments the access URL should be set.
       # If you're just trying Coder, access the dashboard via the service IP.
