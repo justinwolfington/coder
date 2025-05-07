@@ -33,6 +33,14 @@ coder:
       - name: CODER_OAUTH2_GITHUB_DEFAULT_PROVIDER_ENABLE
         value: "false"
 
+      # Restrict to specific GitHub org(s)
+      - name: CODER_OAUTH2_GITHUB_ALLOWED_ORGS
+        value: "abridgeai"
+
+      # Allow signups (if you want users to be able to self-serve)
+      - name: CODER_OAUTH2_GITHUB_ALLOW_SIGNUPS
+        value: "true"
+
       # Prevent direct (IP-based) access; enforce use of ingress/proxy
       - name: CODER_BLOCK_DIRECT
         value: "true"
@@ -41,21 +49,9 @@ coder:
       - name: CODER_ACCESS_URL
         value: http://coder.abridge.coffee
 
-      # Template governance policies
-      - name: CODER_TEMPLATE_ACCESS_CONTROL_ENABLED
-        value: "true"
-      - name: CODER_TEMPLATE_REQUIRE_APPROVAL
-        value: "true"
-
-      # Workspace default resource quotas
-      - name: CODER_WORKSPACE_DEFAULT_SHUTDOWN_TIMEOUT
-        value: "10m"
-      - name: CODER_WORKSPACE_DEFAULT_QUOTA_CPU
-        value: "1"
-      - name: CODER_WORKSPACE_DEFAULT_QUOTA_MEMORY
-        value: "1Gi"
-      - name: CODER_WORKSPACE_DEFAULT_QUOTA_DISK
-        value: "10Gi"
+      # Disable telemetry for the coder server
+      - name: CODER_TELEMETRY_ENABLE
+        value: "false"
 
     # coder.initContainers -- Init containers for the deployment.
     # Cloud SQL Auth Proxy for connecting to PostgreSQL
