@@ -42,6 +42,11 @@ coder:
       - name: CODER_ACCESS_URL
         value: http://coder.abridge.coffee
 
+      # Template governance policies
+      - name: CODER_TEMPLATE_ACCESS_CONTROL_ENABLED
+        value: "true"
+      - name: CODER_TEMPLATE_REQUIRE_APPROVAL
+        value: "true"
 
     # coder.initContainers -- Init containers for the deployment.
     # Cloud SQL Auth Proxy for connecting to PostgreSQL
