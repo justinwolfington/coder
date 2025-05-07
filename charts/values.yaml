@@ -26,8 +26,7 @@ coder:
             key: DB_PASSWORD
 
       - name: CODER_PG_CONNECTION_URL
-        value: >-
-          postgres://$(DB_USER):$(DB_PASSWORD)@localhost:5432/$(DB_NAME)?sslmode=disable
+        value: "postgres://$(DB_USER):$(DB_PASSWORD)@localhost:5432/$(DB_NAME)?sslmode=disable"
 
       # For production deployments, we recommend configuring your own GitHub
       # OAuth2 provider and disabling the default one.
@@ -88,8 +87,7 @@ coder:
     # coder.serviceAccount -- GCP IAM-linked service account for the Coder deployment.
     serviceAccount:
       annotations:
-        iam.gke.io/gcp-service-account: >-
-          coder-app@client-dev-e301d.iam.gserviceaccount.com
+        iam.gke.io/gcp-service-account: "coder-app@client-dev-e301d.iam.gserviceaccount.com"
 
     # coder.ingress -- The Ingress object to expose for Coder.
     ingress:
