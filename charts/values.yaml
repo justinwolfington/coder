@@ -64,7 +64,8 @@ coder:
                       name: coder-db-password
                       key: DB_PASSWORD
             - name: CODER_PG_CONNECTION_URL
-              value: postgres://$(DB_USER):$(DB_PASSWORD)@localhost:5432/$(DB_NAME)?sslmode=disable
+              value: >-
+                  postgres://$(DB_USER):$(DB_PASSWORD)@localhost:5432/$(DB_NAME)?sslmode=disable
       # For production deployments, we recommend configuring your own GitHub
       # OAuth2 provider and disabling the default one.
             - name: CODER_OAUTH2_GITHUB_DEFAULT_PROVIDER_ENABLE
@@ -75,14 +76,17 @@ coder:
       # (Optional) For production deployments the access URL should be set.
       # If you're just trying Coder, access the dashboard via the service IP.
             - name: CODER_ACCESS_URL
-              value: http://coder.abridge.coffee # Move to development-values.yaml, etc. when deploying to other environments
+              value: >-
+                  http://coder.abridge.coffee  # Move to development-values.yaml, etc. when
+                  # deploying to other environments
 
         service:
             type: ClusterIP
 
         serviceAccount:
             annotations:
-                iam.gke.io/gcp-service-account: coder-app@client-dev-e301d.iam.gserviceaccount.com
+                iam.gke.io/gcp-service-account: >-
+                    coder-app@client-dev-e301d.iam.gserviceaccount.com
 
     #tls:
     #  secretNames:

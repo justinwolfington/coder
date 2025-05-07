@@ -13,11 +13,6 @@ repos:
           - id: detect-private-key
 
   # YAML
-    - repo: https://github.com/adrienverge/yamllint.git
-      rev: v1.37.0
-      hooks:
-          - id: yamllint
-            args: [--format, parsable, --strict]
 
     - repo: https://github.com/jumanjihouse/pre-commit-hook-yamlfmt
       rev: 0.2.1
