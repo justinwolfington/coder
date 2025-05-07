@@ -35,7 +35,7 @@ services:
             POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
             POSTGRES_DB: ${POSTGRES_DB:-coder}
         volumes:
-            - coder_data:/var/lib/postgresql/data  # Use "docker volume rm coder_coder_data"
+            - coder_data:/var/lib/postgresql/data
         healthcheck:
             test: [CMD-SHELL, 'pg_isready -U ${POSTGRES_USER:-username} -d ${POSTGRES_DB:-coder}']
             interval: 5s
