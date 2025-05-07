@@ -47,6 +47,16 @@ coder:
       - name: CODER_TEMPLATE_REQUIRE_APPROVAL
         value: "true"
 
+      # Workspace default resource quotas
+      - name: CODER_WORKSPACE_DEFAULT_SHUTDOWN_TIMEOUT
+        value: "10m"
+      - name: CODER_WORKSPACE_DEFAULT_QUOTA_CPU
+        value: "1"
+      - name: CODER_WORKSPACE_DEFAULT_QUOTA_MEMORY
+        value: "1Gi"
+      - name: CODER_WORKSPACE_DEFAULT_QUOTA_DISK
+        value: "10Gi"
+
     # coder.initContainers -- Init containers for the deployment.
     # Cloud SQL Auth Proxy for connecting to PostgreSQL
     # See: https://cloud.google.com/sql/docs/mysql/connect-kubernetes-engine#proxy
