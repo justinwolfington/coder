@@ -1,5 +1,6 @@
+---
 coder:
-  coder:
+    coder:
     # You can specify any environment variables you'd like to pass to Coder
     # here. Coder consumes environment variables listed in
     # `coder server --help`, and these environment variables are also passed
@@ -9,87 +10,87 @@ coder:
     # Please keep in mind that you should not set `CODER_HTTP_ADDRESS`,
     # `CODER_TLS_ENABLE`, `CODER_TLS_CERT_FILE` or `CODER_TLS_KEY_FILE` as
     # they are already set by the Helm chart and will cause conflicts.
-    initContainers:
-      - name: cloud-sql-proxy
-        restartPolicy: Always
+        initContainers:
+            - name: cloud-sql-proxy
+              restartPolicy: Always
         # It is recommended to use the latest version of the Cloud SQL Auth Proxy
         # Make sure to update on a regular schedule!
-        image: gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.14.1
-        args:
+              image: gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.14.1
+              args:
           # If connecting from a VPC-native GKE cluster, you can use the
           # following flag to have the proxy connect over private IP
-          - "--private-ip"
+                  - --private-ip
 
           # If you are not connecting with Automatic IAM, you can delete
           # the following flag.
-          - "--auto-iam-authn"
+                  - --auto-iam-authn
 
           # Enable structured logging with LogEntry format:
-          - "--structured-logs"
+                  - --structured-logs
 
           # Replace DB_PORT with the port the proxy should listen on
-          - "--port=5432"
-          - "client-dev-e301d:us-central1:coder-postgres-db"
+                  - --port=5432
+                  - client-dev-e301d:us-central1:coder-postgres-db
 
-        securityContext:
+              securityContext:
           # The default Cloud SQL Auth Proxy image runs as the
           # "nonroot" user and group (uid: 65532) by default.
-          runAsNonRoot: true
+                  runAsNonRoot: true
         # You should use resource requests/limits as a best practice to prevent
         # pods from consuming too many resources and affecting the execution of
         # other pods. You should adjust the following values based on what your
         # application needs. For details, see
         # https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
-        resources:
-          requests:
+              resources:
+                  requests:
             # The proxy's memory use scales linearly with the number of active
             # connections. Fewer open connections will use less memory. Adjust
             # this value based on your application's requirements.
-            memory: "2Gi"
+                      memory: 2Gi
             # The proxy's CPU use scales linearly with the amount of IO between
             # the database and the application. Adjust this value based on your
             # application's requirements.
-            cpu: 0.5
-    env:
-      - name: TEST
-        value: "test"
-      - name: DB_USER
-        value: "postgres"
-      - name: DB_NAME
-        value: "coder"
-      - name: DB_PASSWORD
-        valueFrom:
-          secretKeyRef:
-            name: coder-db-password
-            key: DB_PASSWORD
-      - name: CODER_PG_CONNECTION_URL
-        value: "postgres://$(DB_USER):$(DB_PASSWORD)@localhost:5432/$(DB_NAME)?sslmode=disable"
+                      cpu: 0.5
+        env:
+            - name: TEST
+              value: test
+            - name: DB_USER
+              value: postgres
+            - name: DB_NAME
+              value: coder
+            - name: DB_PASSWORD
+              valueFrom:
+                  secretKeyRef:
+                      name: coder-db-password
+                      key: DB_PASSWORD
+            - name: CODER_PG_CONNECTION_URL
+              value: postgres://$(DB_USER):$(DB_PASSWORD)@localhost:5432/$(DB_NAME)?sslmode=disable
       # For production deployments, we recommend configuring your own GitHub
       # OAuth2 provider and disabling the default one.
-      - name: CODER_OAUTH2_GITHUB_DEFAULT_PROVIDER_ENABLE
-        value: "false"
-      - name: CODER_BLOCK_DIRECT
-        value: "true"
+            - name: CODER_OAUTH2_GITHUB_DEFAULT_PROVIDER_ENABLE
+              value: 'false'
+            - name: CODER_BLOCK_DIRECT
+              value: 'true'
 
       # (Optional) For production deployments the access URL should be set.
       # If you're just trying Coder, access the dashboard via the service IP.
-      - name: CODER_ACCESS_URL
-        value: "http://coder.abridge.coffee" # Move to development-values.yaml, etc. when deploying to other environments
+            - name: CODER_ACCESS_URL
+              value: http://coder.abridge.coffee # Move to development-values.yaml, etc. when deploying to other environments
 
-    service:
-      type: ClusterIP
+        service:
+            type: ClusterIP
 
-    serviceAccount:
-      annotations:
-        iam.gke.io/gcp-service-account: "coder-app@client-dev-e301d.iam.gserviceaccount.com"
+        serviceAccount:
+            annotations:
+                iam.gke.io/gcp-service-account: coder-app@client-dev-e301d.iam.gserviceaccount.com
 
     #tls:
     #  secretNames:
     #    - my-tls-secret-name
-    ingress:
-      enable: true
-      annotations:
-        kubernetes.io/ingress.regional-static-ip-name: "coder-static-ip"
-        kubernetes.io/ingress.class: "gce-internal"
-        networking.gke.io/load-balancer-type: "Internal"
-        kubernetes.io/ingress.allow-http: "true"
+        ingress:
+            enable: true
+            annotations:
+                kubernetes.io/ingress.regional-static-ip-name: coder-static-ip
+                kubernetes.io/ingress.class: gce-internal
+                networking.gke.io/load-balancer-type: Internal
+                kubernetes.io/ingress.allow-http: 'true'
