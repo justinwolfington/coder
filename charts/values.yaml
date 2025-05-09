@@ -114,10 +114,4 @@ coder:
 
     # coder.ingress -- The Ingress object to expose for Coder.
     ingress:
-      enable: true
-      # coder.ingress.annotations -- The ingress annotations.
-      annotations:
-        kubernetes.io/ingress.regional-static-ip-name: coder-static-ip
-        kubernetes.io/ingress.class: gce-internal
-        networking.gke.io/load-balancer-type: Internal
-        kubernetes.io/ingress.allow-http: "true"
+      enable: false
