@@ -57,6 +57,18 @@ coder:
       - name: CODER_TELEMETRY_ENABLE
         value: "false"
 
+      - name: CODER_OAUTH2_GITHUB_CLIENT_ID
+        valueFrom:
+          secretKeyRef:
+            name: coder-github-client-id
+            key: CODER_OAUTH2_GITHUB_CLIENT_ID
+
+      - name: CODER_OAUTH2_GITHUB_CLIENT_SECRET
+        valueFrom:
+          secretKeyRef:
+            name: coder-github-client-secret
+            key: CODER_OAUTH2_GITHUB_CLIENT_SECRET
+
     # coder.initContainers -- Init containers for the deployment.
     # Cloud SQL Auth Proxy for connecting to PostgreSQL
     # See: https://cloud.google.com/sql/docs/mysql/connect-kubernetes-engine#proxy
