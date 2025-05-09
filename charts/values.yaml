@@ -51,7 +51,7 @@ coder:
 
       # Required: external URL for login/workspace links (e.g. https://coder.abridge.coffee)
       - name: CODER_ACCESS_URL
-        value: http://coder.abridge.coffee
+        value: https://coder.abridge.coffee
 
       # Disable telemetry for the coder server
       - name: CODER_TELEMETRY_ENABLE
