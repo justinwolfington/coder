@@ -1,0 +1,14 @@
+apiVersion: networking.gke.io/v1
+kind: GCPBackendPolicy
+metadata:
+  name: coder
+  namespace: coder
+spec:
+  default:
+    logging:
+      enabled: true
+    timeoutSec: 600
+  targetRef:
+    group: ""
+    kind: Service
+    name: coder
