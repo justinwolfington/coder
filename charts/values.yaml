@@ -1,6 +1,10 @@
 # Based on: https://github.com/coder/coder/blob/v2.20.3/helm/coder/values.yaml
 ---
 coder:
+  # coder.httpRoute -- The HTTPRoute object to expose for Coder.
+  httpRoute:
+    hostname: ~
+
   coder:
     # coder.env -- The environment variables to set for Coder.
     # These configure all aspects of `coder server` and are passed to
@@ -18,6 +22,7 @@ coder:
 
       - name: CODER_PG_CONNECTION_URL
         value: "postgres://$(DB_USER)@localhost:5432/$(DB_NAME)?sslmode=disable"
+
 
       # For production deployments, we recommend configuring your own GitHub
       # OAuth2 provider and disabling the default one.
@@ -42,7 +47,7 @@ coder:
 
       # Required: external URL for login/workspace links (e.g. https://coder.abridge.coffee)
       - name: CODER_ACCESS_URL
-        value: https://coder.abridge.coffee
+        value: ~
 
       # Disable telemetry for the coder server
       - name: CODER_TELEMETRY_ENABLE
@@ -80,7 +85,6 @@ coder:
 
           # PostgreSQL port configuration
           - --port=5432
-          - client-dev-e301d:us-central1:coder-postgres-db
         securityContext:
           # The default Cloud SQL Auth Proxy image runs as the
           # "nonroot" user and group (uid: 65532) by default.
@@ -93,6 +97,7 @@ coder:
             # CPU scales with database I/O
             cpu: 0.5
 
+    # Common service configuration
     # coder.service -- The Service object to expose for Coder.
     service:
       # coder.service.type -- Set to ClusterIP when using Ingress.
@@ -101,8 +106,9 @@ coder:
     # coder.serviceAccount -- GCP IAM-linked service account for the Coder deployment.
     serviceAccount:
       annotations:
-        iam.gke.io/gcp-service-account: "coder-app@client-dev-e301d.iam.gserviceaccount.com"
+        iam.gke.io/gcp-service-account: ~
 
+    # Common ingress configuration
     # coder.ingress -- The Ingress object to expose for Coder.
     ingress:
       enable: false
