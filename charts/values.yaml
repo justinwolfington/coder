@@ -10,9 +10,6 @@ coder:
     # - CODER_HTTP_ADDRESS
     # - CODER_TLS_ENABLE / CODER_TLS_CERT_FILE / CODER_TLS_KEY_FILE
     env:
-      - name: TEST
-        value: test
-
       - name: DB_USER
         value: postgres
 
