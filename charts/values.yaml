@@ -11,13 +11,19 @@ coder:
     # - CODER_TLS_ENABLE / CODER_TLS_CERT_FILE / CODER_TLS_KEY_FILE
     env:
       - name: DB_USER
-        value: coder-app@client-dev-e301d.iam
+        value: postgres
 
       - name: DB_NAME
         value: coder
 
+      - name: DB_PASSWORD
+        valueFrom:
+          secretKeyRef:
+            name: coder-db-password
+            key: DB_PASSWORD
+
       - name: CODER_PG_CONNECTION_URL
-        value: "postgres://$(DB_USER)@localhost:5432/$(DB_NAME)?sslmode=disable"
+        value: "postgres://$(DB_USER):$(DB_PASSWORD)@localhost:5432/$(DB_NAME)?sslmode=disable"
 
       # For production deployments, we recommend configuring your own GitHub
       # OAuth2 provider and disabling the default one.
