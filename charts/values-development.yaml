@@ -47,7 +47,7 @@ coder:
         value: "false"
 
       - name: CODER_EXTERNAL_AUTH_0_ID
-        value: github-abridgeai
+        value: primary-github
 
       - name: CODER_EXTERNAL_AUTH_0_TYPE
         value: github
