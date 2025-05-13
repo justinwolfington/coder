@@ -5,7 +5,7 @@ metadata:
   namespace: coder
 spec:
   hostnames:
-  - {{ .Values.coder.httpRoute.hostname }}
+  - "{{ .Values.coder.httpRoute.hostname }}"
   parentRefs:
   - group: gateway.networking.k8s.io
     kind: Gateway
@@ -31,7 +31,7 @@ metadata:
   namespace: coder
 spec:
   hostnames:
-  - {{ .Values.coder.httpRoute.hostname }}
+  - "{{ .Values.coder.httpRoute.hostname }}"
   parentRefs:
   - group: gateway.networking.k8s.io
     kind: Gateway
