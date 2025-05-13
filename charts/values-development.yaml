@@ -56,6 +56,11 @@ coder:
             name: coder-github-client-secret
             key: CODER_OAUTH2_GITHUB_CLIENT_SECRET
 
+    # coder.service -- The Service object to expose for Coder.
+    service:
+      # coder.service.type -- Set to ClusterIP when using Ingress.
+      type: ClusterIP
+
     # Development-specific service account
     serviceAccount:
       annotations:
