@@ -1,0 +1,102 @@
+# Development-specific overrides
+---
+coder:
+  # coder.httpRoute -- The HTTPRoute object to expose for Coder.
+  httpRoute:
+    hostname: coder.abridge.coffee
+
+  coder:
+    # Development-specific configuration
+    env:
+      - name: DB_USER
+        value: coder-app@client-dev-e301d.iam
+
+      - name: DB_NAME
+        value: coder
+
+      - name: CODER_PG_CONNECTION_URL
+        value: "postgres://$(DB_USER)@localhost:5432/$(DB_NAME)?sslmode=disable"
+
+      # Required: external URL for login/workspace links (e.g. https://coder.abridge.coffee)
+      - name: CODER_ACCESS_URL
+        value: https://coder.abridge.coffee
+
+      # For production deployments, we recommend configuring your own GitHub
+      # OAuth2 provider and disabling the default one.
+      - name: CODER_OAUTH2_GITHUB_DEFAULT_PROVIDER_ENABLE
+        value: "true"
+
+      # Restrict to specific GitHub org(s)
+      - name: CODER_OAUTH2_GITHUB_ALLOWED_ORGS
+        value: "abridgeai"
+
+      # Allow signups (if you want users to be able to self-serve)
+      - name: CODER_OAUTH2_GITHUB_ALLOW_SIGNUPS
+        value: "true"
+
+      # Restrict to specific GitHub teams
+      - name: CODER_OAUTH2_GITHUB_ALLOWED_TEAMS
+        value: "abridgeai/coder"
+
+      # Prevent direct (IP-based) access; enforce use of ingress/proxy
+      - name: CODER_BLOCK_DIRECT
+        value: "true"
+
+      # Disable telemetry for the coder server
+      - name: CODER_TELEMETRY_ENABLE
+        value: "false"
+
+      - name: CODER_OAUTH2_GITHUB_CLIENT_ID
+        valueFrom:
+          secretKeyRef:
+            name: coder-github-client-id
+            key: CODER_OAUTH2_GITHUB_CLIENT_ID
+
+      - name: CODER_OAUTH2_GITHUB_CLIENT_SECRET
+        valueFrom:
+          secretKeyRef:
+            name: coder-github-client-secret
+            key: CODER_OAUTH2_GITHUB_CLIENT_SECRET
+
+    # coder.service -- The Service object to expose for Coder.
+    service:
+      # coder.service.type -- Set to ClusterIP when using Ingress.
+      type: ClusterIP
+
+    # Development-specific service account
+    serviceAccount:
+      annotations:
+        iam.gke.io/gcp-service-account: "coder-app@client-dev-e301d.iam.gserviceaccount.com"
+
+    # coder.initContainers -- Init containers for the deployment.
+    # Cloud SQL Auth Proxy for connecting to PostgreSQL
+    # See: https://cloud.google.com/sql/docs/mysql/connect-kubernetes-engine#proxy
+    initContainers:
+      - name: cloud-sql-proxy
+        restartPolicy: Always
+        # It is recommended to use the latest version of the Cloud SQL Auth Proxy!
+        image: gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.14.1
+        args:
+          # Connect over private IP in VPC-native GKE cluster
+          - --private-ip
+
+          # Use Automatic IAM authentication
+          - --auto-iam-authn
+
+          # Enable structured logging
+          - --structured-logs
+
+          # PostgreSQL port configuration
+          - --port=5432
+          - client-dev-e301d:us-central1:coder-postgres-db
+        securityContext:
+          # The default Cloud SQL Auth Proxy image runs as the
+          # "nonroot" user and group (uid: 65532) by default.
+          runAsNonRoot: true
+        # Resource allocation to prevent overutilization
+        resources:
+          requests:
+            # Memory scales with connection count
+            memory: 2Gi
+            # CPU scales with database I/O
+            cpu: 100m
