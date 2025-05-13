@@ -30,11 +30,11 @@ coder:
 
       # Allow signups (if you want users to be able to self-serve)
       - name: CODER_OAUTH2_GITHUB_ALLOW_SIGNUPS
-        value: "false"
+        value: "true"
 
       # Restrict to specific GitHub teams
       - name: CODER_OAUTH2_GITHUB_ALLOWED_TEAMS
-        value: "abridgeai/ml-science,abridgeai/machine-learning,abridgeai/platform-engineering"
+        value: "abridgeai/coder"
 
       # Prevent direct (IP-based) access; enforce use of ingress/proxy
       - name: CODER_BLOCK_DIRECT
