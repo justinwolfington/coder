@@ -15,7 +15,7 @@ coder:
         value: coder
 
       - name: CODER_PG_CONNECTION_URL
-        value: "postgres://$(DB_USER):$(DB_PASSWORD)@localhost:5432/$(DB_NAME)?sslmode=disable"
+        value: "postgres://$(DB_USER)@localhost:5432/$(DB_NAME)?sslmode=disable"
 
       # Required: external URL for login/workspace links (e.g. https://coder.abridge.services)
       - name: CODER_ACCESS_URL
