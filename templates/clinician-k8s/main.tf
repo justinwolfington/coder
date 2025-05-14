@@ -63,12 +63,31 @@ locals {
   init_script = <<-EOT
     set -e
 
+    # Source profile to ensure PATH is set correctly
+    if [ -f "$HOME/.profile" ]; then
+      . "$HOME/.profile"
+    fi
+
     # Verify uv and keyring are working, install if not
-    if ! command -v uv &> /dev/null || ! uv tool list | grep -q keyring; then
-      echo "UV or keyring not found, installing..."
+    if ! command -v uv &> /dev/null; then
+      echo "UV not found, installing..."
       curl -LsSf https://astral.sh/uv/install.sh | sh
-      . "$HOME/.local/bin/env"
-      uv tool install keyring --with keyrings.google-artifactregistry-auth
+      export PATH="/home/vscode/.local/bin:$PATH"
+      . "$HOME/.local/bin/env" || echo "Warning: Could not source UV environment"
+    fi
+
+    # Ensure keyring is installed
+    if ! uv tool list 2>/dev/null | grep -q keyring; then
+      echo "Installing keyring..."
+      uv tool install keyring --with keyrings.google-artifactregistry-auth || echo "Warning: Could not install keyring"
+    fi
+
+    # Verify installation
+    if command -v uv &> /dev/null; then
+      echo "UV is installed and available at: $(which uv)"
+      echo "UV version: $(uv --version)"
+    else
+      echo "Warning: UV installation may have failed"
     fi
 
     curl -fsSL https://code-server.dev/install.sh | sh -s -- --method=standalone --prefix=/tmp/code-server
@@ -236,8 +255,8 @@ resource "kubernetes_deployment" "main" {
       metadata { labels = local.labels }
       spec {
         security_context {
-          run_as_user     = 1000
-          fs_group        = 1000
+          run_as_user     = "1000"
+          fs_group        = "1000"
           run_as_non_root = true
         }
 
@@ -246,7 +265,9 @@ resource "kubernetes_deployment" "main" {
           image             = local.base_image
           image_pull_policy = "Always"
           command           = ["sh", "-c", coder_agent.main.init_script]
-          security_context { run_as_user = 1000 }
+          security_context {
+            run_as_user = "1000"
+          }
           env {
             name  = "CODER_AGENT_TOKEN"
             value = coder_agent.main.token

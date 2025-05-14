@@ -18,23 +18,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Google Cloud SDK as root first
+# Install Google Cloud SDK
 RUN curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-linux-x86_64.tar.gz && \
     tar -xf google-cloud-cli-linux-x86_64.tar.gz && \
     ./google-cloud-sdk/install.sh --usage-reporting=false --rc-path=/etc/profile.d/gcloud.sh --path-update=true --command-completion=true --quiet && \
     rm -rf google-cloud-cli-linux-x86_64.tar.gz
 
-# Switch to vscode user for package installations
-USER vscode
-WORKDIR /home/vscode
-
-# Install UV and make it available in the path
+# Install UV and make it available system-wide
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh && \
-    echo 'export PATH="/home/vscode/.local/bin:$PATH"' >> /home/vscode/.bashrc && \
-    echo 'export PATH="/home/vscode/.local/bin:$PATH"' >> /home/vscode/.zshrc && \
-    . /home/vscode/.local/bin/env && \
-    uv tool install keyring --with keyrings.google-artifactregistry-auth
-
-# Switch back to root for any subsequent operations
-USER root
-ENV PATH="/home/vscode/.local/bin:${PATH}"
+    . "$HOME/.local/bin/env" && \
+    uv tool install keyring --with keyrings.google-artifactregistry-auth && \
+    ln -s "$HOME/.local/bin/uv" /usr/local/bin/uv
