@@ -24,6 +24,7 @@ data "coder_workspace" "me" {}
 data "coder_workspace_owner" "me" {}
 
 locals {
+  # Repository configuration
   repo_map = {
     "completion-service" = "https://github.com/abridgeai/completion-service"
   }
@@ -39,12 +40,13 @@ locals {
     || data.coder_parameter.custom_repo.value != ""
   )
 
+  # Image and environment configuration
   base_image_repo = "us-central1-docker.pkg.dev/abridge-artifact-registry/coder/base"
   base_image_tag  = "a550567"
   base_image      = "${local.base_image_repo}:${local.base_image_tag}"
+  home_dir        = "/home/vscode"
 
-  home_dir = "/home/vscode"
-
+  # Kubernetes metadata
   labels = {
     "app.kubernetes.io/name"     = "coder-workspace"
     "app.kubernetes.io/instance" = "coder-workspace-${data.coder_workspace.me.id}"
@@ -60,6 +62,7 @@ locals {
     "com.coder.user.email" = data.coder_workspace_owner.me.email
   }
 
+  # Startup script for the workspace
   init_script = <<-EOT
     set -e
 
@@ -72,16 +75,14 @@ locals {
     export CODE_SERVER_DIR="/tmp/code-server"
 
     if [ ! -f "$CODE_SERVER_DIR/bin/code-server" ]; then
-      echo "Installing code-server..."
       mkdir -p "$CODE_SERVER_DIR"
       curl -fsSL https://code-server.dev/install.sh | sh -s -- --method=standalone --prefix="$CODE_SERVER_DIR" || exit 1
     fi
 
-    echo "Starting code-server..."
     $CODE_SERVER_DIR/bin/code-server --auth none --port 13337 >/tmp/code-server.log 2>&1 &
-
   EOT
 
+  # Metrics for workspace monitoring
   metrics = {
     "0_cpu_usage"      = { name = "CPU Usage", script = "coder stat cpu" }
     "1_ram_usage"      = { name = "RAM Usage", script = "coder stat mem" }
@@ -92,6 +93,7 @@ locals {
   }
 }
 
+# Parameter definitions
 data "coder_parameter" "repo_selection" {
   name         = "repo_selection"
   display_name = "Repository Selection"
@@ -164,6 +166,7 @@ data "coder_parameter" "home_disk_size" {
   }
 }
 
+# Coder agent configuration
 resource "coder_agent" "main" {
   os             = "linux"
   arch           = "amd64"
@@ -181,6 +184,7 @@ resource "coder_agent" "main" {
   }
 }
 
+# Git repository cloning
 module "git-clone" {
   count    = data.coder_workspace.me.start_count > 0 && local.should_clone ? 1 : 0
   source   = "registry.coder.com/coder/git-clone/coder"
@@ -189,6 +193,7 @@ module "git-clone" {
   url      = local.repo_url
 }
 
+# Code-server application
 resource "coder_app" "code-server" {
   agent_id     = coder_agent.main.id
   slug         = "code-server"
@@ -205,6 +210,7 @@ resource "coder_app" "code-server" {
   }
 }
 
+# Persistent storage
 resource "kubernetes_persistent_volume_claim" "home" {
   metadata {
     name        = "coder-${data.coder_workspace.me.id}-home"
@@ -223,22 +229,26 @@ resource "kubernetes_persistent_volume_claim" "home" {
   }
 }
 
+# Kubernetes deployment
 resource "kubernetes_deployment" "main" {
   count            = data.coder_workspace.me.start_count
   depends_on       = [kubernetes_persistent_volume_claim.home]
   wait_for_rollout = false
+
   metadata {
     name        = "coder-${data.coder_workspace.me.id}"
     namespace   = var.namespace
     labels      = local.labels
     annotations = local.annotations
   }
+
   spec {
     replicas = 1
     selector {
       match_labels = local.labels
     }
     strategy { type = "Recreate" }
+
     template {
       metadata { labels = local.labels }
       spec {
@@ -253,13 +263,16 @@ resource "kubernetes_deployment" "main" {
           image             = local.base_image
           image_pull_policy = "Always"
           command           = ["sh", "-c", coder_agent.main.init_script]
+
           security_context {
             run_as_user = "1000"
           }
+
           env {
             name  = "CODER_AGENT_TOKEN"
             value = coder_agent.main.token
           }
+
           resources {
             requests = {
               cpu    = "250m"
@@ -270,6 +283,7 @@ resource "kubernetes_deployment" "main" {
               memory = "${data.coder_parameter.memory.value}Gi"
             }
           }
+
           volume_mount {
             mount_path = local.home_dir
             name       = "home"
@@ -306,6 +320,7 @@ resource "kubernetes_deployment" "main" {
   }
 }
 
+# Metadata for observability
 resource "coder_metadata" "workspace_info" {
   count       = data.coder_workspace.me.start_count
   resource_id = kubernetes_deployment.main[0].id
