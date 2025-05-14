@@ -11,14 +11,20 @@ ENV PYTHONUNBUFFERED=1 \
     PF_TRACING_SKIP_LOCAL_SETUP=false \
     PF_DISABLE_TRACING=false \
     OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://localhost:23333/v1/traces \
-    UV_VERSION=0.7.3 \
     PATH="/google-cloud-sdk/bin:${PATH}"
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
+FROM base AS builder
+
+ENV UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy \
+    UV_PYTHON_DOWNLOADS=0
+
+# Copy UV binary from official image and set up
+COPY --from=ghcr.io/astral-sh/uv:0.7.3 /uv /bin/uv
+
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends build-essential curl && rm -rf /var/lib/apt/lists/*
 
 # Install Google Cloud SDK
 RUN curl -fsSLO "https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-linux-x86_64.tar.gz" && \
@@ -26,11 +32,7 @@ RUN curl -fsSLO "https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/goog
     ./google-cloud-sdk/install.sh --quiet --command-completion=true --path-update=true && \
     rm -rf google-cloud-cli-linux-x86_64.tar.gz google-cloud-sdk/.install
 
-# Copy UV binary from official image and set up
-COPY --from=ghcr.io/astral-sh/uv:${UV_VERSION} /uv /bin/uv
-
 # Install keyring and create marker files
 RUN mkdir -p /usr/local/etc/uv && \
-    echo "${UV_VERSION}" > /usr/local/etc/uv/version && \
     uv tool install keyring --with keyrings.google-artifactregistry-auth && \
     uv tool list > /usr/local/etc/uv/tools_installed
