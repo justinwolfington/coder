@@ -30,7 +30,7 @@ locals {
 
   repo_url = (
     data.coder_parameter.repo_selection.value == "custom"
-    ? data.coder_parameter.custom_repo.value
+    ? "https://github.com/abridgeai/${data.coder_parameter.custom_repo.value}"
     : lookup(local.repo_map, data.coder_parameter.repo_selection.value, "")
   )
 
@@ -95,6 +95,7 @@ EOF
     "3_home_disk"      = { name = "Home Disk", script = "coder stat disk --path $HOME" }
     "4_cpu_usage_host" = { name = "CPU Usage (Host)", script = "coder stat cpu --host" }
     "5_mem_usage_host" = { name = "Memory Usage (Host)", script = "coder stat mem --host" }
+    "6_load_host"      = { name = "Load Average (Host)", script = "echo \"`cat /proc/loadavg | awk '{ print $1 }'` `nproc`\" | awk '{ printf \"%0.2f\", $1/$2 }'" }
   }
 }
 
@@ -117,8 +118,8 @@ data "coder_parameter" "repo_selection" {
 
 data "coder_parameter" "custom_repo" {
   name         = "custom_repo"
-  display_name = "Custom Repository URL"
-  description  = "If you selected 'Custom Repository' above, provide the full Git repository URL"
+  display_name = "Custom Repository Name"
+  description  = "If you selected 'Custom Repository' above, provide just the repository name (e.g. 'my-project')"
   default      = ""
   mutable      = true
   type         = "string"
@@ -127,56 +128,46 @@ data "coder_parameter" "custom_repo" {
 
 data "coder_parameter" "cpu" {
   name         = "cpu"
-  display_name = "CPU"
-  description  = "The number of CPU cores"
+  display_name = "CPU Cores"
+  description  = "The number of CPU cores (between 4-16)"
   default      = "4"
   icon         = "/icon/memory.svg"
   mutable      = true
   order        = 3
-  option {
-    name  = "4 Cores"
-    value = "4"
-  }
-  option {
-    name  = "6 Cores"
-    value = "6"
-  }
-  option {
-    name  = "8 Cores"
-    value = "8"
+  type         = "number"
+  validation {
+    min = 4
+    max = 16
   }
 }
 
 data "coder_parameter" "memory" {
   name         = "memory"
-  display_name = "Memory"
-  description  = "The amount of memory in GB"
-  default      = "6"
+  display_name = "Memory (GB)"
+  description  = "The amount of memory in GB (between 8-32)"
+  default      = "8"
   icon         = "/icon/memory.svg"
   mutable      = true
   order        = 4
-  option {
-    name  = "6 GB"
-    value = "6"
-  }
-  option {
-    name  = "8 GB"
-    value = "8"
+  type         = "number"
+  validation {
+    min = 8
+    max = 32
   }
 }
 
 data "coder_parameter" "home_disk_size" {
   name         = "home_disk_size"
-  display_name = "Home disk size"
-  description  = "The size of the home disk in GB"
-  default      = "10"
+  display_name = "Home disk size (GB)"
+  description  = "The size of the home disk in GB (between 16-1024)"
+  default      = "16"
   type         = "number"
   icon         = "/emojis/1f4be.png"
-  mutable      = false
+  mutable      = true
   order        = 5
   validation {
-    min = 1
-    max = 1000
+    min = 16
+    max = 1024
   }
 }
 
@@ -191,7 +182,7 @@ resource "coder_agent" "main" {
       display_name = metadata.value.name
       key          = metadata.key
       script       = metadata.value.script
-      interval     = metadata.key == "6_load_host" ? 60 : 10
+      interval     = 30
       timeout      = 1
     }
   }

@@ -30,6 +30,3 @@ RUN curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cl
 
 # Install keyring plugin for Google Artifact Registry (GAR)
 RUN uv tool install keyring --with keyrings.google-artifactregistry-auth
-
-# Set working directory
-WORKDIR /home/vscode/app
