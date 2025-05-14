@@ -10,7 +10,7 @@ on:
       - "docker/**"
       - ".github/workflows/build-and-promote-artifacts.yaml"
     types: [opened, synchronize, reopened]
-  
+
   # Build on push to PR branches
   push:
     branches:
@@ -140,8 +140,6 @@ jobs:
           file: ${{ matrix.image.dockerfile }}
           push: true
           tags: ${{ env.REGISTRY }}/${{ env.REPO }}/${{ matrix.image.name }}:${{ env.SHORT_SHA }}
-          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.REPO }}/${{ matrix.image.name }}:latest
-          cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ env.REPO }}/${{ matrix.image.name }}:latest,mode=max
 
   promote-artifacts:
     needs: detect-changed-images
