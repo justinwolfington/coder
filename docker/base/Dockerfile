@@ -31,12 +31,5 @@ RUN curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cl
 # Install keyring plugin for Google Artifact Registry (GAR)
 RUN uv tool install keyring --with keyrings.google-artifactregistry-auth
 
-# Create a non-root user
-RUN useradd -m -s /bin/bash coder && \
-    chown -R coder:coder /home/coder
-
-# Switch to non-root user
-USER coder
-
 # Set working directory
-WORKDIR /home/coder/app
+WORKDIR /home/vscode/app
