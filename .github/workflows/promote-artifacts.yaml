@@ -41,20 +41,40 @@ jobs:
           CHANGED_FILES="${{ steps.changed-files.outputs.all_changed_files }}"
           IMAGES=()
 
-          # Check each Dockerfile in the docker directory
-          for file in $CHANGED_FILES; do
-            if [[ $file == docker/*.Dockerfile ]]; then
+          # Check for Dockerfiles in subdirectories
+          while IFS= read -r file; do
+            if [[ "$file" == docker/*/Dockerfile ]]; then
+              # Extract image name from directory name
+              IMAGE_NAME=$(basename "$(dirname "$file")")
+              IMAGES+=("{\"name\":\"$IMAGE_NAME\"}")
+            fi
+          done <<< "$CHANGED_FILES"
+
+          # Handle the old format for backward compatibility
+          while IFS= read -r file; do
+            if [[ "$file" == docker/*.Dockerfile ]]; then
               # Extract image name from filename (e.g., docker/base.Dockerfile -> base)
               IMAGE_NAME=$(basename "$file" .Dockerfile)
               IMAGES+=("{\"name\":\"$IMAGE_NAME\"}")
             fi
-          done
+          done <<< "$CHANGED_FILES"
 
           # If no specific Dockerfiles changed but docker directory was modified, promote all
-          if [ ${#IMAGES[@]} -eq 0 ] && [[ "$CHANGED_FILES" == *"docker/"* ]]; then
+          if [ ${#IMAGES[@]} -eq 0 ] && echo "$CHANGED_FILES" | grep -q "^docker/"; then
+            # Look for Dockerfiles in subdirectories first
+            for file in docker/*/Dockerfile; do
+              if [[ -f "$file" ]]; then
+                IMAGE_NAME=$(basename "$(dirname "$file")")
+                IMAGES+=("{\"name\":\"$IMAGE_NAME\"}")
+              fi
+            done
+
+            # Also check for old-style Dockerfiles
             for file in docker/*.Dockerfile; do
-              IMAGE_NAME=$(basename "$file" .Dockerfile)
-              IMAGES+=("{\"name\":\"$IMAGE_NAME\"}")
+              if [[ -f "$file" ]]; then
+                IMAGE_NAME=$(basename "$file" .Dockerfile)
+                IMAGES+=("{\"name\":\"$IMAGE_NAME\"}")
+              fi
             done
           fi
 
@@ -69,6 +89,9 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix: ${{ fromJson(needs.detect-changed-images.outputs.matrix) }}
+    env:
+      REGISTRY: us-central1-docker.pkg.dev
+      REPO: ${{ vars.DOCKER_REPOSITORY }}
     steps:
       - name: Download prerelease file
         uses: dawidd6/action-download-artifact@v6
@@ -101,7 +124,5 @@ jobs:
         uses: google-github-actions/setup-gcloud@v2
 
       - name: Promote images
-        env:
-          DOCKER_REPOSITORY: ${{ vars.DOCKER_REPOSITORY }}
         run: |
-          gcloud container images add-tag ${DOCKER_REPOSITORY}/${{ matrix.image.name }}:${PRERELEASE_VERSION} ${DOCKER_REPOSITORY}/${{ matrix.image.name }}:${RELEASE_VERSION} --quiet
+          gcloud container images add-tag ${REGISTRY}/${REPO}/${{ matrix.image.name }}:${PRERELEASE_VERSION} ${REGISTRY}/${REPO}/${{ matrix.image.name }}:${RELEASE_VERSION} --quiet

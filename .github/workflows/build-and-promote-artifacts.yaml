@@ -1,60 +1,36 @@
-name: Build artifacts
+name: Build and Promote Artifacts
 
 on:
+  # Build on PR
   pull_request:
-    # Only run on specific branches
     branches:
       - main
       - taruj/custom-images-for-templates
-    # Only trigger on changes to Docker files or workflow itself
     paths:
-      - "docker/**"  # Dockerfile changes
-      - ".github/workflows/build-artifacts.yml"  # workflow changes
+      - "docker/**"
+      - ".github/workflows/build-and-promote-artifacts.yaml"
+
+  # Promote on workflow_dispatch with PR number
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'PR number to promote artifacts from'
+        required: true
+        type: string
+      promote:
+        description: 'Promote images to latest'
+        required: true
+        type: boolean
+        default: true
 
 permissions:
   contents: read
   id-token: write
 
 jobs:
-  check-versions:
-    runs-on: ubuntu-latest
-    env:
-      HEAD_SHA: ${{ github.event.pull_request.head.sha}}
-    outputs:
-      PRERELEASE_VERSION: ${{ env.PRERELEASE_VERSION }}
-      RELEASE_VERSION: ${{ env.HEAD_VERSION }}
-    steps:
-      - name: Checkout main
-        uses: actions/checkout@v4
-        with:
-          ref: main
-
-      - name: Extract base version from package.json on main
-        run: |
-          BASE_VERSION=$(jq -r '.version' package.json)
-          echo "BASE_VERSION=${BASE_VERSION}" >> "${GITHUB_ENV}"
-
-      - name: Checkout current branch
-        uses: actions/checkout@v4
-
-      - name: Extract head version from package.json on head branch
-        run: |
-          HEAD_VERSION=$(jq -r '.version' package.json)
-          echo "HEAD_VERSION=${HEAD_VERSION}" >> "${GITHUB_ENV}"
-
-      - name: Compare versions
-        run: |
-          if [[ $(printf "%s\n%s" "${BASE_VERSION}" "${HEAD_VERSION}" | sort -V | head -n 1) == "${BASE_VERSION}" && "${BASE_VERSION}" != "${HEAD_VERSION}" ]]; then
-            echo "HEAD_VERSION=${HEAD_VERSION} is greater than BASE_VERSION=${BASE_VERSION}"
-          else
-            echo "HEAD_VERSION=${HEAD_VERSION} is not greater than BASE_VERSION=${BASE_VERSION}"
-            exit 1
-          fi
-
-      - name: Determine pre-release version
-        run: echo "PRERELEASE_VERSION=${HEAD_VERSION}-${HEAD_SHA::7}" >> "${GITHUB_ENV}"
-
   detect-changed-images:
+    # Run on PR or manual trigger
+    if: github.event_name == 'pull_request' || github.event.inputs.promote == 'true'
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
@@ -63,13 +39,14 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          # When triggered manually for promotion, checkout the PR that was specified
+          ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/pull/{0}/merge', github.event.inputs.pr_number) || '' }}
 
       - name: Get changed files
         id: changed-files
         uses: tj-actions/changed-files@v46
         with:
-          files: |
-            docker/**
+          files: docker/**
 
       - name: Set matrix for changed images
         id: set-matrix
@@ -110,18 +87,21 @@ jobs:
           echo "matrix=$MATRIX"
           echo "matrix=$MATRIX" >> $GITHUB_OUTPUT
 
-  build-push-docker-images:
-    needs:
-      - check-versions
-      - detect-changed-images
-    env:
-      PRERELEASE_VERSION: ${{ needs.check-versions.outputs.PRERELEASE_VERSION }}
-      REGISTRY: us-central1-docker.pkg.dev
-      REPO: ${{ vars.DOCKER_REPOSITORY }}
+  build-and-push:
+    needs: detect-changed-images
+    # Only run on pull_request event
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     strategy:
       matrix: ${{ fromJson(needs.detect-changed-images.outputs.matrix) }}
+    env:
+      REGISTRY: us-central1-docker.pkg.dev
+      REPO: ${{ vars.DOCKER_REPOSITORY }}
+      SHORT_SHA: ${{ github.event.pull_request.head.sha }}
     steps:
+      - name: Set Short SHA
+        run: echo "SHORT_SHA=${SHORT_SHA:0:7}" >> $GITHUB_ENV
+
       - name: Checkout code
         uses: actions/checkout@v4
 
@@ -134,7 +114,7 @@ jobs:
           token_format: "access_token"
           access_token_lifetime: "900s"
 
-      - name: Login to GAR for Docker
+      - name: Login to GAR
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
@@ -144,29 +124,53 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build & push image
+      - name: Build and push ${{ matrix.image.name }}
         uses: docker/build-push-action@v6
         with:
           context: ${{ matrix.image.context }}
           file: ${{ matrix.image.dockerfile }}
           push: true
-          tags: ${{ env.REGISTRY }}/${{ env.REPO }}/${{ matrix.image.name }}:${{ env.PRERELEASE_VERSION }}
+          tags: ${{ env.REGISTRY }}/${{ env.REPO }}/${{ matrix.image.name }}:${{ env.SHORT_SHA }}
           cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.REPO }}/${{ matrix.image.name }}:latest
           cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ env.REPO }}/${{ matrix.image.name }}:latest,mode=max
 
-  save-prerelease:
-    needs:
-      - check-versions
-      - build-push-docker-images
-    env:
-      PRERELEASE_VERSION: ${{ needs.check-versions.outputs.PRERELEASE_VERSION }}
-      RELEASE_VERSION: ${{ needs.check-versions.outputs.RELEASE_VERSION }}
+  promote-artifacts:
+    needs: detect-changed-images
+    # Run on workflow_dispatch with promote=true, or if PR was merged
+    if: (github.event_name == 'workflow_dispatch' && github.event.inputs.promote == 'true') || (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
     runs-on: ubuntu-latest
+    strategy:
+      matrix: ${{ fromJson(needs.detect-changed-images.outputs.matrix) }}
+    env:
+      REGISTRY: us-central1-docker.pkg.dev
+      REPO: ${{ vars.DOCKER_REPOSITORY }}
+      # Use PR SHA from event or provided PR number based on trigger
+      SHORT_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.event.inputs.pr_number && format('refs/pull/{0}/merge', github.event.inputs.pr_number) }}
     steps:
-      - name: Save prerelease to file
-        run: echo "${PRERELEASE_VERSION}" > prerelease.txt
-      - name: Upload prerelease file as Github Artifact
-        uses: actions/upload-artifact@v4
+      - name: Set SHA Source
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            PR_NUMBER="${{ github.event.inputs.pr_number }}"
+            PR_DATA=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+                        "https://api.github.com/repos/${{ github.repository }}/pulls/${PR_NUMBER}")
+            echo "SHORT_SHA=$(echo $PR_DATA | jq -r '.head.sha' | cut -c1-7)" >> $GITHUB_ENV
+          else
+            echo "SHORT_SHA=${SHORT_SHA:0:7}" >> $GITHUB_ENV
+          fi
+
+      - name: Authenticate with GCP
+        id: auth
+        uses: google-github-actions/auth@v2
         with:
-          name: prerelease-${{ github.event.number }}
-          path: prerelease.txt
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER_ARTIFACT_REGISTRY }}
+          service_account: ${{ vars.GCP_SA_EMAIL_ARTIFACT_REGISTRY }}
+          token_format: "access_token"
+          access_token_lifetime: "600s"
+
+      - name: Setup gcloud CLI
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Promote images
+        run: |
+          echo "Promoting image ${{ matrix.image.name }} from tag ${{ env.SHORT_SHA }} to latest"
+          gcloud container images add-tag ${REGISTRY}/${REPO}/${{ matrix.image.name }}:${SHORT_SHA} ${REGISTRY}/${REPO}/${{ matrix.image.name }}:latest --quiet
