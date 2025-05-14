@@ -63,6 +63,11 @@ locals {
   init_script = <<-EOT
     set -e
 
+    # Enable debug logging
+    if [ -n "$CODER_AGENT_DEBUG" ]; then
+      set -x
+    fi
+
     # Source profile to ensure PATH is set correctly
     if [ -f "$HOME/.profile" ]; then
       . "$HOME/.profile"
