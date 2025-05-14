@@ -10,8 +10,7 @@ ENV PYTHONUNBUFFERED=1 \
     PF_TRACING_SKIP_EXPORTER_SETUP=false \
     PF_TRACING_SKIP_LOCAL_SETUP=false \
     PF_DISABLE_TRACING=false \
-    OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://localhost:23333/v1/traces \
-    PATH="/home/vscode/.local/bin:$PATH"
+    OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://localhost:23333/v1/traces
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -27,12 +26,15 @@ RUN curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cl
 
 # Switch to vscode user for package installations
 USER vscode
+WORKDIR /home/vscode
 
-# Install UV (Rust-based Python package manager)
-RUN curl -LsSf https://astral.sh/uv/install.sh | sh
-
-# Install keyring plugin for Google Artifact Registry (GAR)
-RUN uv tool install keyring --with keyrings.google-artifactregistry-auth
+# Install UV and make it available in the path
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh && \
+    echo 'export PATH="/home/vscode/.local/bin:$PATH"' >> /home/vscode/.bashrc && \
+    echo 'export PATH="/home/vscode/.local/bin:$PATH"' >> /home/vscode/.zshrc && \
+    . /home/vscode/.local/bin/env && \
+    uv tool install keyring --with keyrings.google-artifactregistry-auth
 
 # Switch back to root for any subsequent operations
 USER root
+ENV PATH="/home/vscode/.local/bin:${PATH}"

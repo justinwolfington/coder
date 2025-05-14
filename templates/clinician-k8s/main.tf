@@ -40,7 +40,7 @@ locals {
   )
 
   base_image_repo = "us-central1-docker.pkg.dev/abridge-artifact-registry/coder/base"
-  base_image_tag  = "3597b66"
+  base_image_tag  = "faf25d6"
   base_image      = "${local.base_image_repo}:${local.base_image_tag}"
 
   home_dir = "/home/vscode"
@@ -62,6 +62,14 @@ locals {
 
   init_script = <<-EOT
     set -e
+
+    # Verify uv and keyring are working, install if not
+    if ! command -v uv &> /dev/null || ! uv tool list | grep -q keyring; then
+      echo "UV or keyring not found, installing..."
+      curl -LsSf https://astral.sh/uv/install.sh | sh
+      . "$HOME/.local/bin/env"
+      uv tool install keyring --with keyrings.google-artifactregistry-auth
+    fi
 
     curl -fsSL https://code-server.dev/install.sh | sh -s -- --method=standalone --prefix=/tmp/code-server
     /tmp/code-server/bin/code-server --auth none --port 13337 >/tmp/code-server.log 2>&1 &
