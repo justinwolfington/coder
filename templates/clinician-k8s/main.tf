@@ -39,7 +39,7 @@ locals {
     || data.coder_parameter.custom_repo.value != ""
   )
 
-  base_image = "us-central1-docker.pkg.dev/abridge-artifact-registry/coder/base:641aa9e"
+  base_image = "us-central1-docker.pkg.dev/abridge-artifact-registry/coder/base:ef839cc"
 
   home_dir = "/home/vscode"
 
@@ -60,6 +60,14 @@ locals {
 
   init_script = <<-EOT
     set -e
+
+    # Install uv
+    curl -LsSf https://astral.sh/uv/install.sh | sh
+    source ~/.local/bin/env
+
+    # Install required authentication tools for keyring and the GAR backend
+    uv tool install keyring --with keyrings.google-artifactregistry-auth
+
 
     if [ ! -f ~/.env ]; then
       cat <<EOF > ~/.env
