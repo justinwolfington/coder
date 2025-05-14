@@ -49,13 +49,13 @@ coder:
       - name: CODER_OAUTH2_GITHUB_CLIENT_ID
         valueFrom:
           secretKeyRef:
-            name: coder-github-client-id
+            name: coder-github
             key: CODER_OAUTH2_GITHUB_CLIENT_ID
 
       - name: CODER_OAUTH2_GITHUB_CLIENT_SECRET
         valueFrom:
           secretKeyRef:
-            name: coder-github-client-secret
+            name: coder-github
             key: CODER_OAUTH2_GITHUB_CLIENT_SECRET
 
     # coder.service -- The Service object to expose for Coder.
@@ -97,7 +97,7 @@ coder:
         resources:
           requests:
             # Memory scales with connection count
-            memory: 2Gi
+            memory: 1Gi
             # CPU scales with database I/O
-            cpu: 0.5
+            cpu: 100m
 # Staging-specific overrides
