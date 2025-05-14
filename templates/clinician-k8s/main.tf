@@ -39,7 +39,9 @@ locals {
     || data.coder_parameter.custom_repo.value != ""
   )
 
-  base_image = "us-central1-docker.pkg.dev/abridge-artifact-registry/coder/base:3597b66"
+  base_image_repo = "us-central1-docker.pkg.dev/abridge-artifact-registry/coder/base"
+  base_image_tag  = "3597b66"
+  base_image      = "${local.base_image_repo}:${local.base_image_tag}"
 
   home_dir = "/home/vscode"
 
