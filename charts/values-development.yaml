@@ -56,25 +56,25 @@ coder:
         valueFrom:
           secretKeyRef:
             name: coder-github-app
-            key: CODER_EXTERNAL_AUTH_0_CLIENT_ID
+            key: CODER_OAUTH2_GITHUB_CLIENT_ID
 
       - name: CODER_EXTERNAL_AUTH_0_CLIENT_SECRET
         valueFrom:
           secretKeyRef:
             name: coder-github-app
-            key: CODER_EXTERNAL_AUTH_0_CLIENT_SECRET
+            key: CODER_OAUTH2_GITHUB_CLIENT_SECRET
 
       - name: CODER_OAUTH2_GITHUB_CLIENT_ID
         valueFrom:
           secretKeyRef:
             name: coder-github-app
-            key: CODER_EXTERNAL_AUTH_0_CLIENT_ID
+            key: CODER_OAUTH2_GITHUB_CLIENT_ID
 
       - name: CODER_OAUTH2_GITHUB_CLIENT_SECRET
         valueFrom:
           secretKeyRef:
             name: coder-github-app
-            key: CODER_EXTERNAL_AUTH_0_CLIENT_SECRET
+            key: CODER_OAUTH2_GITHUB_CLIENT_SECRET
 
     # coder.service -- The Service object to expose for Coder.
     service:
