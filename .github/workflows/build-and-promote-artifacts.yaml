@@ -1,11 +1,20 @@
 name: Build and Promote Artifacts
 
 on:
-  # Build on PR
+  # Build on PR and commits to PR
   pull_request:
     branches:
       - main
       - taruj/custom-images-for-templates
+    paths:
+      - "docker/**"
+      - ".github/workflows/build-and-promote-artifacts.yaml"
+    types: [opened, synchronize, reopened]
+  
+  # Build on push to PR branches
+  push:
+    branches:
+      - '**'
     paths:
       - "docker/**"
       - ".github/workflows/build-and-promote-artifacts.yaml"
@@ -29,8 +38,8 @@ permissions:
 
 jobs:
   detect-changed-images:
-    # Run on PR or manual trigger
-    if: github.event_name == 'pull_request' || github.event.inputs.promote == 'true'
+    # Run on PR, push, or manual trigger
+    if: github.event_name == 'pull_request' || github.event_name == 'push' || github.event.inputs.promote == 'true'
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
@@ -89,15 +98,15 @@ jobs:
 
   build-and-push:
     needs: detect-changed-images
-    # Only run on pull_request event
-    if: github.event_name == 'pull_request'
+    # Run on pull_request or push event
+    if: github.event_name == 'pull_request' || github.event_name == 'push'
     runs-on: ubuntu-latest
     strategy:
       matrix: ${{ fromJson(needs.detect-changed-images.outputs.matrix) }}
     env:
       REGISTRY: us-central1-docker.pkg.dev
       REPO: ${{ vars.DOCKER_REPOSITORY }}
-      SHORT_SHA: ${{ github.event.pull_request.head.sha }}
+      SHORT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
     steps:
       - name: Set Short SHA
         run: echo "SHORT_SHA=${SHORT_SHA:0:7}" >> $GITHUB_ENV
