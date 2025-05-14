@@ -105,7 +105,8 @@ jobs:
       matrix: ${{ fromJson(needs.detect-changed-images.outputs.matrix) }}
     env:
       REGISTRY: us-central1-docker.pkg.dev
-      REPO: ${{ vars.DOCKER_REPOSITORY }}
+      PROJECT: abridge-artifact-registry
+      REPO: coder
       SHORT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
     steps:
       - name: Set Short SHA
@@ -139,7 +140,7 @@ jobs:
           context: ${{ matrix.image.context }}
           file: ${{ matrix.image.dockerfile }}
           push: true
-          tags: ${{ env.REGISTRY }}/${{ env.REPO }}/${{ matrix.image.name }}:${{ env.SHORT_SHA }}
+          tags: ${{ env.REGISTRY }}/${{ env.PROJECT }}/${{ env.REPO }}/${{ matrix.image.name }}:${{ env.SHORT_SHA }}
 
   promote-artifacts:
     needs: detect-changed-images
@@ -150,7 +151,8 @@ jobs:
       matrix: ${{ fromJson(needs.detect-changed-images.outputs.matrix) }}
     env:
       REGISTRY: us-central1-docker.pkg.dev
-      REPO: ${{ vars.DOCKER_REPOSITORY }}
+      PROJECT: abridge-artifact-registry
+      REPO: coder
       # Use PR SHA from event or provided PR number based on trigger
       SHORT_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.event.inputs.pr_number && format('refs/pull/{0}/merge', github.event.inputs.pr_number) }}
     steps:
@@ -180,4 +182,4 @@ jobs:
       - name: Promote images
         run: |
           echo "Promoting image ${{ matrix.image.name }} from tag ${{ env.SHORT_SHA }} to latest"
-          gcloud container images add-tag ${REGISTRY}/${REPO}/${{ matrix.image.name }}:${SHORT_SHA} ${REGISTRY}/${REPO}/${{ matrix.image.name }}:latest --quiet
+          gcloud container images add-tag ${REGISTRY}/${PROJECT}/${REPO}/${{ matrix.image.name }}:${SHORT_SHA} ${REGISTRY}/${PROJECT}/${REPO}/${{ matrix.image.name }}:latest --quiet
