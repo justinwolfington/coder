@@ -45,6 +45,10 @@ locals {
   base_image_tag  = "a550567"
   base_image      = "${local.base_image_repo}:${local.base_image_tag}"
   home_dir        = "/home/vscode"
+  
+  # Determine the repo directory path for the workspace
+  repo_name = data.coder_parameter.repo_selection.value == "custom" ? data.coder_parameter.custom_repo.value : data.coder_parameter.repo_selection.value
+  repo_dir  = "${local.home_dir}/${local.repo_name}"
 
   # Kubernetes metadata
   labels = {
@@ -199,7 +203,7 @@ resource "coder_app" "code-server" {
   slug         = "code-server"
   display_name = "code-server"
   icon         = "/icon/code.svg"
-  url          = "http://localhost:13337?folder=${local.home_dir}"
+  url          = "http://localhost:13337?folder=${local.should_clone ? local.repo_dir : local.home_dir}"
   subdomain    = false
   share        = "owner"
 
