@@ -13,8 +13,6 @@ ENV PYTHONUNBUFFERED=1 \
     OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://localhost:23333/v1/traces \
     PATH="/google-cloud-sdk/bin:${PATH}"
 
-FROM base AS builder
-
 ENV UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy \
     UV_PYTHON_DOWNLOADS=0
