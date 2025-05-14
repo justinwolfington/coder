@@ -19,14 +19,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Switch to vscode user for package installations
-USER vscode
-
-# Install Google Cloud SDK
+# Install Google Cloud SDK as root first
 RUN curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-linux-x86_64.tar.gz && \
     tar -xf google-cloud-cli-linux-x86_64.tar.gz && \
     ./google-cloud-sdk/install.sh --usage-reporting=false --rc-path=/etc/profile.d/gcloud.sh --path-update=true --command-completion=true --quiet && \
     rm -rf google-cloud-cli-linux-x86_64.tar.gz
+
+# Switch to vscode user for package installations
+USER vscode
 
 # Install UV (Rust-based Python package manager)
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh
