@@ -11,7 +11,7 @@ ENV PYTHONUNBUFFERED=1 \
     PF_TRACING_SKIP_LOCAL_SETUP=false \
     PF_DISABLE_TRACING=false \
     OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://localhost:23333/v1/traces \
-    PATH="/root/.local/bin:$PATH"
+    PATH="/home/vscode/.local/bin:$PATH"
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -19,8 +19,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Install UV (Rust-based Python package manager)
-RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+# Switch to vscode user for package installations
+USER vscode
 
 # Install Google Cloud SDK
 RUN curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-linux-x86_64.tar.gz && \
@@ -28,5 +28,11 @@ RUN curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cl
     ./google-cloud-sdk/install.sh --usage-reporting=false --rc-path=/etc/profile.d/gcloud.sh --path-update=true --command-completion=true --quiet && \
     rm -rf google-cloud-cli-linux-x86_64.tar.gz
 
+# Install UV (Rust-based Python package manager)
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+
 # Install keyring plugin for Google Artifact Registry (GAR)
 RUN uv tool install keyring --with keyrings.google-artifactregistry-auth
+
+# Switch back to root for any subsequent operations
+USER root

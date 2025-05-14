@@ -39,7 +39,7 @@ locals {
     || data.coder_parameter.custom_repo.value != ""
   )
 
-  base_image = "us-central1-docker.pkg.dev/abridge-artifact-registry/coder/base:ef839cc"
+  base_image = "us-central1-docker.pkg.dev/abridge-artifact-registry/coder/base:3597b66"
 
   home_dir = "/home/vscode"
 
@@ -60,30 +60,6 @@ locals {
 
   init_script = <<-EOT
     set -e
-
-    # Install uv
-    curl -LsSf https://astral.sh/uv/install.sh | sh
-    source ~/.local/bin/env
-
-    # Install required authentication tools for keyring and the GAR backend
-    uv tool install keyring --with keyrings.google-artifactregistry-auth
-
-
-    if [ ! -f ~/.env ]; then
-      cat <<EOF > ~/.env
-EYES_API_URL=http://eyes-v1-eyes-new.eyes-v1.svc.cluster.local/api
-ELMS_API_URL=http://elms-api.elms.svc.cluster.local
-ELMS_BASE_URL=http://elms-api.elms.svc.cluster.local
-PF_TRACING_SKIP_EXPORTER_SETUP=false
-PF_TRACING_SKIP_LOCAL_SETUP=false
-PF_DISABLE_TRACING=false
-OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://localhost:23333/v1/traces
-PATH="\$HOME/.local/bin:\$PATH"
-EOF
-      echo "source ~/.env" >> ~/.bashrc
-      cat ~/.bashrc >> ~/.profile
-      cat ~/.bashrc >> ~/.zshrc
-    fi
 
     curl -fsSL https://code-server.dev/install.sh | sh -s -- --method=standalone --prefix=/tmp/code-server
     /tmp/code-server/bin/code-server --auth none --port 13337 >/tmp/code-server.log 2>&1 &
