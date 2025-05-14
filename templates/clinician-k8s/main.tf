@@ -40,7 +40,7 @@ locals {
   )
 
   base_image_repo = "us-central1-docker.pkg.dev/abridge-artifact-registry/coder/base"
-  base_image_tag  = "faf25d6"
+  base_image_tag  = "a550567"
   base_image      = "${local.base_image_repo}:${local.base_image_tag}"
 
   home_dir = "/home/vscode"
@@ -63,40 +63,23 @@ locals {
   init_script = <<-EOT
     set -e
 
-    # Enable debug logging
-    if [ -n "$CODER_AGENT_DEBUG" ]; then
-      set -x
-    fi
-
     # Source profile to ensure PATH is set correctly
     if [ -f "$HOME/.profile" ]; then
       . "$HOME/.profile"
     fi
 
-    # Verify uv and keyring are working, install if not
-    if ! command -v uv &> /dev/null; then
-      echo "UV not found, installing..."
-      curl -LsSf https://astral.sh/uv/install.sh | sh
-      export PATH="/home/vscode/.local/bin:$PATH"
-      . "$HOME/.local/bin/env" || echo "Warning: Could not source UV environment"
+    # Install and start code-server
+    export CODE_SERVER_DIR="/tmp/code-server"
+
+    if [ ! -f "$CODE_SERVER_DIR/bin/code-server" ]; then
+      echo "Installing code-server..."
+      mkdir -p "$CODE_SERVER_DIR"
+      curl -fsSL https://code-server.dev/install.sh | sh -s -- --method=standalone --prefix="$CODE_SERVER_DIR" || exit 1
     fi
 
-    # Ensure keyring is installed
-    if ! uv tool list 2>/dev/null | grep -q keyring; then
-      echo "Installing keyring..."
-      uv tool install keyring --with keyrings.google-artifactregistry-auth || echo "Warning: Could not install keyring"
-    fi
+    echo "Starting code-server..."
+    $CODE_SERVER_DIR/bin/code-server --auth none --port 13337 >/tmp/code-server.log 2>&1 &
 
-    # Verify installation
-    if command -v uv &> /dev/null; then
-      echo "UV is installed and available at: $(which uv)"
-      echo "UV version: $(uv --version)"
-    else
-      echo "Warning: UV installation may have failed"
-    fi
-
-    curl -fsSL https://code-server.dev/install.sh | sh -s -- --method=standalone --prefix=/tmp/code-server
-    /tmp/code-server/bin/code-server --auth none --port 13337 >/tmp/code-server.log 2>&1 &
   EOT
 
   metrics = {
@@ -192,7 +175,7 @@ resource "coder_agent" "main" {
       display_name = metadata.value.name
       key          = metadata.key
       script       = metadata.value.script
-      interval     = 30
+      interval     = 15
       timeout      = 1
     }
   }
