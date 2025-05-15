@@ -1,5 +1,4 @@
 # Base image
-# FROM python:3.11-slim
 FROM mcr.microsoft.com/devcontainers/python:3.11
 
 # Set up environment variables
@@ -15,8 +14,7 @@ ENV PYTHONUNBUFFERED=1 \
     PATH="/google-cloud-sdk/bin:${PATH}"
 
 ENV UV_COMPILE_BYTECODE=1 \
-    UV_LINK_MODE=copy \
-    UV_PYTHON_DOWNLOADS=0
+    UV_LINK_MODE=copy
 
 # Copy UV binary from official image and set up
 COPY --from=ghcr.io/astral-sh/uv:0.7.3 /uv /bin/uv
