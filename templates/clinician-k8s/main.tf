@@ -42,7 +42,7 @@ locals {
 
   # Image and environment configuration
   base_image_repo = "us-central1-docker.pkg.dev/abridge-artifact-registry/coder/base"
-  base_image_tag  = "a550567"
+  base_image_tag  = "1c2f3b3"
   base_image      = "${local.base_image_repo}:${local.base_image_tag}"
   home_dir        = "/home/vscode"
 
@@ -70,8 +70,12 @@ locals {
   init_script = <<-EOT
     set -e
 
-    cat .bashrc >> .profile
-    cat .bashrc >> .zshrc
+    export USER_HOME="/home/vscode"
+    export BASHRC_FILE="$USER_HOME/.bashrc"
+    export ROOT_BASHRC_FILE="/root/.bashrc"
+
+    sudo cp "$ROOT_BASHRC_FILE" "$BASHRC_FILE"
+    sudo chown vscode:vscode "$BASHRC_FILE"
 
     # Install and start code-server
     export CODE_SERVER_DIR="/tmp/code-server"
