@@ -24,10 +24,9 @@ COPY --from=ghcr.io/astral-sh/uv:0.7.3 /uv /bin/uv
 RUN apt-get update && apt-get install -y --no-install-recommends build-essential curl && rm -rf /var/lib/apt/lists/*
 
 # Install Google Cloud SDK
-RUN curl -fsSLO "https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-linux-x86_64.tar.gz" && \
-    tar -xzf google-cloud-cli-linux-x86_64.tar.gz && \
-    ./google-cloud-sdk/install.sh --quiet --command-completion=true --path-update=true && \
-    rm -rf google-cloud-cli-linux-x86_64.tar.gz google-cloud-sdk/.install
+RUN curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-linux-x86_64.tar.gz && \
+    tar -xf google-cloud-cli-linux-x86_64.tar.gz && \
+    ./google-cloud-sdk/install.sh --usage-reporting false --rc-path ~/.bashrc --path-update true --command-completion true --quiet
 
 # Install keyring and create marker files
 RUN mkdir -p /usr/local/etc/uv && \

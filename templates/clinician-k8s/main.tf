@@ -45,7 +45,7 @@ locals {
   base_image_tag  = "a550567"
   base_image      = "${local.base_image_repo}:${local.base_image_tag}"
   home_dir        = "/home/vscode"
-  
+
   # Determine the repo directory path for the workspace
   repo_name = data.coder_parameter.repo_selection.value == "custom" ? data.coder_parameter.custom_repo.value : data.coder_parameter.repo_selection.value
   repo_dir  = "${local.home_dir}/${local.repo_name}"
@@ -70,10 +70,8 @@ locals {
   init_script = <<-EOT
     set -e
 
-    # Source profile to ensure PATH is set correctly
-    if [ -f "$HOME/.profile" ]; then
-      . "$HOME/.profile"
-    fi
+    cat .bashrc >> .profile
+    cat .bashrc >> .zshrc
 
     # Install and start code-server
     export CODE_SERVER_DIR="/tmp/code-server"
