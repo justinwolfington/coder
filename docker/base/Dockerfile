@@ -4,7 +4,7 @@ FROM mcr.microsoft.com/devcontainers/python:3.11
 # Set up environment variables
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    EYES_API_URL=http://eyes-v1-eyes-new.eyes-v1.svc.cluster.local/api \
+    EYES_API_URL=http://eyes-v1-eyes-new-api.eyes-v1.svc.cluster.local/api \
     ELMS_API_URL=http://elms-api.elms.svc.cluster.local \
     ELMS_BASE_URL=http://elms-api.elms.svc.cluster.local \
     PF_TRACING_SKIP_EXPORTER_SETUP=false \
