@@ -46,16 +46,34 @@ coder:
       - name: CODER_TELEMETRY_ENABLE
         value: "false"
 
+      - name: CODER_EXTERNAL_AUTH_0_ID
+        value: primary-github
+
+      - name: CODER_EXTERNAL_AUTH_0_TYPE
+        value: github
+
+      - name: CODER_EXTERNAL_AUTH_0_CLIENT_ID
+        valueFrom:
+          secretKeyRef:
+            name: coder-github-app
+            key: CODER_OAUTH2_GITHUB_CLIENT_ID
+
+      - name: CODER_EXTERNAL_AUTH_0_CLIENT_SECRET
+        valueFrom:
+          secretKeyRef:
+            name: coder-github-app
+            key: CODER_OAUTH2_GITHUB_CLIENT_SECRET
+
       - name: CODER_OAUTH2_GITHUB_CLIENT_ID
         valueFrom:
           secretKeyRef:
-            name: coder-github-client-id
+            name: coder-github-app
             key: CODER_OAUTH2_GITHUB_CLIENT_ID
 
       - name: CODER_OAUTH2_GITHUB_CLIENT_SECRET
         valueFrom:
           secretKeyRef:
-            name: coder-github-client-secret
+            name: coder-github-app
             key: CODER_OAUTH2_GITHUB_CLIENT_SECRET
 
     # coder.service -- The Service object to expose for Coder.
@@ -97,7 +115,7 @@ coder:
         resources:
           requests:
             # Memory scales with connection count
-            memory: 2Gi
+            memory: 1Gi
             # CPU scales with database I/O
-            cpu: 0.5
+            cpu: 100m
 # Staging-specific overrides
