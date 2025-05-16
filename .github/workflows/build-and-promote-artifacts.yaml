@@ -14,7 +14,7 @@ on:
   # Build on push to PR branches
   push:
     branches:
-      - '**'
+      - main
     paths:
       - "docker/**"
       - ".github/workflows/build-and-promote-artifacts.yaml"
@@ -144,8 +144,8 @@ jobs:
 
   promote-artifacts:
     needs: detect-changed-images
-    # Run on workflow_dispatch with promote=true, or if PR was merged
-    if: (github.event_name == 'workflow_dispatch' && github.event.inputs.promote == 'true') || (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
+    # Run ONLY when a PR is merged to main
+    if: github.event_name == 'pull_request' && github.event.pull_request.merged == true && github.base_ref == 'main'
     runs-on: ubuntu-latest
     strategy:
       matrix: ${{ fromJson(needs.detect-changed-images.outputs.matrix) }}
@@ -153,19 +153,19 @@ jobs:
       REGISTRY: us-central1-docker.pkg.dev
       PROJECT: abridge-artifact-registry
       REPO: coder
-      # Use PR SHA from event or provided PR number based on trigger
-      SHORT_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.event.inputs.pr_number && format('refs/pull/{0}/merge', github.event.inputs.pr_number) }}
+      # SHORT_SHA is set by the "Set SHA Source for merged PR" step
     steps:
-      - name: Set SHA Source
+      - name: Set SHA Source for merged PR
         run: |
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            PR_NUMBER="${{ github.event.inputs.pr_number }}"
-            PR_DATA=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-                        "https://api.github.com/repos/${{ github.repository }}/pulls/${PR_NUMBER}")
-            echo "SHORT_SHA=$(echo $PR_DATA | jq -r '.head.sha' | cut -c1-7)" >> $GITHUB_ENV
-          else
-            echo "SHORT_SHA=${SHORT_SHA:0:7}" >> $GITHUB_ENV
+          echo "Event: ${{ github.event_name }}, Merged: ${{ github.event.pull_request.merged }}, Base Ref: ${{ github.base_ref }}"
+          HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+          if [[ -z "$HEAD_SHA" ]]; then
+            echo "Error: github.event.pull_request.head.sha was empty for this merged PR event."
+            exit 1
           fi
+          echo "Original PR Head SHA: $HEAD_SHA"
+          echo "SHORT_SHA=${HEAD_SHA:0:7}" >> $GITHUB_ENV
+          echo "Successfully set SHORT_SHA to ${HEAD_SHA:0:7}"
 
       - name: Authenticate with GCP
         id: auth
@@ -181,5 +181,9 @@ jobs:
 
       - name: Promote images
         run: |
+          if [[ -z "${{ env.SHORT_SHA }}" ]]; then
+            echo "Error: SHORT_SHA is empty. Cannot promote."
+            exit 1
+          fi
           echo "Promoting image ${{ matrix.image.name }} from tag ${{ env.SHORT_SHA }} to latest"
           gcloud container images add-tag ${REGISTRY}/${PROJECT}/${REPO}/${{ matrix.image.name }}:${SHORT_SHA} ${REGISTRY}/${PROJECT}/${REPO}/${{ matrix.image.name }}:latest --quiet
