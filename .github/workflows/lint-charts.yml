@@ -1,12 +1,9 @@
 name: Lint Charts
 
 on:
-  push:
+  pull_request:
     branches:
       - main
-  pull_request:
-    paths:
-      - charts/**/*
 
 jobs:
   pre-commit:
