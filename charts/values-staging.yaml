@@ -24,7 +24,7 @@ coder:
       # For production deployments, we recommend configuring your own GitHub
       # OAuth2 provider and disabling the default one.
       - name: CODER_OAUTH2_GITHUB_DEFAULT_PROVIDER_ENABLE
-        value: "true"
+        value: "false"
 
       # Restrict to specific GitHub org(s)
       - name: CODER_OAUTH2_GITHUB_ALLOWED_ORGS

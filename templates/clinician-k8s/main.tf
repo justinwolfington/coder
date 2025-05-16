@@ -42,7 +42,7 @@ locals {
 
   # Image and environment configuration
   base_image_repo = "us-central1-docker.pkg.dev/abridge-artifact-registry/coder/base"
-  base_image_tag  = "1c2f3b3"
+  base_image_tag  = "4bd7714"
   base_image      = "${local.base_image_repo}:${local.base_image_tag}"
   home_dir        = "/home/vscode"
 
@@ -84,6 +84,10 @@ locals {
       mkdir -p "$CODE_SERVER_DIR"
       curl -fsSL https://code-server.dev/install.sh | sh -s -- --method=standalone --prefix="$CODE_SERVER_DIR" || exit 1
     fi
+
+    # Install VS Code extensions
+    $CODE_SERVER_DIR/bin/code-server --install-extension ms-python.python
+    $CODE_SERVER_DIR/bin/code-server --install-extension prompt-flow.prompt-flow
 
     $CODE_SERVER_DIR/bin/code-server --auth none --port 13337 >/tmp/code-server.log 2>&1 &
   EOT
