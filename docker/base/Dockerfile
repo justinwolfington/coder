@@ -4,13 +4,6 @@ FROM mcr.microsoft.com/devcontainers/python:3.11
 # Set up environment variables
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    EYES_API_URL=http://eyes-v1-eyes-new-api.eyes-v1.svc.cluster.local/api \
-    ELMS_API_URL=http://elms-api.elms.svc.cluster.local \
-    ELMS_BASE_URL=http://elms-api.elms.svc.cluster.local \
-    PF_TRACING_SKIP_EXPORTER_SETUP=false \
-    PF_TRACING_SKIP_LOCAL_SETUP=false \
-    PF_DISABLE_TRACING=false \
-    OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://localhost:23333/v1/traces \
     PATH="/google-cloud-sdk/bin:${PATH}"
 
 ENV UV_COMPILE_BYTECODE=1 \
