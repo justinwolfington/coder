@@ -87,7 +87,7 @@ locals {
 
     # Install VS Code extensions
     $CODE_SERVER_DIR/bin/code-server --install-extension ms-python.python
-    $CODE_SERVER_DIR/bin/code-server --install-extension prompt-flow.prompt-flow
+    $CODE_SERVER_DIR/bin/code-server --install-extension ms-toolsai.jupyter
 
     $CODE_SERVER_DIR/bin/code-server --auth none --port 13337 >/tmp/code-server.log 2>&1 &
   EOT
