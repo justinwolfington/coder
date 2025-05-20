@@ -7,38 +7,49 @@ verified: true
 tags: [kubernetes, container, clinical, development]
 ---
 
+## Table of Contents
+
+- [Clinician Development on Kubernetes](#clinician-development-on-kubernetes)
+  - [Features](#features)
+  - [Architecture](#architecture)
+  - [Container Details](#container-details)
+  - [Workspace Creation Form](#workspace-creation-form)
+  - [Repository Selection](#repository-selection)
+  - [Resource Customization](#resource-customization)
+  - [Usage](#usage)
+  - [Available Tools](#available-tools)
+  - [Customization \& Troubleshooting](#customization--troubleshooting)
+
 # Clinician Development on Kubernetes
 
 A Kubernetes workspace template optimized for clinical development with pre-configured access to Abridge services.
 
 ## Features
 
-- **Git Integration**: Clone repositories with a simple dropdown selection
-- **Resource Configuration**: Customize CPU (4-8 cores), memory (6-8GB), and storage
-- **Pre-configured Environment**: Access to EYES, ELMS, and other internal services
-- **Code-Server**: VS Code in the browser
-- **Performance Monitoring**: CPU, memory, and disk usage metrics
-- **Development Tools**: Python with UV package manager, Google Cloud SDK
+- **Git Integration**: Clone repositories with a simple dropdown selection.
+- **Resource Configuration**: Customize CPU, memory, and storage.
+- **Pre-configured Environment**: Access to essential Abridge services.
+- **Code-Server**: VS Code in the browser.
+- **Performance Monitoring**: CPU, memory, and disk usage metrics.
+- **Development Tools**: Python with UV package manager, Google Cloud SDK.
 
 ## Architecture
 
-- Kubernetes deployment with a single pod
-- Persistent volume for `/home/vscode` (data persists between restarts)
-- Code-Server instance (VS Code in browser)
-- Automatic Git repository cloning to `/home/vscode/{repo-name}`
+- Kubernetes deployment with a single pod.
+- Persistent volume for `/home/vscode`.
+- Code-Server instance (VS Code in browser).
+- Automatic Git repository cloning.
 
 ## Container Details
 
-- Base image: `us-central1-docker.pkg.dev/abridge-artifact-registry/coder/base:641aa9e`
-- Authentication: Uses automatic Kubernetes credential detection
-- Security: Runs as non-root user
-- Package Management: UV automatically installed in user's home directory
-- User: Container uses the VS Code devcontainer user with home directory at `/home/vscode`
+- Base image: `mcr.microsoft.com/devcontainers/python:3.11` as builder
+- Package Management: UV (`ghcr.io/astral-sh/uv:0.7.3`) automatically installed.
 
 ## Workspace Creation Form
 
 When creating a workspace, parameters appear in this order:
-1. Repository Selection (dropdown)
+
+1. Repository Selection
 2. Custom Repository URL (if "Custom Repository" selected)
 3. CPU
 4. Memory
@@ -46,48 +57,33 @@ When creating a workspace, parameters appear in this order:
 
 ## Repository Selection
 
-1. **Completion Service**: Clones the completion-service repository
-2. **Custom Repository**: Clone any Git repository
+1. **Completion Service**: Clones the `abridgeai/completion-service` repository.
+2. **Custom Repository**: Clone any Git repository from the `abridgeai` GitHub organization.
 
 Repositories are cloned to `/home/vscode/{repo-name}`.
 
 ## Resource Customization
 
-- **CPU**: Choose between 4, 6, or 8 cores
-- **Memory**: Select 6GB or 8GB of RAM
-- **Storage**: Configure persistent storage size (default: 10GB)
+- **CPU**: 4-16 cores (default: 4)
+- **Memory**: 8-32GB RAM (default: 8GB)
+- **Storage**: 16-1024GB (default: 16GB)
 
 ## Usage
 
-1. Create a workspace with this template
-2. Select repository and configure resources
-3. Start the workspace
-4. Connect via web IDE or SSH
-
-## Environment Variables
-
-The workspace includes environment variables for internal services:
-```
-EYES_API_URL=http://eyes-v1-eyes-new-api.eyes-v1.svc.cluster.local/api
-ELMS_API_URL=http://elms-api.elms.svc.cluster.local
-ELMS_BASE_URL=http://elms-api.elms.svc.cluster.local
-PF_TRACING_SKIP_EXPORTER_SETUP=false
-PF_DISABLE_TRACING=false
-PATH="$HOME/.local/bin:$PATH"
-```
-
-These variables are automatically loaded in bash, zsh, and profile scripts.
+1. Create a workspace using this template.
+2. Select a repository and configure resources.
+3. Start the workspace.
+4. Connect via the web IDE or SSH.
 
 ## Available Tools
 
-- **UV**: Fast Python package manager (automatically installed at `~/.local/bin/uv`)
-- **Google Cloud SDK**: Access with `gcloud` command
-- **Python 3.11**: Default Python environment
+- **UV**: Fast Python package manager. Includes `keyring` with `keyrings.google-artifactregistry-auth`.
+- **Google Cloud SDK**: Access with `gcloud`.
+- **Python 3.11**: Default Python environment.
 
 ## Customization & Troubleshooting
 
-- Add repositories to the selection dropdown in the Terraform configuration
-- Customize the base image with additional tools
-- Check workspace logs for errors if you encounter issues
-- The initialization script will automatically install UV if not found
-- For more help, contact the Abridge DevOps team
+- Add repositories to the dropdown via Terraform configuration.
+- Customize the base image for additional tools.
+- Check workspace logs for errors.
+- Contact the Abridge DevOps team for further assistance.
