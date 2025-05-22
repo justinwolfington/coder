@@ -46,4 +46,4 @@ RUN groupadd -g 1000 vscode && \
     chmod 0440 /etc/sudoers.d/vscode
 
 # Set default working directory
-WORKDIR /workspace
+WORKDIR /home/vscode
