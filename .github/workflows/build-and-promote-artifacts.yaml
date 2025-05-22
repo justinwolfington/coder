@@ -60,38 +60,20 @@ jobs:
       - name: Set matrix for changed images
         id: set-matrix
         run: |
-          echo "Changed files: ${{ steps.changed-files.outputs.all_changed_files }}"
+          FILES="${{ steps.changed-files.outputs.all_changed_files }}"
+          echo "Changed files:"
+          echo "$FILES"
 
           declare -a IMAGES=()
 
-          while IFS= read -r file; do
-            if [[ "$file" == docker/*/Dockerfile ]]; then
-              IMAGE_NAME=$(basename "$(dirname "$file")")
-              CONTEXT_PATH=$(dirname "$file")
-              IMAGES+=("{\"name\":\"$IMAGE_NAME\",\"dockerfile\":\"$file\",\"context\":\"$CONTEXT_PATH\"}")
-            fi
-          done <<< "${{ steps.changed-files.outputs.all_changed_files }}"
-
-          # If no specific Dockerfiles changed but docker directory was modified, build all
-          if [ ${#IMAGES[@]} -eq 0 ] && grep -q '^docker/' <<< "${{ steps.changed-files.outputs.all_changed_files }}"; then
-            for file in docker/*/Dockerfile; do
-              if [[ -f "$file" ]]; then
-                IMAGE_NAME=$(basename "$(dirname "$file")")
-                CONTEXT_PATH=$(dirname "$file")
-                IMAGES+=("{\"name\":\"$IMAGE_NAME\",\"dockerfile\":\"$file\",\"context\":\"$CONTEXT_PATH\"}")
-              fi
+          if grep -q '^docker/' <<< "$FILES"; then
+            for file in docker/*.Dockerfile; do
+              [ -f "$file" ] || continue
+              IMAGE_NAME=$(basename "$file" .Dockerfile)
+              IMAGES+=("{\"name\":\"$IMAGE_NAME\",\"dockerfile\":\"$file\",\"context\":\".\"}")
             done
           fi
 
-          # Handle the old format for backward compatibility
-          while IFS= read -r file; do
-            if [[ "$file" == docker/*.Dockerfile ]]; then
-              IMAGE_NAME=$(basename "$file" .Dockerfile)
-              IMAGES+=("{\"name\":\"$IMAGE_NAME\",\"dockerfile\":\"$file\",\"context\":\".\"}")
-            fi
-          done <<< "${{ steps.changed-files.outputs.all_changed_files }}"
-
-          # Create matrix JSON
           MATRIX="{\"image\":[$(IFS=,; echo "${IMAGES[*]}")]}"
           echo "matrix=$MATRIX"
           echo "matrix=$MATRIX" >> $GITHUB_OUTPUT
