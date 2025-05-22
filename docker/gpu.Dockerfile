@@ -1,4 +1,4 @@
-FROM nvcr.io/nvidia/cuda:12.9.0-devel-ubuntu22.04
+FROM nvcr.io/nvidia/cuda:12.9.0-cudnn-devel-ubuntu22.04
 
 # Set up environment variables
 ENV PYTHONUNBUFFERED=1 \
