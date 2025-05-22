@@ -39,5 +39,11 @@ RUN mkdir -p /usr/local/etc/uv && \
     uv tool install keyring --with keyrings.google-artifactregistry-auth && \
     uv tool list > /usr/local/etc/uv/tools_installed
 
+# Create vscode user with sudo privileges
+RUN groupadd -g 1000 vscode && \
+    useradd -u 1000 -g 1000 -s /bin/bash -m vscode && \
+    echo "vscode ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/vscode && \
+    chmod 0440 /etc/sudoers.d/vscode
+
 # Set default working directory
 WORKDIR /workspace
