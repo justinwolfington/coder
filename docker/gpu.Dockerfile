@@ -1,4 +1,4 @@
-FROM nvidia/cuda:12.9.0-devel-ubuntu22.04
+FROM nvcr.io/nvidia/cuda:12.9.0-devel-ubuntu22.04
 
 # Set non-interactive frontend and basic environment variables
 ENV DEBIAN_FRONTEND=noninteractive \
