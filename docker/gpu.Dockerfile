@@ -11,8 +11,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
 USER root
 
 # Clean up unused CUDA sources and install system packages
-RUN set -euxo pipefail && \
-    rm -rf /etc/apt/sources.list.d/cuda* && \
+RUN rm -rf /etc/apt/sources.list.d/cuda* && \
     apt-get update && \
     apt-get install -y --no-install-recommends \
     git gcc build-essential \
@@ -27,15 +26,13 @@ RUN set -euxo pipefail && \
 COPY --from=ghcr.io/astral-sh/uv:0.7.3 /uv /bin/uv
 
 # Install Google Cloud SDK
-RUN set -euxo pipefail && \
-    curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-linux-x86_64.tar.gz && \
+RUN curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-linux-x86_64.tar.gz && \
     tar -xf google-cloud-cli-linux-x86_64.tar.gz && \
     ./google-cloud-sdk/install.sh --usage-reporting false --rc-path ~/.bashrc --path-update true --command-completion true --quiet && \
     rm google-cloud-cli-linux-x86_64.tar.gz
 
 # Install uv tools and set up tool marker
-RUN set -euxo pipefail && \
-    mkdir -p /usr/local/etc/uv && \
+RUN mkdir -p /usr/local/etc/uv && \
     uv tool install keyring --with keyrings.google-artifactregistry-auth && \
     uv tool list > /usr/local/etc/uv/tools_installed
 
