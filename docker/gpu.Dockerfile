@@ -39,13 +39,5 @@ RUN mkdir -p /usr/local/etc/uv && \
     uv tool install keyring --with keyrings.google-artifactregistry-auth && \
     uv tool list > /usr/local/etc/uv/tools_installed
 
-# Create vscode user with sudo privileges and GPU access
-RUN groupadd -g 1000 vscode && \
-    useradd -u 1000 -g 1000 -s /bin/bash -m vscode && \
-    echo "vscode ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/vscode && \
-    chmod 0440 /etc/sudoers.d/vscode && \
-    # Add user to groups that typically have GPU access
-    usermod -a -G video,render vscode
-
 # Set default working directory
 WORKDIR /home/vscode
