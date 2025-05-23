@@ -1,0 +1,415 @@
+terraform {
+  required_providers {
+    coder = {
+      source = "coder/coder"
+    }
+    kubernetes = {
+      source = "hashicorp/kubernetes"
+    }
+  }
+}
+
+provider "coder" {}
+
+provider "kubernetes" {
+  config_path = null
+}
+
+variable "namespace" {
+  type        = string
+  description = "Target Kubernetes namespace for workspace deployments."
+  default     = "coder" # Or your default namespace
+}
+
+data "coder_workspace" "me" {}
+data "coder_workspace_owner" "me" {}
+
+locals {
+  # Image and environment configuration
+  base_image_repo = "us-central1-docker.pkg.dev/abridge-artifact-registry/coder/gpu"
+  base_image_tag  = "7572cdd"
+  base_image      = "${local.base_image_repo}:${local.base_image_tag}"
+
+  home_dir = "/home/vscode"
+
+  # Kubernetes metadata
+  labels = {
+    "app.kubernetes.io/name"     = "coder-workspace"
+    "app.kubernetes.io/instance" = "coder-workspace-${data.coder_workspace.me.id}"
+    "app.kubernetes.io/part-of"  = "coder"
+    "com.coder.resource"         = "true"
+    "com.coder.workspace.id"     = data.coder_workspace.me.id
+    "com.coder.workspace.name"   = data.coder_workspace.me.name
+    "com.coder.user.id"          = data.coder_workspace_owner.me.id
+    "com.coder.user.username"    = data.coder_workspace_owner.me.name
+  }
+
+  annotations = {
+    "com.coder.user.email" = data.coder_workspace_owner.me.email
+  }
+
+  init_script = <<-EOT
+    set -e
+
+    # Install and start code-server
+    export CODE_SERVER_DIR="/tmp/code-server"
+    if [ ! -f "$CODE_SERVER_DIR/bin/code-server" ]; then
+      mkdir -p "$CODE_SERVER_DIR"
+      curl -fsSL https://code-server.dev/install.sh | sh -s -- --method=standalone --prefix="$CODE_SERVER_DIR" || exit 1
+    fi
+
+    # Install VS Code extensions
+    $CODE_SERVER_DIR/bin/code-server --install-extension ms-python.python
+    $CODE_SERVER_DIR/bin/code-server --install-extension ms-toolsai.jupyter
+
+    # Install and start Jupyter
+    uv pip install --system jupyterlab jupyter
+    jupyter ${data.coder_parameter.jupyter.value} --${local.jupyter_type_arg}App.token="" --ip="*" >/dev/null 2>&1 &
+
+    $CODE_SERVER_DIR/bin/code-server --auth none --port 13337 >/tmp/code-server.log 2>&1 &
+  EOT
+
+  metrics = {
+    "0_cpu_usage"      = { name = "CPU Usage", script = "coder stat cpu" }
+    "1_ram_usage"      = { name = "RAM Usage", script = "coder stat mem" }
+    "2_gpu_usage"      = { name = "GPU Usage", script = "nvidia-smi --query-gpu=utilization.gpu --format=csv,noheader,nounits" }
+    "3_home_disk"      = { name = "Home Disk", script = "coder stat disk --path $HOME" }
+    "4_cpu_usage_host" = { name = "CPU Usage (Host)", script = "coder stat cpu --host" }
+    "5_mem_usage_host" = { name = "Memory Usage (Host)", script = "coder stat mem --host" }
+    "6_load_host"      = { name = "Load Average (Host)", script = "echo \"`cat /proc/loadavg | awk '{ print $1 }'` `nproc`\" | awk '{ printf \"%0.2f\", $1/$2 }'" }
+  }
+
+  _base_gpu_selector = data.coder_parameter.gpu_accelerator.value != "" ? {
+    "cloud.google.com/gke-accelerator" = data.coder_parameter.gpu_accelerator.value
+  } : {}
+
+  _reservation_selector = data.coder_parameter.gpu_accelerator.value != "" && data.coder_parameter.gcp_reservation_name.value != "" ? {
+    "cloud.google.com/gke-reservation-name" = data.coder_parameter.gcp_reservation_name.value
+  } : {}
+
+  gpu_node_selector = merge(local._base_gpu_selector, local._reservation_selector)
+
+  # Conditional GPU resource requests and limits
+  gpu_requests = data.coder_parameter.gpu_accelerator.value != "" ? {
+    "nvidia.com/gpu" = data.coder_parameter.gpu_count.value
+  } : {}
+
+  gpu_limits = data.coder_parameter.gpu_accelerator.value != "" ? {
+    "nvidia.com/gpu" = data.coder_parameter.gpu_count.value # Assuming limits are same as requests for GPUs
+  } : {}
+
+  jupyter_type_arg = data.coder_parameter.jupyter.value == "notebook" ? "Notebook" : "Server"
+}
+
+
+data "coder_parameter" "cpu" {
+  name         = "cpu"
+  display_name = "CPU Cores"
+  description  = "The number of CPU cores (between 4-16)"
+  default      = "4"
+  icon         = "/icon/memory.svg"
+  mutable      = true
+  order        = 1
+  type         = "number"
+  validation {
+    min = 4
+    max = 16
+  }
+}
+
+data "coder_parameter" "memory" {
+  name         = "memory"
+  display_name = "Memory (GB)"
+  description  = "The amount of memory in GB (between 8-32)"
+  default      = "8"
+  icon         = "/icon/memory.svg"
+  mutable      = true
+  order        = 2
+  type         = "number"
+  validation {
+    min = 8
+    max = 32
+  }
+}
+
+data "coder_parameter" "home_disk_size" {
+  name         = "home_disk_size"
+  display_name = "Home disk size (GB)"
+  description  = "The size of the home disk in GB (between 16-1024)"
+  default      = "16"
+  type         = "number"
+  icon         = "/icon/folder.svg"
+  mutable      = true
+  order        = 3
+  validation {
+    min = 16
+    max = 1024
+  }
+}
+
+data "coder_parameter" "gpu_accelerator" {
+  name         = "gpu_accelerator"
+  display_name = "GPU Accelerator Type"
+  description  = "Choose GPU type. Must match 'cloud.google.com/gke-accelerator' label values on GKE nodes. Leave empty for CPU-only."
+  default      = ""
+  mutable      = true
+  order        = 4
+  icon         = "/icon/container.svg"
+  type         = "string"
+  option {
+    name  = "No GPU"
+    value = ""
+  }
+  option {
+    name  = "NVIDIA L4"
+    value = "nvidia-l4"
+  }
+  option {
+    name  = "NVIDIA H100 (80GB)"
+    value = "nvidia-h100-80gb"
+  }
+}
+
+data "coder_parameter" "gpu_count" {
+  name         = "gpu_count"
+  display_name = "Number of GPUs"
+  description  = "Number of GPUs to allocate to the workspace. Only applicable if a GPU Accelerator Type is selected."
+  default      = "1"
+  mutable      = true
+  order        = 5
+  type         = "number"
+  icon         = "/icon/container.svg"
+  validation {
+    min = 1
+    max = 8 # Adjust max as per typical node limits / user needs
+  }
+}
+
+data "coder_parameter" "gcp_reservation_name" {
+  name         = "gcp_reservation_name"
+  display_name = "GCP Reservation Name (Optional)"
+  description  = "If using GCP reserved instances, enter the specific reservation name here."
+  default      = ""
+  icon         = "/icon/gcp.png"
+  mutable      = true
+  type         = "string"
+  order        = 6
+}
+
+data "coder_parameter" "jupyter" {
+  name        = "Notebook Type"
+  type        = "string"
+  description = "Jupyter variant to use"
+  default     = "lab"
+  icon        = "/icon/jupyter.svg"
+  mutable     = true
+  order       = 7
+
+  option {
+    name  = "Jupyter Lab"
+    value = "lab"
+  }
+  option {
+    name  = "Jupyter Notebook"
+    value = "notebook"
+  }
+}
+
+# --- Coder Agent ---
+resource "coder_agent" "main" {
+  os             = "linux"
+  arch           = "amd64"
+  startup_script = local.init_script
+
+  dynamic "metadata" {
+    for_each = local.metrics
+    content {
+      display_name = metadata.value.name
+      key          = metadata.key
+      script       = metadata.value.script
+      interval     = 15
+      timeout      = 5
+    }
+  }
+}
+
+# --- Coder Application: code-server ---
+resource "coder_app" "code-server" {
+  agent_id     = coder_agent.main.id
+  slug         = "code-server"
+  display_name = "VS Code"
+  icon         = "/icon/code.svg"
+  url          = "http://localhost:13337?folder=/root"
+  subdomain    = false
+  share        = "owner"
+
+  healthcheck {
+    url       = "http://localhost:13337/healthz"
+    interval  = 5
+    threshold = 10
+  }
+}
+
+# --- Coder Application: Jupyter ---
+resource "coder_app" "jupyter" {
+  agent_id     = coder_agent.main.id
+  slug         = "jupyter"
+  display_name = "Jupyter ${data.coder_parameter.jupyter.value}"
+  icon         = "/icon/jupyter.svg"
+  url          = "http://localhost:8888/"
+  subdomain    = true
+  share        = "owner"
+
+  healthcheck {
+    url       = "http://localhost:8888/healthz/"
+    interval  = 10
+    threshold = 20
+  }
+}
+
+# --- Kubernetes Resources ---
+
+resource "kubernetes_persistent_volume_claim" "home" {
+  metadata {
+    name        = "coder-${data.coder_workspace.me.id}-home"
+    namespace   = var.namespace
+    labels      = local.labels
+    annotations = local.annotations
+  }
+  wait_until_bound = false
+  spec {
+    access_modes = ["ReadWriteOnce"]
+    resources {
+      requests = {
+        storage = "${data.coder_parameter.home_disk_size.value}Gi"
+      }
+    }
+  }
+}
+
+resource "kubernetes_deployment" "main" {
+  count            = data.coder_workspace.me.start_count
+  depends_on       = [kubernetes_persistent_volume_claim.home]
+  wait_for_rollout = false
+
+  metadata {
+    name        = "coder-${data.coder_workspace.me.id}"
+    namespace   = var.namespace
+    labels      = local.labels
+    annotations = local.annotations
+  }
+
+  spec {
+    replicas = 1
+    selector {
+      match_labels = local.labels
+    }
+    strategy { type = "Recreate" }
+
+    template {
+      metadata {
+        labels      = local.labels
+        annotations = local.annotations
+      }
+      spec {
+        node_selector = data.coder_parameter.gpu_accelerator.value != "" ? local.gpu_node_selector : null
+
+        security_context {
+          # Run as root for unrestricted access
+          run_as_user     = 0
+          fs_group        = 0
+          run_as_non_root = false
+        }
+
+        container {
+          name              = "dev"
+          image             = local.base_image
+          image_pull_policy = "Always"
+          command           = ["sh", "-c", coder_agent.main.init_script]
+
+          security_context {
+            # Run as root
+            run_as_user                = 0
+            allow_privilege_escalation = true
+            read_only_root_filesystem  = false
+          }
+
+          env {
+            name  = "CODER_AGENT_TOKEN"
+            value = coder_agent.main.token
+          }
+
+          resources {
+            requests = merge(
+              {
+                cpu    = data.coder_parameter.cpu.value
+                memory = "${data.coder_parameter.memory.value}Gi"
+              },
+              local.gpu_requests
+            )
+            limits = merge(
+              {
+                cpu    = data.coder_parameter.cpu.value
+                memory = "${data.coder_parameter.memory.value}Gi"
+              },
+              local.gpu_limits
+            )
+          }
+
+          volume_mount {
+            mount_path = local.home_dir
+            name       = "home"
+            read_only  = false
+          }
+        }
+
+        volume {
+          name = "home"
+          persistent_volume_claim {
+            claim_name = kubernetes_persistent_volume_claim.home.metadata[0].name
+          }
+        }
+      }
+    }
+  }
+}
+
+# --- Coder Metadata (for UI display) ---
+resource "coder_metadata" "workspace_info" {
+  count       = data.coder_workspace.me.start_count
+  resource_id = kubernetes_deployment.main[0].id
+
+  item {
+    key   = "Image Used"
+    value = local.base_image
+  }
+  item {
+    key   = "CPU Cores"
+    value = "${data.coder_parameter.cpu.value} vCPU"
+  }
+  item {
+    key   = "Memory"
+    value = "${data.coder_parameter.memory.value} GB RAM"
+  }
+  item {
+    key   = "GPU Type"
+    value = data.coder_parameter.gpu_accelerator.value != "" ? data.coder_parameter.gpu_accelerator.value : "None"
+  }
+  item {
+    key   = "GPU Count"
+    value = data.coder_parameter.gpu_accelerator.value != "" ? data.coder_parameter.gpu_count.value : "N/A"
+  }
+}
+
+resource "coder_metadata" "home_pvc_info" {
+  resource_id = kubernetes_persistent_volume_claim.home.id
+
+  item {
+    key   = "Home Volume Size"
+    value = "${data.coder_parameter.home_disk_size.value} GB"
+  }
+  item {
+    key   = "Namespace"
+    value = var.namespace
+  }
+}
