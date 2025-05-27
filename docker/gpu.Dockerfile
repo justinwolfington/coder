@@ -1,3 +1,4 @@
+# Base image
 FROM nvcr.io/nvidia/cuda:12.6.3-cudnn-devel-ubuntu22.04
 
 # Set up environment variables
