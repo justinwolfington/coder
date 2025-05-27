@@ -7,7 +7,6 @@ A production-ready Coder template for provisioning GPU-accelerated development w
 ### Development Environment
 
 - **VS Code in Browser**: Full-featured code-server with web-based VS Code experience
-- **Jupyter Integration**: Choose between Jupyter Lab or Jupyter Notebook
 - **GPU Acceleration**: Support for NVIDIA GPUs with configurable types and counts
 - **Persistent Storage**: Home directory backed by Kubernetes PersistentVolumeClaim
 - **Custom Base Images**: Support for organization-specific GPU-enabled Docker images
@@ -62,11 +61,6 @@ A production-ready Coder template for provisioning GPU-accelerated development w
 | `gpu_accelerator` | GPU type selection | None | No GPU, NVIDIA L4, NVIDIA H100 (80GB) |
 | `gpu_count` | Number of GPUs | 1 | 1-8 |
 
-### Application Settings
-
-| Parameter | Description | Default | Options |
-|-----------|-------------|---------|---------|
-| `Notebook Type` | Jupyter variant | Jupyter Lab | Jupyter Lab, Jupyter Notebook |
 
 ## Quick Start
 
@@ -85,7 +79,6 @@ A production-ready Coder template for provisioning GPU-accelerated development w
 
 3. **Access Applications**
    - **VS Code**: Automatically opens in browser
-   - **Jupyter**: Available via workspace applications menu
 
 ## 🔧 Customization Guide
 
@@ -165,15 +158,8 @@ The template includes built-in monitoring for:
 - **URL**: `http://localhost:13337`
 - **Display Name**: code-server
 - **Features**: Full VS Code experience with extensions
-- **Default Extensions**: Python, Jupyter support
+- **Default Extensions**: Python support
 - **Health Check**: Automated monitoring on `/healthz`
-
-### Jupyter
-
-- **URL**: `http://localhost:8888`
-- **Types**: Lab or Notebook (configurable)
-- **Features**: Token-free access, persistent notebooks
-- **Health Check**: Monitoring on `/healthz/`
 
 ## 🔐 Security Considerations
 
@@ -208,7 +194,7 @@ The template includes built-in monitoring for:
 
 #### Application Access Issues
 
-**Symptoms**: VS Code or Jupyter not accessible
+**Symptoms**: VS Code not accessible
 **Solutions**:
 
 1. Check application logs in Coder UI

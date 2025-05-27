@@ -134,24 +134,6 @@ data "coder_parameter" "gpu_count" {
   }
 }
 
-data "coder_parameter" "jupyter" {
-  name        = "Notebook Type"
-  type        = "string"
-  description = "Jupyter variant to use"
-  default     = "lab"
-  icon        = "/icon/jupyter.svg"
-  mutable     = true
-  order       = 8
-
-  option {
-    name  = "Jupyter Lab"
-    value = "lab"
-  }
-  option {
-    name  = "Jupyter Notebook"
-    value = "notebook"
-  }
-}
 
 locals {
   # Repository configuration
@@ -172,10 +154,10 @@ locals {
 
   # Image and environment configuration
   base_image_repo = "us-central1-docker.pkg.dev/abridge-artifact-registry/coder/gpu"
-  base_image_tag  = "7572cdd"
+  base_image_tag  = "1402364"
   base_image      = "${local.base_image_repo}:${local.base_image_tag}"
 
-  home_dir        = "/home/vscode"
+  home_dir = "/home/vscode"
 
   # Determine the repo directory path for the workspace
   repo_name = data.coder_parameter.repo_selection.value == "custom" ? data.coder_parameter.custom_repo.value : data.coder_parameter.repo_selection.value
@@ -203,6 +185,7 @@ locals {
 
     # Install and start code-server
     export CODE_SERVER_DIR="/tmp/code-server"
+
     if [ ! -f "$CODE_SERVER_DIR/bin/code-server" ]; then
       mkdir -p "$CODE_SERVER_DIR"
       curl -fsSL https://code-server.dev/install.sh | sh -s -- --method=standalone --prefix="$CODE_SERVER_DIR" || exit 1
@@ -212,13 +195,10 @@ locals {
     $CODE_SERVER_DIR/bin/code-server --install-extension ms-python.python
     $CODE_SERVER_DIR/bin/code-server --install-extension ms-toolsai.jupyter
 
-    # Install and start Jupyter
-    uv pip install --system jupyterlab jupyter
-    jupyter ${data.coder_parameter.jupyter.value} --${local.jupyter_type_arg}App.token="" --ip="*" >/dev/null 2>&1 &
-
     $CODE_SERVER_DIR/bin/code-server --auth none --port 13337 >/tmp/code-server.log 2>&1 &
   EOT
 
+  # Metrics for workspace monitoring
   metrics = {
     "0_cpu_usage"      = { name = "CPU Usage", script = "coder stat cpu" }
     "1_ram_usage"      = { name = "RAM Usage", script = "coder stat mem" }
@@ -242,7 +222,6 @@ locals {
     "nvidia.com/gpu" = data.coder_parameter.gpu_count.value # Assuming limits are same as requests for GPUs
   } : {}
 
-  jupyter_type_arg = data.coder_parameter.jupyter.value == "notebook" ? "Notebook" : "Server"
 }
 
 # --- Coder Agent ---
@@ -289,22 +268,6 @@ resource "coder_app" "code-server" {
   }
 }
 
-# --- Coder Application: Jupyter ---
-resource "coder_app" "jupyter" {
-  agent_id     = coder_agent.main.id
-  slug         = "jupyter"
-  display_name = "Jupyter ${data.coder_parameter.jupyter.value}"
-  icon         = "/icon/jupyter.svg"
-  url          = "http://localhost:8888/"
-  subdomain    = true
-  share        = "owner"
-
-  healthcheck {
-    url       = "http://localhost:8888/healthz/"
-    interval  = 10
-    threshold = 20
-  }
-}
 
 # --- Kubernetes Resources ---
 

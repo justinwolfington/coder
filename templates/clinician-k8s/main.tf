@@ -115,7 +115,7 @@ locals {
 
   # Image and environment configuration
   base_image_repo = "us-central1-docker.pkg.dev/abridge-artifact-registry/coder/base"
-  base_image_tag  = "366cfee"
+  base_image_tag  = "1402364"
   base_image      = "${local.base_image_repo}:${local.base_image_tag}"
   home_dir        = "/home/vscode"
 
@@ -240,7 +240,6 @@ resource "kubernetes_persistent_volume_claim" "home" {
   }
 }
 
-# Kubernetes deployment
 resource "kubernetes_deployment" "main" {
   count            = data.coder_workspace.me.start_count
   depends_on       = [kubernetes_persistent_volume_claim.home]
