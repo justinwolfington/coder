@@ -18,19 +18,168 @@ provider "kubernetes" {
 variable "namespace" {
   type        = string
   description = "Target Kubernetes namespace for workspace deployments."
-  default     = "coder" # Or your default namespace
+  default     = "coder"
 }
 
 data "coder_workspace" "me" {}
 data "coder_workspace_owner" "me" {}
 
+data "coder_parameter" "repo_selection" {
+  name         = "repo_selection"
+  display_name = "Repository Selection"
+  description  = "Choose which repository to clone"
+  default      = "completion-service"
+  mutable      = true
+  order        = 1
+  option {
+    name  = "Completion Service"
+    value = "completion-service"
+  }
+  option {
+    name  = "Custom Repository"
+    value = "custom"
+  }
+}
+
+data "coder_parameter" "custom_repo" {
+  name         = "custom_repo"
+  display_name = "Custom Repository Name"
+  description  = "If you selected 'Custom Repository' above, provide just the repository name (e.g. 'my-project')"
+  default      = ""
+  mutable      = true
+  type         = "string"
+  order        = 2
+}
+
+data "coder_parameter" "cpu" {
+  name         = "cpu"
+  display_name = "CPU Cores"
+  description  = "The number of CPU cores (between 4-16)"
+  default      = "4"
+  icon         = "/icon/memory.svg"
+  mutable      = true
+  order        = 3
+  type         = "number"
+  validation {
+    min = 4
+    max = 16
+  }
+}
+
+data "coder_parameter" "memory" {
+  name         = "memory"
+  display_name = "Memory (GB)"
+  description  = "The amount of memory in GB (between 8-32)"
+  default      = "8"
+  icon         = "/icon/memory.svg"
+  mutable      = true
+  order        = 4
+  type         = "number"
+  validation {
+    min = 8
+    max = 32
+  }
+}
+
+data "coder_parameter" "home_disk_size" {
+  name         = "home_disk_size"
+  display_name = "Home disk size (GB)"
+  description  = "The size of the home disk in GB (between 16-1024)"
+  default      = "16"
+  type         = "number"
+  icon         = "/icon/folder.svg"
+  mutable      = true
+  order        = 5
+  validation {
+    min = 16
+    max = 1024
+  }
+}
+
+data "coder_parameter" "gpu_accelerator" {
+  name         = "gpu_accelerator"
+  display_name = "GPU Accelerator Type"
+  description  = "Choose GPU type. Must match 'cloud.google.com/gke-accelerator' label values on GKE nodes. Leave empty for CPU-only."
+  default      = ""
+  mutable      = true
+  order        = 6
+  icon         = "/icon/container.svg"
+  type         = "string"
+  option {
+    name  = "No GPU"
+    value = ""
+  }
+  option {
+    name  = "NVIDIA L4"
+    value = "nvidia-l4"
+  }
+  option {
+    name  = "NVIDIA H100 (80GB)"
+    value = "nvidia-h100-80gb"
+  }
+}
+
+data "coder_parameter" "gpu_count" {
+  name         = "gpu_count"
+  display_name = "Number of GPUs"
+  description  = "Number of GPUs to allocate to the workspace. Only applicable if a GPU Accelerator Type is selected."
+  default      = "1"
+  mutable      = true
+  order        = 7
+  type         = "number"
+  icon         = "/icon/container.svg"
+  validation {
+    min = 1
+    max = 8 # Adjust max as per typical node limits / user needs
+  }
+}
+
+data "coder_parameter" "jupyter" {
+  name        = "Notebook Type"
+  type        = "string"
+  description = "Jupyter variant to use"
+  default     = "lab"
+  icon        = "/icon/jupyter.svg"
+  mutable     = true
+  order       = 8
+
+  option {
+    name  = "Jupyter Lab"
+    value = "lab"
+  }
+  option {
+    name  = "Jupyter Notebook"
+    value = "notebook"
+  }
+}
+
 locals {
+  # Repository configuration
+  repo_map = {
+    "completion-service" = "https://github.com/abridgeai/completion-service"
+  }
+
+  repo_url = (
+    data.coder_parameter.repo_selection.value == "custom"
+    ? "https://github.com/abridgeai/${data.coder_parameter.custom_repo.value}"
+    : lookup(local.repo_map, data.coder_parameter.repo_selection.value, "")
+  )
+
+  should_clone = (
+    data.coder_parameter.repo_selection.value != "custom"
+    || data.coder_parameter.custom_repo.value != ""
+  )
+
   # Image and environment configuration
   base_image_repo = "us-central1-docker.pkg.dev/abridge-artifact-registry/coder/gpu"
   base_image_tag  = "7572cdd"
   base_image      = "${local.base_image_repo}:${local.base_image_tag}"
 
-  home_dir = "/home/vscode"
+  home_dir        = "/home/vscode"
+
+  # Determine the repo directory path for the workspace
+  repo_name = data.coder_parameter.repo_selection.value == "custom" ? data.coder_parameter.custom_repo.value : data.coder_parameter.repo_selection.value
+  repo_dir  = "${local.home_dir}/${local.repo_name}"
 
   # Kubernetes metadata
   labels = {
@@ -48,6 +197,7 @@ locals {
     "com.coder.user.email" = data.coder_workspace_owner.me.email
   }
 
+  # Startup script for the workspace
   init_script = <<-EOT
     set -e
 
@@ -79,15 +229,9 @@ locals {
     "6_load_host"      = { name = "Load Average (Host)", script = "echo \"`cat /proc/loadavg | awk '{ print $1 }'` `nproc`\" | awk '{ printf \"%0.2f\", $1/$2 }'" }
   }
 
-  _base_gpu_selector = data.coder_parameter.gpu_accelerator.value != "" ? {
+  gpu_node_selector = data.coder_parameter.gpu_accelerator.value != "" ? {
     "cloud.google.com/gke-accelerator" = data.coder_parameter.gpu_accelerator.value
   } : {}
-
-  _reservation_selector = data.coder_parameter.gpu_accelerator.value != "" && data.coder_parameter.gcp_reservation_name.value != "" ? {
-    "cloud.google.com/gke-reservation-name" = data.coder_parameter.gcp_reservation_name.value
-  } : {}
-
-  gpu_node_selector = merge(local._base_gpu_selector, local._reservation_selector)
 
   # Conditional GPU resource requests and limits
   gpu_requests = data.coder_parameter.gpu_accelerator.value != "" ? {
@@ -99,120 +243,6 @@ locals {
   } : {}
 
   jupyter_type_arg = data.coder_parameter.jupyter.value == "notebook" ? "Notebook" : "Server"
-}
-
-
-data "coder_parameter" "cpu" {
-  name         = "cpu"
-  display_name = "CPU Cores"
-  description  = "The number of CPU cores (between 4-16)"
-  default      = "4"
-  icon         = "/icon/memory.svg"
-  mutable      = true
-  order        = 1
-  type         = "number"
-  validation {
-    min = 4
-    max = 16
-  }
-}
-
-data "coder_parameter" "memory" {
-  name         = "memory"
-  display_name = "Memory (GB)"
-  description  = "The amount of memory in GB (between 8-32)"
-  default      = "8"
-  icon         = "/icon/memory.svg"
-  mutable      = true
-  order        = 2
-  type         = "number"
-  validation {
-    min = 8
-    max = 32
-  }
-}
-
-data "coder_parameter" "home_disk_size" {
-  name         = "home_disk_size"
-  display_name = "Home disk size (GB)"
-  description  = "The size of the home disk in GB (between 16-1024)"
-  default      = "16"
-  type         = "number"
-  icon         = "/icon/folder.svg"
-  mutable      = true
-  order        = 3
-  validation {
-    min = 16
-    max = 1024
-  }
-}
-
-data "coder_parameter" "gpu_accelerator" {
-  name         = "gpu_accelerator"
-  display_name = "GPU Accelerator Type"
-  description  = "Choose GPU type. Must match 'cloud.google.com/gke-accelerator' label values on GKE nodes. Leave empty for CPU-only."
-  default      = ""
-  mutable      = true
-  order        = 4
-  icon         = "/icon/container.svg"
-  type         = "string"
-  option {
-    name  = "No GPU"
-    value = ""
-  }
-  option {
-    name  = "NVIDIA L4"
-    value = "nvidia-l4"
-  }
-  option {
-    name  = "NVIDIA H100 (80GB)"
-    value = "nvidia-h100-80gb"
-  }
-}
-
-data "coder_parameter" "gpu_count" {
-  name         = "gpu_count"
-  display_name = "Number of GPUs"
-  description  = "Number of GPUs to allocate to the workspace. Only applicable if a GPU Accelerator Type is selected."
-  default      = "1"
-  mutable      = true
-  order        = 5
-  type         = "number"
-  icon         = "/icon/container.svg"
-  validation {
-    min = 1
-    max = 8 # Adjust max as per typical node limits / user needs
-  }
-}
-
-data "coder_parameter" "gcp_reservation_name" {
-  name         = "gcp_reservation_name"
-  display_name = "GCP Reservation Name (Optional)"
-  description  = "If using GCP reserved instances, enter the specific reservation name here."
-  default      = ""
-  icon         = "/icon/gcp.png"
-  mutable      = true
-  type         = "string"
-  order        = 6
-}
-
-data "coder_parameter" "jupyter" {
-  name        = "Notebook Type"
-  type        = "string"
-  description = "Jupyter variant to use"
-  default     = "lab"
-  icon        = "/icon/jupyter.svg"
-  mutable     = true
-  order       = 7
-
-  option {
-    name  = "Jupyter Lab"
-    value = "lab"
-  }
-  option {
-    name  = "Jupyter Notebook"
-    value = "notebook"
-  }
 }
 
 # --- Coder Agent ---
@@ -233,19 +263,28 @@ resource "coder_agent" "main" {
   }
 }
 
+# --- Git Repository Cloning ---
+module "git-clone" {
+  count    = data.coder_workspace.me.start_count > 0 && local.should_clone ? 1 : 0
+  source   = "registry.coder.com/coder/git-clone/coder"
+  version  = "1.0.18"
+  agent_id = coder_agent.main.id
+  url      = local.repo_url
+}
+
 # --- Coder Application: code-server ---
 resource "coder_app" "code-server" {
   agent_id     = coder_agent.main.id
   slug         = "code-server"
-  display_name = "VS Code"
+  display_name = "code-server"
   icon         = "/icon/code.svg"
-  url          = "http://localhost:13337?folder=/root"
+  url          = "http://localhost:13337?folder=${local.should_clone ? local.repo_dir : local.home_dir}"
   subdomain    = false
   share        = "owner"
 
   healthcheck {
     url       = "http://localhost:13337/healthz"
-    interval  = 5
+    interval  = 3
     threshold = 10
   }
 }

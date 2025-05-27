@@ -18,10 +18,83 @@ provider "kubernetes" {
 variable "namespace" {
   type        = string
   description = "Target Kubernetes namespace for workspace deployments."
+  default     = "coder"
 }
 
 data "coder_workspace" "me" {}
 data "coder_workspace_owner" "me" {}
+
+data "coder_parameter" "repo_selection" {
+  name         = "repo_selection"
+  display_name = "Repository Selection"
+  description  = "Choose which repository to clone"
+  default      = "completion-service"
+  mutable      = true
+  order        = 1
+  option {
+    name  = "Completion Service"
+    value = "completion-service"
+  }
+  option {
+    name  = "Custom Repository"
+    value = "custom"
+  }
+}
+
+data "coder_parameter" "custom_repo" {
+  name         = "custom_repo"
+  display_name = "Custom Repository Name"
+  description  = "If you selected 'Custom Repository' above, provide just the repository name (e.g. 'my-project')"
+  default      = ""
+  mutable      = true
+  type         = "string"
+  order        = 2
+}
+
+data "coder_parameter" "cpu" {
+  name         = "cpu"
+  display_name = "CPU Cores"
+  description  = "The number of CPU cores (between 4-16)"
+  default      = "4"
+  icon         = "/icon/memory.svg"
+  mutable      = true
+  order        = 3
+  type         = "number"
+  validation {
+    min = 4
+    max = 16
+  }
+}
+
+data "coder_parameter" "memory" {
+  name         = "memory"
+  display_name = "Memory (GB)"
+  description  = "The amount of memory in GB (between 8-32)"
+  default      = "8"
+  icon         = "/icon/memory.svg"
+  mutable      = true
+  order        = 4
+  type         = "number"
+  validation {
+    min = 8
+    max = 32
+  }
+}
+
+data "coder_parameter" "home_disk_size" {
+  name         = "home_disk_size"
+  display_name = "Home disk size (GB)"
+  description  = "The size of the home disk in GB (between 16-1024)"
+  default      = "16"
+  type         = "number"
+  icon         = "/icon/folder.svg"
+  mutable      = true
+  order        = 5
+  validation {
+    min = 16
+    max = 1024
+  }
+}
 
 locals {
   # Repository configuration
@@ -103,80 +176,7 @@ locals {
   }
 }
 
-# Parameter definitions
-data "coder_parameter" "repo_selection" {
-  name         = "repo_selection"
-  display_name = "Repository Selection"
-  description  = "Choose which repository to clone"
-  default      = "completion-service"
-  mutable      = true
-  order        = 1
-  option {
-    name  = "Completion Service"
-    value = "completion-service"
-  }
-  option {
-    name  = "Custom Repository"
-    value = "custom"
-  }
-}
-
-data "coder_parameter" "custom_repo" {
-  name         = "custom_repo"
-  display_name = "Custom Repository Name"
-  description  = "If you selected 'Custom Repository' above, provide just the repository name (e.g. 'my-project')"
-  default      = ""
-  mutable      = true
-  type         = "string"
-  order        = 2
-}
-
-data "coder_parameter" "cpu" {
-  name         = "cpu"
-  display_name = "CPU Cores"
-  description  = "The number of CPU cores (between 4-16)"
-  default      = "4"
-  icon         = "/icon/memory.svg"
-  mutable      = true
-  order        = 3
-  type         = "number"
-  validation {
-    min = 4
-    max = 16
-  }
-}
-
-data "coder_parameter" "memory" {
-  name         = "memory"
-  display_name = "Memory (GB)"
-  description  = "The amount of memory in GB (between 8-32)"
-  default      = "8"
-  icon         = "/icon/memory.svg"
-  mutable      = true
-  order        = 4
-  type         = "number"
-  validation {
-    min = 8
-    max = 32
-  }
-}
-
-data "coder_parameter" "home_disk_size" {
-  name         = "home_disk_size"
-  display_name = "Home disk size (GB)"
-  description  = "The size of the home disk in GB (between 16-1024)"
-  default      = "16"
-  type         = "number"
-  icon         = "/icon/folder.svg"
-  mutable      = true
-  order        = 5
-  validation {
-    min = 16
-    max = 1024
-  }
-}
-
-# Coder agent configuration
+# --- Coder Agent ---
 resource "coder_agent" "main" {
   os             = "linux"
   arch           = "amd64"
@@ -189,12 +189,12 @@ resource "coder_agent" "main" {
       key          = metadata.key
       script       = metadata.value.script
       interval     = 15
-      timeout      = 1
+      timeout      = 5
     }
   }
 }
 
-# Git repository cloning
+# --- Git Repository Cloning ---
 module "git-clone" {
   count    = data.coder_workspace.me.start_count > 0 && local.should_clone ? 1 : 0
   source   = "registry.coder.com/coder/git-clone/coder"
@@ -203,7 +203,7 @@ module "git-clone" {
   url      = local.repo_url
 }
 
-# Code-server application
+# --- Coder Application: code-server ---
 resource "coder_app" "code-server" {
   agent_id     = coder_agent.main.id
   slug         = "code-server"
@@ -220,7 +220,8 @@ resource "coder_app" "code-server" {
   }
 }
 
-# Persistent storage
+# --- Kubernetes Resources ---
+
 resource "kubernetes_persistent_volume_claim" "home" {
   metadata {
     name        = "coder-${data.coder_workspace.me.id}-home"
@@ -260,7 +261,10 @@ resource "kubernetes_deployment" "main" {
     strategy { type = "Recreate" }
 
     template {
-      metadata { labels = local.labels }
+      metadata {
+        labels      = local.labels
+        annotations = local.annotations
+      }
       spec {
         security_context {
           run_as_user     = "1000"
@@ -285,8 +289,8 @@ resource "kubernetes_deployment" "main" {
 
           resources {
             requests = {
-              cpu    = "250m"
-              memory = "512Mi"
+              cpu    = data.coder_parameter.cpu.value
+              memory = "${data.coder_parameter.memory.value}Gi"
             }
             limits = {
               cpu    = data.coder_parameter.cpu.value
@@ -330,27 +334,34 @@ resource "kubernetes_deployment" "main" {
   }
 }
 
-# Metadata for observability
+# --- Coder Metadata (for UI display) ---
 resource "coder_metadata" "workspace_info" {
   count       = data.coder_workspace.me.start_count
   resource_id = kubernetes_deployment.main[0].id
 
   item {
-    key   = "image"
+    key   = "Image Used"
     value = local.base_image
   }
-
   item {
-    key   = "type"
-    value = "Kubernetes Pod"
+    key   = "CPU Cores"
+    value = "${data.coder_parameter.cpu.value} vCPU"
+  }
+  item {
+    key   = "Memory"
+    value = "${data.coder_parameter.memory.value} GB RAM"
   }
 }
 
-resource "coder_metadata" "home_info" {
+resource "coder_metadata" "home_pvc_info" {
   resource_id = kubernetes_persistent_volume_claim.home.id
 
   item {
-    key   = "size"
-    value = "${data.coder_parameter.home_disk_size.value} GiB"
+    key   = "Home Volume Size"
+    value = "${data.coder_parameter.home_disk_size.value} GB"
+  }
+  item {
+    key   = "Namespace"
+    value = var.namespace
   }
 }
