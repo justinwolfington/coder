@@ -16,8 +16,7 @@ A production-ready Coder template for provisioning GPU-accelerated development w
 
 - **Flexible Resource Allocation**: Configurable CPU, memory, and storage
 - **GPU Selection**: Multiple GPU types (L4, H100) with multi-GPU support
-- **GCP Reservations**: Integration with Google Cloud Platform reserved instances
-- **Real-time Monitoring**: Built-in metrics for resource utilization
+- **Real-time Monitoring**: Built-in metrics for resource utilization including GPU usage
 
 ### Production Ready
 
@@ -38,7 +37,6 @@ A production-ready Coder template for provisioning GPU-accelerated development w
 
 - GKE cluster with GPU-enabled node pools
 - Node pools labeled with `cloud.google.com/gke-accelerator`
-- (Optional) Compute Engine reservations configured
 - Proper IAM permissions for container registry access
 
 ### Coder Setup
@@ -63,7 +61,6 @@ A production-ready Coder template for provisioning GPU-accelerated development w
 |-----------|-------------|---------|---------|
 | `gpu_accelerator` | GPU type selection | None | No GPU, NVIDIA L4, NVIDIA H100 (80GB) |
 | `gpu_count` | Number of GPUs | 1 | 1-8 |
-| `gcp_reservation_name` | GCP reservation name (optional) | "" | Any valid reservation name |
 
 ### Application Settings
 
@@ -109,9 +106,9 @@ locals {
 Verify and customize GPU node selectors:
 
 ```terraform
-local._base_gpu_selector = {
+gpu_node_selector = data.coder_parameter.gpu_accelerator.value != "" ? {
   "cloud.google.com/gke-accelerator" = data.coder_parameter.gpu_accelerator.value
-}
+} : {}
 ```
 
 **Important**: Ensure the label keys match your cluster's GPU node labels.
@@ -157,15 +154,16 @@ The template includes built-in monitoring for:
 
 - **CPU Usage**: Both container and host-level monitoring
 - **Memory Usage**: RAM utilization tracking
+- **GPU Usage**: NVIDIA GPU utilization monitoring
 - **Disk Usage**: Home directory storage monitoring
 - **Load Average**: System load metrics
-
 
 ## 🌐 Applications
 
 ### VS Code (code-server)
 
 - **URL**: `http://localhost:13337`
+- **Display Name**: code-server
 - **Features**: Full VS Code experience with extensions
 - **Default Extensions**: Python, Jupyter support
 - **Health Check**: Automated monitoring on `/healthz`
@@ -228,27 +226,12 @@ The template includes built-in monitoring for:
 3. Ensure sufficient storage quota
 4. Review volume mount permissions
 
-### GCP-Specific Issues
-
-#### Reservation Not Used
-
-**Symptoms**: Pods not scheduled on reserved instances
-**Solutions**:
-
-1. Verify reservation name matches exactly
-2. Check node pool reservation affinity configuration
-3. Ensure nodes are labeled with reservation name
-4. Confirm reservation has available capacity
-
-
-
 ## Additional Resources
 
 - [Coder Documentation](https://coder.com/docs)
 - [Kubernetes GPU Documentation](https://kubernetes.io/docs/tasks/manage-gpus/scheduling-gpus/)
 - [NVIDIA GPU Operator](https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/overview.html)
 - [GCP GKE GPU Guide](https://cloud.google.com/kubernetes-engine/docs/how-to/gpus)
-- [GCP Compute Reservations](https://cloud.google.com/compute/docs/instances/reservations-overview)
 
 ## 🤝 Contributing
 
