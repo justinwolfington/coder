@@ -1,13 +1,14 @@
 name: Push Coder Templates
 
 on:
-  # Run after successful promotion of artifacts
+  # Run after successful build/promotion of artifacts
   workflow_run:
     workflows: ["Build and Promote Artifacts"]
     types:
       - completed
     branches:
       - main
+      - taruj/custom-images-for-templates
 
   # Allow manual trigger for debugging
   workflow_dispatch:
