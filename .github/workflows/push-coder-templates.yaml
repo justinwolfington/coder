@@ -42,7 +42,7 @@ permissions:
 jobs:
   push-templates:
     if: github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request' || github.event.workflow_run.conclusion == 'success'
-    runs-on: ubuntu-latest
+    runs-on: abridge-runner-${{ github.event.inputs.environment || 'development' }}
     environment: ${{ github.event.inputs.environment || 'development' }}
     strategy:
       matrix:
