@@ -53,7 +53,7 @@ jobs:
             directory: "./templates/clinician-k8s"
 
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
         with:
           submodules: true
@@ -63,14 +63,17 @@ jobs:
         run: |
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             SHA="${{ github.sha }}"
+          elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            SHA="${{ github.event.pull_request.head.sha }}"
           else
             SHA="${{ github.event.workflow_run.head_sha }}"
           fi
+
           SHORT_SHA="${SHA:0:7}"
           echo "sha_short=$SHORT_SHA" >> $GITHUB_OUTPUT
           echo "Using SHA: $SHA (short: $SHORT_SHA)"
 
-      - name: Setup Coder
+      - name: Setup Coder CLI
         uses: coder/setup-action@v1
         with:
           access_url: ${{ vars.CODER_ACCESS_URL }}
@@ -84,18 +87,18 @@ jobs:
           echo "Version: ${{ steps.vars.outputs.sha_short }}"
 
           coder templates push ${{ matrix.template.name }} \
-            --directory ${{ matrix.template.directory }} \
-            --name ${{ steps.vars.outputs.sha_short }} \
+            --directory "${{ matrix.template.directory }}" \
+            --name "${{ steps.vars.outputs.sha_short }}" \
             --yes
 
       - name: Notify on success
         if: success()
         run: |
-          echo "✅ Successfully pushed template: ${{ matrix.template.name }}"
+          echo "Successfully pushed template: ${{ matrix.template.name }}"
           echo "Version: ${{ steps.vars.outputs.sha_short }}"
 
       - name: Notify on failure
         if: failure()
         run: |
-          echo "❌ Failed to push template: ${{ matrix.template.name }}"
+          echo "Failed to push template: ${{ matrix.template.name }}"
           echo "Please check the logs above for details"
