@@ -26,15 +26,24 @@ on:
         description: 'Specific template name to push (optional, pushes all if empty)'
         required: false
         type: string
+      environment:
+        description: 'Environment to deploy to (development, staging, production)'
+        required: true
+        default: 'development'
+        type: choice
+        options:
+          - development
+          - staging
+          - production
 
 permissions:
   contents: read
 
 jobs:
   push-templates:
-    # Only run if the previous workflow succeeded, on pull request, or on manual trigger
     if: github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment || 'development' }}
     strategy:
       matrix:
         template:
@@ -42,13 +51,14 @@ jobs:
             directory: "./templates/gpu-k8s"
           - name: "clinician-k8s"
             directory: "./templates/clinician-k8s"
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           submodules: true
 
-      - name: Get short commit SHA # to use as template version name
+      - name: Get short commit SHA
         id: vars
         run: |
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
@@ -67,7 +77,6 @@ jobs:
           coder_session_token: ${{ secrets.CODER_SESSION_TOKEN }}
 
       - name: Push template ${{ matrix.template.name }}
-        # Skip if manual trigger with specific template and this isn't it
         if: github.event_name != 'workflow_dispatch' || github.event.inputs.template_name == '' || github.event.inputs.template_name == matrix.template.name
         run: |
           echo "Pushing template: ${{ matrix.template.name }}"
