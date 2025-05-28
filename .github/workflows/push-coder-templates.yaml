@@ -8,7 +8,16 @@ on:
       - completed
     branches:
       - main
+
+  # Run on pull requests to test templates
+  pull_request:
+    branches:
+      - main
       - taruj/custom-images-for-templates
+      # - add branch name here to test templates on that branch
+    paths:
+      - "templates/**"
+      - ".github/workflows/push-coder-templates.yaml"
 
   # Allow manual trigger for debugging
   workflow_dispatch:
@@ -23,8 +32,8 @@ permissions:
 
 jobs:
   push-templates:
-    # Only run if the previous workflow succeeded or on manual trigger
-    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    # Only run if the previous workflow succeeded, on pull request, or on manual trigger
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     strategy:
       matrix:
