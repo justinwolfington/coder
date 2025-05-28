@@ -27,7 +27,8 @@ RUN apt-get update && \
     apt-utils \
     screen \
     tmux \
-    ranger && \
+    ranger \
+    openssh-client && \
     rm -rf /var/lib/apt/lists/*
 
 # Install Google Cloud SDK
