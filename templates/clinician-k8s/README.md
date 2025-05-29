@@ -18,9 +18,15 @@ tags: [kubernetes, container, completion-service, development, github, cursor]
   - [Repository Selection](#repository-selection)
   - [Resource Customization](#resource-customization)
   - [Development Environments](#development-environments)
+    - [**🖥️ VS Code (Code-Server)**](#️-vs-code-code-server)
+    - [**🖱️ Cursor IDE**](#️-cursor-ide)
   - [Usage](#usage)
   - [Available Tools](#available-tools)
   - [Customization \& Troubleshooting](#customization--troubleshooting)
+    - [**Adding Repositories**](#adding-repositories)
+    - [**GitHub Integration Issues**](#github-integration-issues)
+    - [**Performance Tuning**](#performance-tuning)
+    - [**Support**](#support)
 
 # Completion Service Development on Kubernetes
 
