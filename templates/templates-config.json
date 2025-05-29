@@ -7,7 +7,7 @@
             "directory": "./templates/clinician-k8s"
         },
         "gpu-k8s": {
-            "display_name": "GPU k8s VMKiller",
+            "display_name": "GPU VMKiller",
             "description": "Provision Kubernetes Deployments as Coder workspaces with GPU support",
             "icon": "/emojis/1f35f.png",
             "directory": "./templates/gpu-k8s"

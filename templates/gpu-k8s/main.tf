@@ -124,7 +124,7 @@ locals {
 
   # Image and environment configuration
   base_image_repo = "us-central1-docker.pkg.dev/abridge-artifact-registry/coder/gpu"
-  base_image_tag  = "1402364"
+  base_image_tag  = "de9c4c0"
   base_image      = "${local.base_image_repo}:${local.base_image_tag}"
 
   # Repository configuration - simplified
@@ -233,10 +233,11 @@ module "cursor" {
 
 # --- Git Configuration ---
 module "git-config" {
-  count    = data.coder_workspace.me.start_count > 0 && local.should_clone ? 1 : 0
-  source   = "registry.coder.com/coder/git-config/coder"
-  version  = "1.0.15"
-  agent_id = coder_agent.main.id
+  source                = "registry.coder.com/coder/git-config/coder"
+  version               = "1.0.15"
+  agent_id              = coder_agent.main.id
+  allow_username_change = false
+  allow_email_change    = false
 }
 
 # --- Coder Application: code-server ---

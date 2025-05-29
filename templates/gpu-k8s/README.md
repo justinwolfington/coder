@@ -1,299 +1,86 @@
-# GPU k8s VMKiller Template
+---
+display_name: GPU K8s
+description: GPU-accelerated Kubernetes development workspace for ML/AI workloads
+icon: /emojis/1f916.png
+maintainer_github: abridgeai
+verified: true
+tags: [kubernetes, gpu, machine-learning, development, github, cursor]
+---
 
-A production-ready Coder template for provisioning GPU-accelerated development workspaces in Kubernetes, optimized for machine learning, data science, and compute-intensive workloads with optional GitHub integration.
+# GPU K8s Template
+
+GPU-accelerated Kubernetes workspace for ML/AI development with NVIDIA GPU support.
 
 ## Features
 
-### Development Environment
+- NVIDIA GPU acceleration (L4, H100)
+- VS Code (browser) and Cursor IDE integration
+- Single URL input for repository cloning
+- Configurable resources: CPU, memory, storage, GPUs
+- Real-time monitoring including GPU usage
+- Root access for unrestricted development
 
-- **🖥️ VS Code in Browser**: Full-featured code-server with web-based VS Code experience
-- **🖱️ Cursor IDE**: Desktop IDE with AI assistance for advanced development
-- **🔧 Optional GitHub Integration**: Automatic repository cloning and SSH key management
-- **🚀 GPU Acceleration**: Support for NVIDIA GPUs with configurable types and counts
-- **💾 Persistent Storage**: Home directory backed by Kubernetes PersistentVolumeClaim
-- **📦 Custom Base Images**: Support for organization-specific GPU-enabled Docker images
-
-### Resource Management
-
-- **⚙️ Flexible Resource Allocation**: Configurable CPU, memory, and storage
-- **🎮 GPU Selection**: Multiple GPU types (L4, H100) with multi-GPU support
-- **📊 Real-time Monitoring**: Built-in metrics for resource utilization including GPU usage
-
-### Production Ready
-
-- **❤️ Health Checks**: Automated health monitoring for all services
-- **🔒 Secure by Default**: Proper security contexts and access controls
-- **📈 Auto-scaling**: Kubernetes-native scaling and resource management
-
-## 📋 Prerequisites
-
-### Kubernetes Cluster Requirements
-
-- Kubernetes cluster with GPU node pools
-- NVIDIA GPU device plugin installed
-- StorageClass configured for persistent volumes
-- Sufficient GPU and compute resources
-
-### For GCP GKE Users
-
-- GKE cluster with GPU-enabled node pools
-- Node pools labeled with `cloud.google.com/gke-accelerator`
-- Proper IAM permissions for container registry access
-
-### Coder Setup
-
-- Coder deployment with Kubernetes provider configured
-- Access to the target Kubernetes namespace
-- Container registry access for base images
-- **Optional**: GitHub external authentication for Git integration features
-
-## ⚙️ Configuration Parameters
-
-### Repository and Integration
-
-| Parameter | Description | Default | Type |
-|-----------|-------------|---------|------|
-| `repo_selection` | Repository to clone | completion-service | dropdown |
-| `custom_repo` | Custom repository name | "" | string |
-| `enable_github_integration` | Enable GitHub features | true | boolean |
-
-### Compute Resources
-
-| Parameter | Description | Default | Range |
-|-----------|-------------|---------|-------|
-| `cpu` | Number of CPU cores | 4 | 4-16 |
-| `memory` | RAM allocation (GB) | 8 | 8-32 |
-| `home_disk_size` | Persistent storage (GB) | 16 | 16-1024 |
-
-### GPU Configuration
+## Configuration
 
 | Parameter | Description | Default | Options |
 |-----------|-------------|---------|---------|
-| `gpu_accelerator` | GPU type selection | None | No GPU, NVIDIA L4, NVIDIA H100 (80GB) |
-| `gpu_count` | Number of GPUs | 1 | 1-8 |
+| Repository URL | GitHub repository URL (optional) | `https://github.com/abridgeai/completion-service` | - |
+| CPU Cores | CPU allocation | 4 | 4-16 |
+| Memory | RAM in GB | 16 | 16-1024 |
+| Storage | Disk space in GB | 16 | 16-1024 |
+| GPU Type | GPU accelerator | None | None, NVIDIA L4, NVIDIA H100 (80GB) |
+| GPU Count | Number of GPUs | 1 | 1-8 |
 
-## 🔧 GitHub Integration
+## Repository Management
 
-### When Enabled (default: true)
+- **Default**: Clones completion-service repository
+- **Custom Repository**: Enter any GitHub repository URL
+- **No Repository**: Clear field for clean workspace
 
-✅ **Automatic Repository Cloning**: Selected repositories are cloned to `/home/vscode/{repo-name}`
-✅ **Git Configuration**: User name and email automatically configured from Coder profile
-✅ **SSH Key Upload**: Public SSH keys automatically uploaded to GitHub account
-✅ **Seamless Git Operations**: Push/pull without manual authentication
+Repository clones to `/root/{repo-name}` when URL provided.
 
-### When Disabled
+## Container Details
 
-❌ **No Repository Cloning**: Clean workspace without any repositories
-❌ **No Git Configuration**: Manual Git setup required if needed
-❌ **No SSH Keys**: Manual SSH key management required
-✅ **Faster Startup**: Quicker workspace initialization
+- **Base Image**: `us-central1-docker.pkg.dev/abridge-artifact-registry/coder/gpu:de9c4c0`
+- **User**: Root with full GPU access
+- **Home**: `/root`
+- **GPU**: NVIDIA drivers and CUDA pre-installed
 
-> **Note**: GitHub integration requires GitHub external authentication to be configured in your Coder deployment with `admin:public_key` scope.
+## Development Environment
 
-## Quick Start
+**VS Code (code-server)**
 
-1. **Deploy the Template**
+- Full VS Code experience in browser
+- Pre-installed Python and Jupyter extensions
+- GPU development tools available
 
-   ```bash
-   # Add template to your Coder deployment
-   coder templates create gpu-k8s ./templates/gpu-k8s
-   ```
+**Cursor IDE**
 
-2. **Create a Workspace**
-   - Navigate to Coder UI
-   - Select "gpu-k8s" template
-   - Configure repository (if GitHub integration enabled)
-   - Configure resources and GPU requirements
+- Desktop IDE with AI assistance
+- Direct connection from Cursor application
+- Advanced GPU development features
+
+## Prerequisites
+
+- Kubernetes cluster with GPU nodes and NVIDIA device plugin
+- Node pools labeled with `cloud.google.com/gke-accelerator` (for GKE)
+- GitHub external authentication for Git integration
+
+## Usage
+
+1. **Create Workspace**
+   - Select template and configure parameters
+   - Choose GPU type and count
    - Launch workspace
 
-3. **Access Applications**
-   - **VS Code**: Automatically opens in browser
-   - **Cursor IDE**: Available in workspace applications
+2. **Access Applications**
+   - VS Code opens automatically in browser
+   - Cursor IDE available in workspace applications
 
-## 🔧 Customization Guide
+## Monitoring
 
-### 1. Base Image Configuration
-
-Update the base image repository and tag in `main.tf`:
-
-```terraform
-locals {
-  base_image_repo = "your-registry.example.com/gpu-images"
-  base_image_tag  = "latest"
-  base_image      = "${local.base_image_repo}:${local.base_image_tag}"
-}
-```
-
-### 2. Repository Configuration
-
-Add repositories to the dropdown in `main.tf`:
-
-```terraform
-locals {
-  repo_map = {
-    "completion-service" = "https://github.com/abridgeai/completion-service"
-    "your-repo" = "https://github.com/abridgeai/your-repo"
-  }
-}
-
-data "coder_parameter" "repo_selection" {
-  option {
-    name  = "Your Repository"
-    value = "your-repo"
-  }
-}
-```
-
-### 3. GPU Node Selection
-
-Verify and customize GPU node selectors:
-
-```terraform
-gpu_node_selector = data.coder_parameter.gpu_accelerator.value != "" ? {
-  "cloud.google.com/gke-accelerator" = data.coder_parameter.gpu_accelerator.value
-} : {}
-```
-
-**Important**: Ensure the label keys match your cluster's GPU node labels.
-
-### 4. GPU Types and Resources
-
-Update available GPU options to match your cluster:
-
-```terraform
-data "coder_parameter" "gpu_accelerator" {
-  # Add or modify GPU options based on your available hardware
-  option {
-    name  = "Your GPU Type"
-    value = "your-gpu-label-value"
-  }
-}
-```
-
-### 5. Startup Script Customization
-
-Modify `local.init_script` to install additional tools:
-
-```bash
-# Add custom package installations
-pip install tensorflow pytorch
-# Install additional VS Code extensions
-$CODE_SERVER_DIR/bin/code-server --install-extension ms-toolsai.pytorch
-```
-
-### 6. Namespace Configuration
-
-Update the default namespace if needed:
-
-```terraform
-variable "namespace" {
-  default = "your-namespace"
-}
-```
-
-## Monitoring and Metrics
-
-The template includes built-in monitoring for:
-
-- **CPU Usage**: Both container and host-level monitoring
-- **Memory Usage**: RAM utilization tracking
-- **GPU Usage**: NVIDIA GPU utilization monitoring via nvidia-smi
-- **Disk Usage**: Home directory storage monitoring
-- **Load Average**: System load metrics
-
-## 🌐 Applications
-
-### VS Code (code-server)
-
-- **URL**: `http://localhost:13337`
-- **Display Name**: code-server
-- **Features**: Full VS Code experience with extensions
-- **Default Extensions**: Python, Jupyter support
-- **Health Check**: Automated monitoring on `/healthz`
-- **Opens**: Repository directory (when cloned) or home directory
-
-### Cursor IDE
-
-- **Integration**: Direct connection from Cursor desktop application
-- **Features**: AI-powered development assistance
-- **Connection**: Automatic setup via Coder integration
-- **Usage**: Install Cursor locally and connect to workspace
-
-## 🔐 Security Considerations
-
-- **Root Access**: Containers run as root for maximum flexibility
-- **Privilege Escalation**: Enabled for system-level operations
-- **Network Access**: Applications bound to localhost by default
-- **Storage**: Persistent volumes with proper access controls
-- **SSH Keys**: Automatically managed when GitHub integration enabled
-
-## Troubleshooting
-
-### Common Issues
-
-#### GitHub Integration Not Working
-
-**Symptoms**: Repository not cloned, SSH keys not uploaded
-**Solutions**:
-
-1. Verify GitHub external auth is configured in Coder deployment
-2. Check user has linked GitHub account in Coder settings
-3. Ensure GitHub app has `admin:public_key` scope
-4. Try unlinking and relinking GitHub account
-
-#### GPU Not Available
-
-**Symptoms**: GPU resources not allocated or visible
-**Solutions**:
-
-1. Verify GPU device plugin is installed: `kubectl get daemonset -n kube-system`
-2. Check node labels: `kubectl describe nodes`
-3. Ensure `nvidia.com/gpu` resource is available
-4. Verify GPU accelerator parameter matches node labels
-
-#### Pod Scheduling Failures
-
-**Symptoms**: Workspace fails to start, pod pending
-**Solutions**:
-
-1. Check resource availability: `kubectl describe nodes`
-2. Verify node selectors match available nodes
-3. Check GPU resource requests vs. availability
-4. Review pod events: `kubectl describe pod <pod-name>`
-
-#### Application Access Issues
-
-**Symptoms**: VS Code or Cursor not accessible
-**Solutions**:
-
-1. Check application logs in Coder UI
-2. Verify health checks are passing
-3. Check port forwarding and network policies
-4. Review startup script execution logs
-
-### Support
-
-- **Template Issues**: Contact Abridge DevOps team
-- **Coder Platform**: Review Coder documentation
-- **GPU Hardware**: Check with cluster administrators
-- **GitHub Integration**: Verify external auth configuration
-
-## Additional Resources
-
-- [Coder Documentation](https://coder.com/docs)
-- [Kubernetes GPU Documentation](https://kubernetes.io/docs/tasks/manage-gpus/scheduling-gpus/)
-- [NVIDIA GPU Operator](https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/overview.html)
-- [GCP GKE GPU Guide](https://cloud.google.com/kubernetes-engine/docs/how-to/gpus)
-
-## 🤝 Contributing
-
-To improve this template:
-
-1. Test changes in a development environment
-2. Update documentation for any new features
-3. Ensure backward compatibility
-4. Follow Terraform and Kubernetes best practices
+Built-in metrics: CPU, memory, GPU utilization, disk usage
 
 ---
 
-**Note**: This template assumes your Kubernetes cluster has the necessary GPU device plugins and drivers installed. For production use, thoroughly test resource limits and security configurations.
+**Note**: Requires Kubernetes cluster with GPU support and NVIDIA drivers.
