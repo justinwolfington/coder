@@ -75,7 +75,7 @@ jobs:
         run: |
           CONFIG="./templates/templates-config.json"
           jq -r '.templates | to_entries[] | .value.directory' "$CONFIG" | while read -r dir; do
-            cd "./templates/$dir"
+            cd "$dir"
             terraform init -backend=false > /dev/null
             terraform validate || { echo "Terraform validation failed in $dir"; exit 1; }
             cd - > /dev/null
@@ -93,7 +93,7 @@ jobs:
             eval "$(jq -r --arg t "$template" '.templates[$t] | @sh "DIR=\(.directory) NAME=\(.display_name) DESC=\(.description) ICON=\(.icon)"' "$CONFIG")"
 
             echo "Pushing: template $template ($NAME) from $DIR"
-            coder templates push "$template" --directory "./templates/$DIR" --name "$VERSION" --message "Auto-deploy $VERSION" --yes
+            coder templates push "$template" --directory "./$DIR" --name "$VERSION" --message "Auto-deploy $VERSION" --yes
 
             echo "Editing template metadata"
             coder templates edit "$template" --display-name "$NAME" --description "$DESC" --icon "$ICON" --yes
