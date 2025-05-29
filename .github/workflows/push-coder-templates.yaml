@@ -1,4 +1,4 @@
-name: Push Coder Templates
+name: Test and Publish Coder Template
 
 on:
   # Run after successful build/promotion of artifacts
@@ -48,8 +48,15 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Setup Coder CLI
+        uses: coder/setup-action@v1
         with:
-          submodules: true
+          access_url: ${{ vars.CODER_ACCESS_URL }}
+          coder_session_token: ${{ secrets.CODER_SESSION_TOKEN }}
 
       - name: Get short commit SHA
         id: vars
@@ -58,31 +65,54 @@ jobs:
           [[ -z "$SHA" ]] && SHA=$(git rev-parse HEAD)
           echo "sha_short=${SHA:0:7}" >> $GITHUB_OUTPUT
 
-      - name: Setup Coder CLI
-        uses: coder/setup-action@v1
-        with:
-          access_url: ${{ vars.CODER_ACCESS_URL }}
-          coder_session_token: ${{ secrets.CODER_SESSION_TOKEN }}
+      - name: Validate templates-config.json
+        run: |
+          CONFIG="./templates/templates-config.json"
+          jq 'has("templates")' "$CONFIG"
+          jq -e '.templates | to_entries[] | .value.directory and .value.display_name and .value.description and .value.icon' "$CONFIG" > /dev/null
 
-      - name: Push templates
+      - name: Validate Terraform configuration for all templates
+        run: |
+          CONFIG="./templates/templates-config.json"
+          jq -r '.templates | to_entries[] | .value.directory' "$CONFIG" | while read -r dir; do
+            cd "./templates/$dir"
+            terraform init -backend=false > /dev/null
+            terraform validate || { echo "Terraform validation failed in $dir"; exit 1; }
+            cd - > /dev/null
+          done
+
+      - name: Push and test templates
         run: |
           CONFIG="./templates/templates-config.json"
           VERSION="${{ steps.vars.outputs.sha_short }}"
           FILTER_TEMPLATE="${{ github.event.inputs.template_name }}"
 
-          # Parse and push templates
           jq -r '.templates | keys[]' "$CONFIG" | while read -r template; do
             [[ -n "$FILTER_TEMPLATE" && "$template" != "$FILTER_TEMPLATE" ]] && continue
 
             eval "$(jq -r --arg t "$template" '.templates[$t] | @sh "DIR=\(.directory) NAME=\(.display_name) DESC=\(.description) ICON=\(.icon)"' "$CONFIG")"
 
-            echo "🚀 Pushing: $template ($NAME) from $DIR"
-            coder templates push "$template" --directory "$DIR" --name "$VERSION" --message "Auto-deploy $VERSION" --yes
+            echo "Pushing: template $template ($NAME) from $DIR"
+            coder templates push "$template" --directory "./templates/$DIR" --name "$VERSION" --message "Auto-deploy $VERSION" --yes
 
-            echo "🔧 Setting metadata for: $template"
+            echo "Editing template metadata"
             coder templates edit "$template" --display-name "$NAME" --description "$DESC" --icon "$ICON" --yes
 
-            echo "✅ Template $template deployed with metadata"
+            WORKSPACE_NAME="test-${template}-${VERSION}"
+            echo "Creating test workspace $WORKSPACE_NAME"
+            coder create -t "$template" --template-version "$VERSION" "$WORKSPACE_NAME" --yes
+
+            echo "Configuring SSH access"
+            coder config-ssh --yes
+
+            echo "Testing workspace connectivity"
+            ssh coder."$WORKSPACE_NAME" -- 'ls -la && pwd && whoami && echo "Testing workspace setup"' || echo "Workspace test failed"
+
+            echo "Cleaning up test workspace"
+            coder delete "$WORKSPACE_NAME" --yes || echo "Failed to delete workspace"
+
+            echo "Promoting template version"
+            coder template version promote --template="$template" --template-version="$VERSION" --yes
           done
 
       - name: Notify on success
