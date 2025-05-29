@@ -78,7 +78,11 @@ jobs:
 
             echo "🚀 Pushing: $template ($NAME) from $DIR"
             coder templates push "$template" --directory "$DIR" --name "$VERSION" --message "Auto-deploy $VERSION" --yes
-            echo "📝 Metadata: $NAME | $DESC | $ICON"
+
+            echo "🔧 Setting metadata for: $template"
+            coder templates edit "$template" --display-name "$NAME" --description "$DESC" --icon "$ICON" --yes
+
+            echo "✅ Template $template deployed with metadata"
           done
 
       - name: Notify on success
