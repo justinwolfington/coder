@@ -117,5 +117,5 @@ jobs:
             # coder delete "$WORKSPACE_NAME" --yes || echo "Failed to delete workspace"
 
             echo "Promoting template version"
-            coder template version promote --template="$template" --template-version="$VERSION" --yes
+            coder template version promote --template="$template" --template-version="$VERSION"
           done
