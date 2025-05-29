@@ -1,0 +1,31 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: coder-workspace
+  namespace: coder
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: coder-workspace
+  policyTypes:
+  - Egress
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: eyes
+          app.kubernetes.io/instance: eyes
+          component: api
+      namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: eyes
+    ports:
+    - protocol: TCP
+      port: 80
+  - ports:
+    - port: 53
+      protocol: TCP
+    - port: 443
+      protocol: TCP
+    - port: 53
+      protocol: UDP
