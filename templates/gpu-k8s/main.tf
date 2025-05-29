@@ -15,14 +15,6 @@ provider "kubernetes" {
   config_path = null
 }
 
-# Template metadata configuration
-resource "coder_template" "template" {
-  name         = "gpu-k8s"
-  display_name = "GPU k8s VMKiller"
-  description  = "Provision Kubernetes Deployments as Coder workspaces with GPU support"
-  icon         = "/emojis/1f35f.png"
-}
-
 variable "namespace" {
   type        = string
   description = "Target Kubernetes namespace for workspace deployments."

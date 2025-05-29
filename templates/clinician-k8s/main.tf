@@ -15,14 +15,6 @@ provider "kubernetes" {
   config_path = null
 }
 
-# Template metadata configuration
-resource "coder_template" "template" {
-  name         = "k8s-completion-service"
-  display_name = "Completion Service"
-  description  = "Provision Kubernetes Deployments as Coder workspaces, with completion-service cloned, uv and gcloud CLI installed"
-  icon         = "/emojis/1f33c.png"
-}
-
 variable "namespace" {
   type        = string
   description = "Target Kubernetes namespace for workspace deployments."

@@ -44,13 +44,6 @@ jobs:
     if: github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request' || github.event.workflow_run.conclusion == 'success'
     runs-on: abridge-runner-${{ github.event.inputs.environment || 'development' }}
     environment: ${{ github.event.inputs.environment || 'development' }}
-    strategy:
-      matrix:
-        template:
-          - name: "gpu-k8s"
-            directory: "./templates/gpu-k8s"
-          - name: "k8s-completion-service"
-            directory: "./templates/clinician-k8s"
 
     steps:
       - name: Checkout repository
@@ -61,29 +54,9 @@ jobs:
       - name: Get short commit SHA
         id: vars
         run: |
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            SHA="${{ github.sha }}"
-          elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            SHA="${{ github.event.pull_request.head.sha }}"
-          else
-            SHA="${{ github.event.workflow_run.head_sha }}"
-          fi
-
-          # Fallback to current commit if SHA is empty
-          if [[ -z "$SHA" ]]; then
-            SHA=$(git rev-parse HEAD)
-          fi
-
-          SHORT_SHA="${SHA:0:7}"
-
-          # Validate that we have a valid short SHA
-          if [[ -z "$SHORT_SHA" ]]; then
-            echo "Error: Could not determine commit SHA"
-            exit 1
-          fi
-
-          echo "sha_short=$SHORT_SHA" >> $GITHUB_OUTPUT
-          echo "Using SHA: $SHA (short: $SHORT_SHA)"
+          SHA="${{ github.event_name == 'workflow_dispatch' && github.sha || github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.event.workflow_run.head_sha }}"
+          [[ -z "$SHA" ]] && SHA=$(git rev-parse HEAD)
+          echo "sha_short=${SHA:0:7}" >> $GITHUB_OUTPUT
 
       - name: Setup Coder CLI
         uses: coder/setup-action@v1
@@ -91,43 +64,31 @@ jobs:
           access_url: ${{ vars.CODER_ACCESS_URL }}
           coder_session_token: ${{ secrets.CODER_SESSION_TOKEN }}
 
-      - name: Push template ${{ matrix.template.name }}
-        if: github.event_name != 'workflow_dispatch' || github.event.inputs.template_name == '' || github.event.inputs.template_name == matrix.template.name
+      - name: Push templates
         run: |
-          echo "Pushing template: ${{ matrix.template.name }}"
-          echo "Directory: ${{ matrix.template.directory }}"
-          echo "Version: ${{ steps.vars.outputs.sha_short }}"
-
-          # Validate version name before pushing
+          CONFIG="./templates/templates-config.json"
           VERSION="${{ steps.vars.outputs.sha_short }}"
-          if [[ -z "$VERSION" ]]; then
-            echo "Error: Version name is empty"
-            exit 1
-          fi
+          FILTER_TEMPLATE="${{ github.event.inputs.template_name }}"
 
-          # Validate template directory exists
-          if [[ ! -d "${{ matrix.template.directory }}" ]]; then
-            echo "Error: Template directory not found: ${{ matrix.template.directory }}"
-            exit 1
-          fi
+          # Parse and push templates
+          jq -r '.templates | keys[]' "$CONFIG" | while read -r template; do
+            [[ -n "$FILTER_TEMPLATE" && "$template" != "$FILTER_TEMPLATE" ]] && continue
 
-          # Push the template with proper quoting
-          echo "Executing: coder templates push ${{ matrix.template.name }} --directory ${{ matrix.template.directory }} --name \"$VERSION\" --message \"Automated deployment from commit $VERSION\" --yes"
+            eval "$(jq -r --arg t "$template" '.templates[$t] | @sh "DIR=\(.directory) NAME=\(.display_name) DESC=\(.description) ICON=\(.icon)"' "$CONFIG")"
 
-          coder templates push ${{ matrix.template.name }} \
-            --directory ${{ matrix.template.directory }} \
-            --name "$VERSION" \
-            --message "Automated deployment from commit $VERSION" \
-            --yes
+            echo "🚀 Pushing: $template ($NAME) from $DIR"
+            coder templates push "$template" --directory "$DIR" --name "$VERSION" --message "Auto-deploy $VERSION" --yes
+            echo "📝 Metadata: $NAME | $DESC | $ICON"
+          done
 
       - name: Notify on success
         if: success()
         run: |
-          echo "Successfully pushed template: ${{ matrix.template.name }}"
+          echo "Successfully pushed templates"
           echo "Version: ${{ steps.vars.outputs.sha_short }}"
 
       - name: Notify on failure
         if: failure()
         run: |
-          echo "Failed to push template: ${{ matrix.template.name }}"
+          echo "Failed to push templates"
           echo "Please check the logs above for details"
