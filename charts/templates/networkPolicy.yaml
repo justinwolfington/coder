@@ -15,7 +15,6 @@ spec:
         matchLabels:
           app.kubernetes.io/name: eyes
           app.kubernetes.io/instance: eyes
-          component: api
       namespaceSelector:
         matchLabels:
           kubernetes.io/metadata.name: eyes
