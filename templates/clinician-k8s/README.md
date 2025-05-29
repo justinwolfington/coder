@@ -1,66 +1,90 @@
 ---
-display_name: Clinician Kubernetes Workspace
-description: Provision specialized Kubernetes workspaces for clinical development
-icon: /icon/k8s.svg
+display_name: Completion Service
+description: Provision Kubernetes Deployments as Coder workspaces, with completion-service cloned, uv and gcloud CLI installed
+icon: /emojis/1f33c.png
 maintainer_github: abridgeai
 verified: true
-tags: [kubernetes, container, clinical, development]
+tags: [kubernetes, container, completion-service, development, github, cursor]
 ---
 
 ## Table of Contents
 
-- [Clinician Development on Kubernetes](#clinician-development-on-kubernetes)
+- [Completion Service Development on Kubernetes](#completion-service-development-on-kubernetes)
   - [Features](#features)
   - [Architecture](#architecture)
   - [Container Details](#container-details)
   - [Workspace Creation Form](#workspace-creation-form)
+  - [GitHub Integration](#github-integration)
   - [Repository Selection](#repository-selection)
   - [Resource Customization](#resource-customization)
+  - [Development Environments](#development-environments)
   - [Usage](#usage)
   - [Available Tools](#available-tools)
   - [Customization \& Troubleshooting](#customization--troubleshooting)
 
-# Clinician Development on Kubernetes
+# Completion Service Development on Kubernetes
 
-A Kubernetes workspace template optimized for clinical development with pre-configured access to Abridge services.
+A Kubernetes workspace template optimized for completion service development with optional GitHub integration and multiple IDE options.
 
 ## Features
 
-- **Git Integration**: Clone repositories with a simple dropdown selection.
-- **Resource Configuration**: Customize CPU, memory, and storage.
-- **Pre-configured Environment**: Access to essential Abridge services.
-- **Code-Server**: VS Code in the browser.
-- **Performance Monitoring**: CPU, memory, and disk usage metrics.
-- **Development Tools**: Python with UV package manager, Google Cloud SDK.
+- **🔧 Optional GitHub Integration**: Automatic repository cloning and SSH key management
+- **🖱️ Multiple IDEs**: Choose between VS Code (code-server) and Cursor IDE
+- **⚙️ Resource Configuration**: Customize CPU, memory, and storage
+- **🔑 Automatic SSH Setup**: GitHub SSH keys automatically uploaded (when enabled)
+- **📊 Performance Monitoring**: CPU, memory, and disk usage metrics
+- **🐍 Development Tools**: Python with UV package manager, Google Cloud SDK
+- **🏗️ Pre-configured Environment**: Access to essential Abridge services
 
 ## Architecture
 
-- Kubernetes deployment with a single pod.
-- Persistent volume for `/home/vscode`.
-- Code-Server instance (VS Code in browser).
-- Automatic Git repository cloning.
+- Kubernetes deployment with a single pod
+- Persistent volume for `/home/vscode`
+- Code-Server instance (VS Code in browser)
+- Cursor IDE integration for desktop development
+- Conditional Git repository cloning and SSH key management
 
 ## Container Details
 
-- Base image: `mcr.microsoft.com/devcontainers/python:3.11` as builder
-- Package Management: UV (`ghcr.io/astral-sh/uv:0.7.3`) automatically installed.
+- Base image: `us-central1-docker.pkg.dev/abridge-artifact-registry/coder/base:1402364`
+- Package Management: UV with `keyring` and `keyrings.google-artifactregistry-auth`
+- Git configuration and SSH key management (when GitHub integration enabled)
 
 ## Workspace Creation Form
 
 When creating a workspace, parameters appear in this order:
 
-1. Repository Selection
-2. Custom Repository URL (if "Custom Repository" selected)
-3. CPU
-4. Memory
-5. Home disk size
+1. **Repository Selection**: Choose which repository to clone
+2. **Custom Repository Name**: If "Custom Repository" selected, specify repository name
+3. **Enable GitHub Integration**: Toggle GitHub features on/off
+4. **CPU Cores**: 4-16 cores (default: 4)
+5. **Memory**: 8-32GB RAM (default: 8GB)
+6. **Home Disk Size**: 16-1024GB (default: 16GB)
+
+## GitHub Integration
+
+When **Enable GitHub Integration** is set to `true`:
+
+✅ **Automatic Repository Cloning**: Selected repositories are cloned to `/home/vscode/{repo-name}`
+✅ **Git Configuration**: User name and email automatically configured from Coder profile
+✅ **SSH Key Upload**: Public SSH keys automatically uploaded to GitHub account
+✅ **Seamless Git Operations**: Push/pull without manual authentication
+
+When **Enable GitHub Integration** is set to `false`:
+
+❌ **No Repository Cloning**: Clean workspace without any repositories
+❌ **No Git Configuration**: Manual Git setup required if needed
+❌ **No SSH Keys**: Manual SSH key management required
+✅ **Faster Startup**: Quicker workspace initialization
+
+> **Note**: GitHub integration requires GitHub external authentication to be configured in your Coder deployment.
 
 ## Repository Selection
 
-1. **Completion Service**: Clones the `abridgeai/completion-service` repository.
-2. **Custom Repository**: Clone any Git repository from the `abridgeai` GitHub organization.
+1. **Completion Service**: Clones the `abridgeai/completion-service` repository
+2. **Custom Repository**: Clone any repository from the `abridgeai` GitHub organization
 
-Repositories are cloned to `/home/vscode/{repo-name}`.
+Repositories are cloned to `/home/vscode/{repo-name}` when GitHub integration is enabled.
 
 ## Resource Customization
 
@@ -68,22 +92,56 @@ Repositories are cloned to `/home/vscode/{repo-name}`.
 - **Memory**: 8-32GB RAM (default: 8GB)
 - **Storage**: 16-1024GB (default: 16GB)
 
+## Development Environments
+
+### **🖥️ VS Code (Code-Server)**
+- Full VS Code experience in the browser
+- Pre-installed extensions: Python, Jupyter
+- Accessible via workspace dashboard
+- Opens in repository directory (when cloned)
+
+### **🖱️ Cursor IDE**
+- Desktop IDE with AI assistance
+- Connect directly from Cursor application
+- Seamless remote development experience
+- Available via workspace applications
+
 ## Usage
 
-1. Create a workspace using this template.
-2. Select a repository and configure resources.
-3. Start the workspace.
-4. Connect via the web IDE or SSH.
+1. **Create Workspace**: Use this template from Coder dashboard
+2. **Configure Options**:
+   - Choose repository (if GitHub integration enabled)
+   - Set resource requirements
+   - Toggle GitHub integration as needed
+3. **Start Workspace**: Wait for initialization to complete
+4. **Choose IDE**: Access via Code-Server or Cursor
+5. **Start Developing**: Repository ready (if cloned), Git configured (if enabled)
 
 ## Available Tools
 
-- **UV**: Fast Python package manager. Includes `keyring` with `keyrings.google-artifactregistry-auth`.
-- **Google Cloud SDK**: Access with `gcloud`.
-- **Python 3.11**: Default Python environment.
+- **🐍 Python 3.11**: Default Python environment
+- **📦 UV**: Fast Python package manager with keyring support
+- **☁️ Google Cloud SDK**: Access with `gcloud` command
+- **🔧 Git**: Pre-configured with user identity (when GitHub integration enabled)
+- **🔑 SSH**: Keys automatically managed (when GitHub integration enabled)
+- **📊 Monitoring**: Built-in CPU, memory, and disk usage metrics
 
 ## Customization & Troubleshooting
 
-- Add repositories to the dropdown via Terraform configuration.
-- Customize the base image for additional tools.
-- Check workspace logs for errors.
-- Contact the Abridge DevOps team for further assistance.
+### **Adding Repositories**
+- Update `repo_map` in `locals` section of `main.tf`
+- Add new options to `repo_selection` parameter
+
+### **GitHub Integration Issues**
+- Ensure GitHub external auth is configured in Coder deployment
+- Check user has linked GitHub account in Coder settings
+- Verify GitHub app has `admin:public_key` scope
+
+### **Performance Tuning**
+- Adjust default resource limits in template parameters
+- Monitor workspace metrics via built-in monitoring
+
+### **Support**
+- Check workspace logs for initialization errors
+- Contact Abridge DevOps team for deployment-specific issues
+- Review Coder documentation for general troubleshooting

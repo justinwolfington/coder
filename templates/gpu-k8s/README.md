@@ -1,27 +1,29 @@
-# Coder GPU Kubernetes Template (`gpu-k8s`)
+# GPU k8s VMKiller Template
 
-A production-ready Coder template for provisioning GPU-accelerated development workspaces in Kubernetes, optimized for machine learning, data science, and compute-intensive workloads.
+A production-ready Coder template for provisioning GPU-accelerated development workspaces in Kubernetes, optimized for machine learning, data science, and compute-intensive workloads with optional GitHub integration.
 
 ## Features
 
 ### Development Environment
 
-- **VS Code in Browser**: Full-featured code-server with web-based VS Code experience
-- **GPU Acceleration**: Support for NVIDIA GPUs with configurable types and counts
-- **Persistent Storage**: Home directory backed by Kubernetes PersistentVolumeClaim
-- **Custom Base Images**: Support for organization-specific GPU-enabled Docker images
+- **🖥️ VS Code in Browser**: Full-featured code-server with web-based VS Code experience
+- **🖱️ Cursor IDE**: Desktop IDE with AI assistance for advanced development
+- **🔧 Optional GitHub Integration**: Automatic repository cloning and SSH key management
+- **🚀 GPU Acceleration**: Support for NVIDIA GPUs with configurable types and counts
+- **💾 Persistent Storage**: Home directory backed by Kubernetes PersistentVolumeClaim
+- **📦 Custom Base Images**: Support for organization-specific GPU-enabled Docker images
 
 ### Resource Management
 
-- **Flexible Resource Allocation**: Configurable CPU, memory, and storage
-- **GPU Selection**: Multiple GPU types (L4, H100) with multi-GPU support
-- **Real-time Monitoring**: Built-in metrics for resource utilization including GPU usage
+- **⚙️ Flexible Resource Allocation**: Configurable CPU, memory, and storage
+- **🎮 GPU Selection**: Multiple GPU types (L4, H100) with multi-GPU support
+- **📊 Real-time Monitoring**: Built-in metrics for resource utilization including GPU usage
 
 ### Production Ready
 
-- **Health Checks**: Automated health monitoring for all services
-- **Secure by Default**: Proper security contexts and access controls
-- **Auto-scaling**: Kubernetes-native scaling and resource management
+- **❤️ Health Checks**: Automated health monitoring for all services
+- **🔒 Secure by Default**: Proper security contexts and access controls
+- **📈 Auto-scaling**: Kubernetes-native scaling and resource management
 
 ## 📋 Prerequisites
 
@@ -43,8 +45,17 @@ A production-ready Coder template for provisioning GPU-accelerated development w
 - Coder deployment with Kubernetes provider configured
 - Access to the target Kubernetes namespace
 - Container registry access for base images
+- **Optional**: GitHub external authentication for Git integration features
 
 ## ⚙️ Configuration Parameters
+
+### Repository and Integration
+
+| Parameter | Description | Default | Type |
+|-----------|-------------|---------|------|
+| `repo_selection` | Repository to clone | completion-service | dropdown |
+| `custom_repo` | Custom repository name | "" | string |
+| `enable_github_integration` | Enable GitHub features | true | boolean |
 
 ### Compute Resources
 
@@ -61,6 +72,23 @@ A production-ready Coder template for provisioning GPU-accelerated development w
 | `gpu_accelerator` | GPU type selection | None | No GPU, NVIDIA L4, NVIDIA H100 (80GB) |
 | `gpu_count` | Number of GPUs | 1 | 1-8 |
 
+## 🔧 GitHub Integration
+
+### When Enabled (default: true)
+
+✅ **Automatic Repository Cloning**: Selected repositories are cloned to `/home/vscode/{repo-name}`
+✅ **Git Configuration**: User name and email automatically configured from Coder profile
+✅ **SSH Key Upload**: Public SSH keys automatically uploaded to GitHub account
+✅ **Seamless Git Operations**: Push/pull without manual authentication
+
+### When Disabled
+
+❌ **No Repository Cloning**: Clean workspace without any repositories
+❌ **No Git Configuration**: Manual Git setup required if needed
+❌ **No SSH Keys**: Manual SSH key management required
+✅ **Faster Startup**: Quicker workspace initialization
+
+> **Note**: GitHub integration requires GitHub external authentication to be configured in your Coder deployment with `admin:public_key` scope.
 
 ## Quick Start
 
@@ -74,11 +102,13 @@ A production-ready Coder template for provisioning GPU-accelerated development w
 2. **Create a Workspace**
    - Navigate to Coder UI
    - Select "gpu-k8s" template
+   - Configure repository (if GitHub integration enabled)
    - Configure resources and GPU requirements
    - Launch workspace
 
 3. **Access Applications**
    - **VS Code**: Automatically opens in browser
+   - **Cursor IDE**: Available in workspace applications
 
 ## 🔧 Customization Guide
 
@@ -94,7 +124,27 @@ locals {
 }
 ```
 
-### 2. GPU Node Selection
+### 2. Repository Configuration
+
+Add repositories to the dropdown in `main.tf`:
+
+```terraform
+locals {
+  repo_map = {
+    "completion-service" = "https://github.com/abridgeai/completion-service"
+    "your-repo" = "https://github.com/abridgeai/your-repo"
+  }
+}
+
+data "coder_parameter" "repo_selection" {
+  option {
+    name  = "Your Repository"
+    value = "your-repo"
+  }
+}
+```
+
+### 3. GPU Node Selection
 
 Verify and customize GPU node selectors:
 
@@ -106,7 +156,7 @@ gpu_node_selector = data.coder_parameter.gpu_accelerator.value != "" ? {
 
 **Important**: Ensure the label keys match your cluster's GPU node labels.
 
-### 3. GPU Types and Resources
+### 4. GPU Types and Resources
 
 Update available GPU options to match your cluster:
 
@@ -120,18 +170,18 @@ data "coder_parameter" "gpu_accelerator" {
 }
 ```
 
-### 4. Startup Script Customization
+### 5. Startup Script Customization
 
 Modify `local.init_script` to install additional tools:
 
 ```bash
 # Add custom package installations
-uv pip install --system tensorflow pytorch
+pip install tensorflow pytorch
 # Install additional VS Code extensions
 $CODE_SERVER_DIR/bin/code-server --install-extension ms-toolsai.pytorch
 ```
 
-### 5. Namespace Configuration
+### 6. Namespace Configuration
 
 Update the default namespace if needed:
 
@@ -147,7 +197,7 @@ The template includes built-in monitoring for:
 
 - **CPU Usage**: Both container and host-level monitoring
 - **Memory Usage**: RAM utilization tracking
-- **GPU Usage**: NVIDIA GPU utilization monitoring
+- **GPU Usage**: NVIDIA GPU utilization monitoring via nvidia-smi
 - **Disk Usage**: Home directory storage monitoring
 - **Load Average**: System load metrics
 
@@ -158,8 +208,16 @@ The template includes built-in monitoring for:
 - **URL**: `http://localhost:13337`
 - **Display Name**: code-server
 - **Features**: Full VS Code experience with extensions
-- **Default Extensions**: Python support
+- **Default Extensions**: Python, Jupyter support
 - **Health Check**: Automated monitoring on `/healthz`
+- **Opens**: Repository directory (when cloned) or home directory
+
+### Cursor IDE
+
+- **Integration**: Direct connection from Cursor desktop application
+- **Features**: AI-powered development assistance
+- **Connection**: Automatic setup via Coder integration
+- **Usage**: Install Cursor locally and connect to workspace
 
 ## 🔐 Security Considerations
 
@@ -167,10 +225,21 @@ The template includes built-in monitoring for:
 - **Privilege Escalation**: Enabled for system-level operations
 - **Network Access**: Applications bound to localhost by default
 - **Storage**: Persistent volumes with proper access controls
+- **SSH Keys**: Automatically managed when GitHub integration enabled
 
 ## Troubleshooting
 
 ### Common Issues
+
+#### GitHub Integration Not Working
+
+**Symptoms**: Repository not cloned, SSH keys not uploaded
+**Solutions**:
+
+1. Verify GitHub external auth is configured in Coder deployment
+2. Check user has linked GitHub account in Coder settings
+3. Ensure GitHub app has `admin:public_key` scope
+4. Try unlinking and relinking GitHub account
 
 #### GPU Not Available
 
@@ -194,23 +263,20 @@ The template includes built-in monitoring for:
 
 #### Application Access Issues
 
-**Symptoms**: VS Code not accessible
+**Symptoms**: VS Code or Cursor not accessible
 **Solutions**:
 
 1. Check application logs in Coder UI
-2. Verify health check status
-3. Ensure ports are not blocked
-4. Check startup script execution logs
+2. Verify health checks are passing
+3. Check port forwarding and network policies
+4. Review startup script execution logs
 
-#### Storage Issues
+### Support
 
-**Symptoms**: Home directory not persistent or accessible
-**Solutions**:
-
-1. Verify PVC status: `kubectl get pvc`
-2. Check StorageClass availability
-3. Ensure sufficient storage quota
-4. Review volume mount permissions
+- **Template Issues**: Contact Abridge DevOps team
+- **Coder Platform**: Review Coder documentation
+- **GPU Hardware**: Check with cluster administrators
+- **GitHub Integration**: Verify external auth configuration
 
 ## Additional Resources
 

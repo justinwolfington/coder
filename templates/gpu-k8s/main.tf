@@ -51,6 +51,16 @@ data "coder_parameter" "custom_repo" {
   order        = 2
 }
 
+data "coder_parameter" "enable_github_integration" {
+  name         = "enable_github_integration"
+  display_name = "Enable GitHub Integration"
+  description  = "Enable automatic GitHub repository cloning and SSH key upload. Requires GitHub external auth to be configured."
+  default      = "true"
+  mutable      = false
+  type         = "bool"
+  order        = 3
+}
+
 data "coder_parameter" "cpu" {
   name         = "cpu"
   display_name = "CPU Cores"
@@ -58,7 +68,7 @@ data "coder_parameter" "cpu" {
   default      = "4"
   icon         = "/icon/memory.svg"
   mutable      = true
-  order        = 3
+  order        = 4
   type         = "number"
   validation {
     min = 4
@@ -73,7 +83,7 @@ data "coder_parameter" "memory" {
   default      = "8"
   icon         = "/icon/memory.svg"
   mutable      = true
-  order        = 4
+  order        = 5
   type         = "number"
   validation {
     min = 8
@@ -89,7 +99,7 @@ data "coder_parameter" "home_disk_size" {
   type         = "number"
   icon         = "/icon/folder.svg"
   mutable      = true
-  order        = 5
+  order        = 6
   validation {
     min = 16
     max = 1024
@@ -102,7 +112,7 @@ data "coder_parameter" "gpu_accelerator" {
   description  = "Choose GPU type. Must match 'cloud.google.com/gke-accelerator' label values on GKE nodes. Leave empty for CPU-only."
   default      = ""
   mutable      = true
-  order        = 6
+  order        = 7
   icon         = "/icon/container.svg"
   type         = "string"
   option {
@@ -125,7 +135,7 @@ data "coder_parameter" "gpu_count" {
   description  = "Number of GPUs to allocate to the workspace. Only applicable if a GPU Accelerator Type is selected."
   default      = "1"
   mutable      = true
-  order        = 7
+  order        = 8
   type         = "number"
   icon         = "/icon/container.svg"
   validation {
@@ -148,8 +158,8 @@ locals {
   )
 
   should_clone = (
-    data.coder_parameter.repo_selection.value != "custom"
-    || data.coder_parameter.custom_repo.value != ""
+    data.coder_parameter.enable_github_integration.value &&
+    (data.coder_parameter.repo_selection.value != "custom" || data.coder_parameter.custom_repo.value != "")
   )
 
   # Image and environment configuration
@@ -249,6 +259,30 @@ module "git-clone" {
   version  = "1.0.18"
   agent_id = coder_agent.main.id
   url      = local.repo_url
+}
+
+# --- Cursor IDE Integration ---
+module "cursor" {
+  count    = data.coder_workspace.me.start_count
+  source   = "registry.coder.com/coder/cursor/coder"
+  version  = "1.1.0"
+  agent_id = coder_agent.main.id
+}
+
+# --- Git Configuration ---
+module "git-config" {
+  count    = data.coder_workspace.me.start_count > 0 && data.coder_parameter.enable_github_integration.value ? 1 : 0
+  source   = "registry.coder.com/coder/git-config/coder"
+  version  = "1.0.15"
+  agent_id = coder_agent.main.id
+}
+
+# --- GitHub SSH Key Upload ---
+module "github-upload-public-key" {
+  count    = data.coder_workspace.me.start_count > 0 && data.coder_parameter.enable_github_integration.value ? 1 : 0
+  source   = "registry.coder.com/coder/github-upload-public-key/coder"
+  version  = "1.0.15"
+  agent_id = coder_agent.main.id
 }
 
 # --- Coder Application: code-server ---
