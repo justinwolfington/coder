@@ -24,13 +24,17 @@ variable "namespace" {
 data "coder_workspace" "me" {}
 data "coder_workspace_owner" "me" {}
 
-data "coder_parameter" "repo_selection" {
-  name         = "repo_selection"
-  display_name = "Repository Selection"
+data "coder_parameter" "repository" {
+  name         = "repository"
+  display_name = "Repository"
   description  = "Choose which repository to clone"
   default      = "completion-service"
   mutable      = true
   order        = 1
+  option {
+    name  = "No Repository"
+    value = "none"
+  }
   option {
     name  = "Completion Service"
     value = "completion-service"
@@ -41,24 +45,14 @@ data "coder_parameter" "repo_selection" {
   }
 }
 
-data "coder_parameter" "custom_repo" {
-  name         = "custom_repo"
+data "coder_parameter" "custom_repo_name" {
+  name         = "custom_repo_name"
   display_name = "Custom Repository Name"
-  description  = "If you selected 'Custom Repository' above, provide just the repository name (e.g. 'my-project')"
+  description  = "Repository name under abridgeai organization (e.g. 'my-project')"
   default      = ""
   mutable      = true
   type         = "string"
   order        = 2
-}
-
-data "coder_parameter" "enable_github_integration" {
-  name         = "enable_github_integration"
-  display_name = "Enable GitHub Integration"
-  description  = "Enable automatic GitHub repository cloning and SSH key upload. Requires GitHub external auth to be configured."
-  default      = "false"
-  mutable      = false
-  type         = "bool"
-  order        = 3
 }
 
 data "coder_parameter" "cpu" {
@@ -68,7 +62,7 @@ data "coder_parameter" "cpu" {
   default      = "4"
   icon         = "/icon/memory.svg"
   mutable      = true
-  order        = 4
+  order        = 3
   type         = "number"
   validation {
     min = 4
@@ -83,7 +77,7 @@ data "coder_parameter" "memory" {
   default      = "8"
   icon         = "/icon/memory.svg"
   mutable      = true
-  order        = 5
+  order        = 4
   type         = "number"
   validation {
     min = 8
@@ -99,7 +93,7 @@ data "coder_parameter" "home_disk_size" {
   type         = "number"
   icon         = "/icon/folder.svg"
   mutable      = true
-  order        = 6
+  order        = 5
   validation {
     min = 16
     max = 1024
@@ -109,19 +103,20 @@ data "coder_parameter" "home_disk_size" {
 locals {
   # Repository configuration
   repo_map = {
+    "none"               = ""
     "completion-service" = "https://github.com/abridgeai/completion-service"
   }
 
   repo_url = (
-    data.coder_parameter.repo_selection.value == "custom"
-    ? "https://github.com/abridgeai/${data.coder_parameter.custom_repo.value}"
-    : lookup(local.repo_map, data.coder_parameter.repo_selection.value, "")
+    data.coder_parameter.repository.value == "custom"
+    ? "https://github.com/abridgeai/${data.coder_parameter.custom_repo_name.value}"
+    : lookup(local.repo_map, data.coder_parameter.repository.value, "")
   )
 
   should_clone = (
-    data.coder_parameter.enable_github_integration.value &&
-    (data.coder_parameter.repo_selection.value != "custom" || data.coder_parameter.custom_repo.value != "") &&
-    local.repo_url != ""
+    data.coder_parameter.repository.value != "none" &&
+    local.repo_url != "" &&
+    (data.coder_parameter.repository.value != "custom" || data.coder_parameter.custom_repo_name.value != "")
   )
 
   # Image and environment configuration
@@ -131,8 +126,12 @@ locals {
   home_dir        = "/home/vscode"
 
   # Determine the repo directory path for the workspace
-  repo_name = data.coder_parameter.repo_selection.value == "custom" ? data.coder_parameter.custom_repo.value : data.coder_parameter.repo_selection.value
-  repo_dir  = "${local.home_dir}/${local.repo_name}"
+  repo_name = (
+    data.coder_parameter.repository.value == "none" ? "" :
+    data.coder_parameter.repository.value == "custom" ? data.coder_parameter.custom_repo_name.value :
+    data.coder_parameter.repository.value
+  )
+  repo_dir = repo_name != "" ? "${local.home_dir}/${local.repo_name}" : local.home_dir
 
   # Kubernetes metadata
   labels = {
@@ -224,16 +223,8 @@ module "cursor" {
 
 # --- Git Configuration ---
 module "git-config" {
-  count    = data.coder_workspace.me.start_count > 0 && data.coder_parameter.enable_github_integration.value ? 1 : 0
+  count    = data.coder_workspace.me.start_count > 0 && local.should_clone ? 1 : 0
   source   = "registry.coder.com/coder/git-config/coder"
-  version  = "1.0.15"
-  agent_id = coder_agent.main.id
-}
-
-# --- GitHub SSH Key Upload ---
-module "github-upload-public-key" {
-  count    = data.coder_workspace.me.start_count > 0 && data.coder_parameter.enable_github_integration.value ? 1 : 0
-  source   = "registry.coder.com/coder/github-upload-public-key/coder"
   version  = "1.0.15"
   agent_id = coder_agent.main.id
 }
@@ -244,7 +235,7 @@ resource "coder_app" "code-server" {
   slug         = "code-server"
   display_name = "code-server"
   icon         = "/icon/code.svg"
-  url          = "http://localhost:13337?folder=${local.should_clone ? local.repo_dir : local.home_dir}"
+  url          = "http://localhost:13337?folder=${local.repo_dir}"
   subdomain    = false
   share        = "owner"
 
