@@ -24,35 +24,14 @@ variable "namespace" {
 data "coder_workspace" "me" {}
 data "coder_workspace_owner" "me" {}
 
-data "coder_parameter" "repository" {
-  name         = "repository"
-  display_name = "Repository"
-  description  = "Choose which repository to clone"
-  default      = "completion-service"
+data "coder_parameter" "repository_url" {
+  name         = "repository_url"
+  display_name = "Repository URL"
+  description  = "GitHub repository URL (leave empty for no repository)"
+  default      = "https://github.com/abridgeai/completion-service"
   mutable      = true
   order        = 1
-  option {
-    name  = "No Repository"
-    value = "none"
-  }
-  option {
-    name  = "Completion Service"
-    value = "completion-service"
-  }
-  option {
-    name  = "Custom Repository"
-    value = "custom"
-  }
-}
-
-data "coder_parameter" "custom_repo_name" {
-  name         = "custom_repo_name"
-  display_name = "Custom Repository Name"
-  description  = "Repository name under abridgeai organization (e.g. 'my-project')"
-  default      = ""
-  mutable      = true
   type         = "string"
-  order        = 2
 }
 
 data "coder_parameter" "cpu" {
@@ -62,7 +41,7 @@ data "coder_parameter" "cpu" {
   default      = "4"
   icon         = "/icon/memory.svg"
   mutable      = true
-  order        = 3
+  order        = 2
   type         = "number"
   validation {
     min = 4
@@ -73,15 +52,15 @@ data "coder_parameter" "cpu" {
 data "coder_parameter" "memory" {
   name         = "memory"
   display_name = "Memory (GB)"
-  description  = "The amount of memory in GB (between 8-32)"
+  description  = "The amount of memory in GB (between 8-64)"
   default      = "8"
   icon         = "/icon/memory.svg"
   mutable      = true
-  order        = 4
+  order        = 3
   type         = "number"
   validation {
     min = 8
-    max = 32
+    max = 64
   }
 }
 
@@ -93,7 +72,7 @@ data "coder_parameter" "home_disk_size" {
   type         = "number"
   icon         = "/icon/folder.svg"
   mutable      = true
-  order        = 5
+  order        = 4
   validation {
     min = 16
     max = 1024
@@ -101,37 +80,22 @@ data "coder_parameter" "home_disk_size" {
 }
 
 locals {
-  # Repository configuration
-  repo_map = {
-    "none"               = ""
-    "completion-service" = "https://github.com/abridgeai/completion-service"
-  }
-
-  repo_url = (
-    data.coder_parameter.repository.value == "custom"
-    ? "https://github.com/abridgeai/${data.coder_parameter.custom_repo_name.value}"
-    : lookup(local.repo_map, data.coder_parameter.repository.value, "")
-  )
-
-  should_clone = (
-    data.coder_parameter.repository.value != "none" &&
-    local.repo_url != "" &&
-    (data.coder_parameter.repository.value != "custom" || data.coder_parameter.custom_repo_name.value != "")
-  )
+  # Directory configuration
+  home_dir = "/home/vscode"
 
   # Image and environment configuration
   base_image_repo = "us-central1-docker.pkg.dev/abridge-artifact-registry/coder/base"
   base_image_tag  = "1402364"
   base_image      = "${local.base_image_repo}:${local.base_image_tag}"
-  home_dir        = "/home/vscode"
 
-  # Determine the repo directory path for the workspace
-  repo_name = (
-    data.coder_parameter.repository.value == "none" ? "" :
-    data.coder_parameter.repository.value == "custom" ? data.coder_parameter.custom_repo_name.value :
-    data.coder_parameter.repository.value
-  )
-  repo_dir = repo_name != "" ? "${local.home_dir}/${local.repo_name}" : local.home_dir
+
+  # Repository configuration - simplified
+  repo_url     = data.coder_parameter.repository_url.value
+  should_clone = local.repo_url != ""
+
+  # Extract repo name from URL for directory naming
+  repo_name = local.should_clone ? regex("([^/]+?)(\\.git)?$", local.repo_url)[0] : ""
+  repo_dir  = local.should_clone ? "${local.home_dir}/${local.repo_name}" : local.home_dir
 
   # Kubernetes metadata
   labels = {
