@@ -55,7 +55,7 @@ data "coder_parameter" "enable_github_integration" {
   name         = "enable_github_integration"
   display_name = "Enable GitHub Integration"
   description  = "Enable automatic GitHub repository cloning and SSH key upload. Requires GitHub external auth to be configured."
-  default      = "true"
+  default      = "false"
   mutable      = false
   type         = "bool"
   order        = 3
@@ -159,7 +159,8 @@ locals {
 
   should_clone = (
     data.coder_parameter.enable_github_integration.value &&
-    (data.coder_parameter.repo_selection.value != "custom" || data.coder_parameter.custom_repo.value != "")
+    (data.coder_parameter.repo_selection.value != "custom" || data.coder_parameter.custom_repo.value != "") &&
+    local.repo_url != ""
   )
 
   # Image and environment configuration
