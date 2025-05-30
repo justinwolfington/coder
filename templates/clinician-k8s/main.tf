@@ -88,6 +88,12 @@ locals {
   base_image_tag  = "latest"
   base_image      = "${local.base_image_repo}:${local.base_image_tag}"
 
+  # Phoenix image configuration
+  # TODO: Revert to latest before merging
+  phoenix_image_repo = "us-central1-docker.pkg.dev/abridge-artifact-registry/coder/phoenix"
+  phoenix_image_tag  = "fb3b823"
+  phoenix_image      = "${local.phoenix_image_repo}:${local.phoenix_image_tag}"
+
   # Repository configuration - simplified
   repo_url     = data.coder_parameter.repository_url.value
   should_clone = local.repo_url != ""
@@ -335,7 +341,7 @@ resource "kubernetes_deployment" "main" {
         # Arize Phoenix sidecar container
         container {
           name              = "arize-phoenix"
-          image             = "us-central1-docker.pkg.dev/abridge-artifact-registry/coder/phoenix:latest"
+          image             = local.phoenix_image
           image_pull_policy = "Always"
 
           port {
