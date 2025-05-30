@@ -79,17 +79,6 @@ data "coder_parameter" "home_disk_size" {
   }
 }
 
-data "coder_parameter" "enable_phoenix" {
-  name         = "enable_phoenix"
-  display_name = "Enable Arize Phoenix"
-  description  = "Enable Arize Phoenix sidecar for tracing and monitoring"
-  default      = "true"
-  type         = "bool"
-  icon         = "/icon/database.svg"
-  mutable      = true
-  order        = 5
-}
-
 locals {
   # Directory configuration
   home_dir = "/home/vscode"
@@ -134,12 +123,6 @@ locals {
 
     sudo cp "$ROOT_BASHRC_FILE" "$BASHRC_FILE"
     sudo chown vscode:vscode "$BASHRC_FILE"
-
-    # Create Phoenix working directory if needed
-    if [ "${data.coder_parameter.enable_phoenix.value}" = "true" ]; then
-      mkdir -p /tmp/phoenix
-      chmod 755 /tmp/phoenix
-    fi
 
     # Install and start code-server
     export CODE_SERVER_DIR="/tmp/code-server"
@@ -228,24 +211,6 @@ resource "coder_app" "code-server" {
   }
 }
 
-# --- Coder Application: Arize Phoenix ---
-resource "coder_app" "arize-phoenix" {
-  count        = data.coder_parameter.enable_phoenix.value ? 1 : 0
-  agent_id     = coder_agent.main.id
-  slug         = "arize-phoenix"
-  display_name = "Arize Phoenix"
-  icon         = "/icon/database.svg"
-  url          = "http://localhost:6006"
-  subdomain    = false
-  share        = "owner"
-
-  healthcheck {
-    url       = "http://localhost:6006"
-    interval  = 10
-    threshold = 15
-  }
-}
-
 # --- Kubernetes Resources ---
 
 resource "kubernetes_persistent_volume_claim" "home" {
@@ -312,39 +277,6 @@ resource "kubernetes_deployment" "main" {
             value = coder_agent.main.token
           }
 
-          # Arize Phoenix tracing environment variables (conditional)
-          dynamic "env" {
-            for_each = data.coder_parameter.enable_phoenix.value ? [1] : []
-            content {
-              name  = "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT"
-              value = "http://localhost:6006/v1/traces"
-            }
-          }
-
-          dynamic "env" {
-            for_each = data.coder_parameter.enable_phoenix.value ? [1] : []
-            content {
-              name  = "PF_TRACING_SKIP_EXPORTER_SETUP"
-              value = "true"
-            }
-          }
-
-          dynamic "env" {
-            for_each = data.coder_parameter.enable_phoenix.value ? [1] : []
-            content {
-              name  = "PF_TRACING_SKIP_LOCAL_SETUP"
-              value = "true"
-            }
-          }
-
-          dynamic "env" {
-            for_each = data.coder_parameter.enable_phoenix.value ? [1] : []
-            content {
-              name  = "PF_DISABLE_TRACING"
-              value = "false"
-            }
-          }
-
           resources {
             requests = {
               cpu    = data.coder_parameter.cpu.value
@@ -363,79 +295,10 @@ resource "kubernetes_deployment" "main" {
           }
         }
 
-        # Arize Phoenix sidecar container (conditional)
-        dynamic "container" {
-          for_each = data.coder_parameter.enable_phoenix.value ? [1] : []
-          content {
-            name              = "arize-phoenix"
-            image             = "us-central1-docker.pkg.dev/abridge-artifact-registry/coder/phoenix:latest"
-            image_pull_policy = "Always"
-
-            port {
-              container_port = 6006
-              name           = "phoenix-http"
-            }
-
-            port {
-              container_port = 4317
-              name           = "phoenix-grpc"
-            }
-
-            resources {
-              requests = {
-                cpu    = "500m"
-                memory = "512Mi"
-              }
-              limits = {
-                cpu    = "1000m"
-                memory = "1Gi"
-              }
-            }
-
-            volume_mount {
-              mount_path = "/tmp/phoenix"
-              name       = "phoenix-data"
-              read_only  = false
-            }
-
-            # Health check for Phoenix
-            liveness_probe {
-              http_get {
-                path = "/"
-                port = 6006
-              }
-              initial_delay_seconds = 30
-              period_seconds        = 10
-              timeout_seconds       = 5
-              failure_threshold     = 3
-            }
-
-            readiness_probe {
-              http_get {
-                path = "/"
-                port = 6006
-              }
-              initial_delay_seconds = 10
-              period_seconds        = 5
-              timeout_seconds       = 3
-              failure_threshold     = 3
-            }
-          }
-        }
-
         volume {
           name = "home"
           persistent_volume_claim {
             claim_name = kubernetes_persistent_volume_claim.home.metadata[0].name
-          }
-        }
-
-        # Phoenix data volume (conditional)
-        dynamic "volume" {
-          for_each = data.coder_parameter.enable_phoenix.value ? [1] : []
-          content {
-            name = "phoenix-data"
-            empty_dir {}
           }
         }
 
@@ -477,14 +340,6 @@ resource "coder_metadata" "workspace_info" {
   item {
     key   = "Memory"
     value = "${data.coder_parameter.memory.value} GB RAM"
-  }
-
-  dynamic "item" {
-    for_each = data.coder_parameter.enable_phoenix.value ? [1] : []
-    content {
-      key   = "Arize Phoenix"
-      value = "Enabled - http://localhost:6006"
-    }
   }
 }
 

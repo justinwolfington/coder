@@ -1,10 +1,16 @@
 {
     "templates": {
         "k8s-completion-service": {
-            "display_name": "Completion Service",
-            "description": "Provision Kubernetes Deployments as Coder workspaces, with completion-service cloned, uv and gcloud CLI installed",
+            "display_name": "Completion Service with Phoenix",
+            "description": "Provision Kubernetes Deployments as Coder workspaces with Arize Phoenix tracing, completion-service cloned, uv and gcloud CLI installed",
             "icon": "/emojis/1f33c.png",
             "directory": "./templates/clinician-k8s"
+        },
+        "cpu-k8s": {
+            "display_name": "CPU VMKiller",
+            "description": "Basic Kubernetes Deployments as Coder workspaces for CPU-based development without additional monitoring tools",
+            "icon": "/emojis/1f4bb.png",
+            "directory": "./templates/cpu-k8s"
         },
         "gpu-k8s": {
             "display_name": "GPU VMKiller",

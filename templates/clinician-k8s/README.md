@@ -1,75 +1,98 @@
----
-display_name: Clinician K8s
-description: CPU-based Kubernetes development workspace with configurable repository cloning
-icon: /emojis/1f33c.png
-maintainer_github: abridgeai
-verified: true
-tags: [kubernetes, container, development, github, cursor]
----
+# Clinician K8s Template with Arize Phoenix
 
-# Clinician K8s Template
-
-CPU-based Kubernetes development workspace with VS Code and Cursor IDE support.
+This Coder template provisions Kubernetes Deployments as workspaces with enhanced tracing and monitoring capabilities via Arize Phoenix.
 
 ## Features
 
-- Single URL input for repository cloning
-- VS Code (browser) and Cursor IDE integration
-- Configurable resources: CPU, memory, storage
-- Automatic Git setup with SSH keys
-- Pre-configured development tools
+- **Dynamic Resource Allocation**: Configure CPU (4-16 cores), memory (8-64 GB), and home disk size (16-1024 GB)
+- **Git Repository Integration**: Automatically clone repositories with git-config and cursor IDE support
+- **Code Server**: Web-based VS Code environment with Python and Jupyter extensions
+- **Arize Phoenix Integration**: Optional sidecar container for tracing and monitoring
+- **Persistent Storage**: Home directory persistence across workspace restarts
+- **Advanced Monitoring**: Built-in metrics for CPU, memory, and disk usage
 
-## Configuration
+## Parameters
 
-| Parameter | Description | Default | Range |
-|-----------|-------------|---------|-------|
-| Repository URL | GitHub repository URL (optional) | `https://github.com/abridgeai/completion-service` | - |
-| CPU Cores | CPU allocation | 4 | 4-16 |
-| Memory | RAM in GB | 8 | 8-64 |
-| Storage | Disk space in GB | 16 | 16-1024 |
+### Repository URL
+- **Default**: `https://github.com/abridgeai/completion-service`
+- **Description**: GitHub repository URL (leave empty for no repository)
+- **Mutable**: Yes
 
-## Repository Management
+### CPU Cores
+- **Range**: 4-16 cores
+- **Default**: 4 cores
+- **Description**: The number of CPU cores allocated to the workspace
 
-- **Default**: Clones completion-service repository
-- **Custom Repository**: Enter any GitHub repository URL
-- **No Repository**: Clear field for clean workspace
+### Memory
+- **Range**: 8-64 GB
+- **Default**: 8 GB
+- **Description**: The amount of memory allocated to the workspace
 
-Repository clones to `/home/vscode/{repo-name}` when URL provided.
+### Home Disk Size
+- **Range**: 16-1024 GB
+- **Default**: 16 GB
+- **Description**: The size of the persistent home directory
 
-## Container Details
+### Enable Arize Phoenix
+- **Type**: Boolean
+- **Default**: `true`
+- **Description**: Enable Arize Phoenix sidecar for tracing and monitoring
 
-- **Base Image**: `us-central1-docker.pkg.dev/abridge-artifact-registry/coder/base:de9c4c0`
-- **User**: `vscode` with sudo access
-- **Home**: `/home/vscode`
+## Arize Phoenix Integration
 
-## Available Tools
+When enabled, this template includes:
 
-- Python 3.11 with UV package manager
-- Google Cloud SDK
-- Git with automatic SSH key management
-- VS Code (browser) and Cursor IDE
+- **Phoenix Web UI**: Accessible at `http://localhost:6006`
+- **OTLP Traces**: Automatic trace collection endpoint at `http://localhost:6006/v1/traces`
+- **Environment Variables**: Pre-configured for Arize Phoenix tracing
+- **Health Checks**: Built-in liveness and readiness probes
+- **Resource Limits**: Dedicated CPU and memory allocation for Phoenix
 
-## Development Environment
+### Phoenix Environment Variables
 
-**VS Code (Code-Server)**
+The template automatically configures the following environment variables when Phoenix is enabled:
 
-- Full VS Code experience in browser
-- Pre-installed Python and Jupyter extensions
-- Opens in repository directory or home
+- `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT`: Points to Phoenix trace endpoint
+- `PF_TRACING_SKIP_EXPORTER_SETUP`: Skips default exporter setup
+- `PF_TRACING_SKIP_LOCAL_SETUP`: Skips local tracing setup
+- `PF_DISABLE_TRACING`: Ensures tracing is enabled
 
-**Cursor IDE**
+## Applications
 
-- Desktop IDE with AI assistance
-- Connect from Cursor application
-- Available via workspace applications
+### Code Server
+- **URL**: `http://localhost:13337`
+- **Features**: Python and Jupyter extensions pre-installed
+- **Health Check**: Built-in health monitoring
 
-## Usage
+### Arize Phoenix (Optional)
+- **URL**: `http://localhost:6006`
+- **Features**: Tracing and monitoring dashboard
+- **Health Check**: HTTP health monitoring
 
-1. Select template and configure parameters
-2. Launch workspace
-3. Access via VS Code or Cursor IDE
+## Architecture
 
-## Prerequisites
+The template creates:
 
-- Kubernetes cluster with storage support
-- GitHub external authentication for Git integration
+1. **Main Container**: Development environment with code-server
+2. **Phoenix Sidecar**: (Optional) Arize Phoenix for tracing
+3. **Persistent Volume**: Home directory storage
+4. **Kubernetes Deployment**: With pod anti-affinity rules
+5. **Metadata Resources**: Workspace information display
+
+## Resource Requirements
+
+### Main Container
+- **CPU**: User-defined (4-16 cores)
+- **Memory**: User-defined (8-64 GB)
+- **Storage**: User-defined (16-1024 GB)
+
+### Phoenix Sidecar (when enabled)
+- **CPU**: 500m requests, 1000m limits
+- **Memory**: 512Mi requests, 1Gi limits
+- **Storage**: Ephemeral volume for Phoenix data
+
+## Security
+
+- **Non-root**: Runs with user ID 1000
+- **FS Group**: 1000 for file system permissions
+- **Security Context**: Proper user and group isolation
