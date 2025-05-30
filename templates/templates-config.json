@@ -2,7 +2,7 @@
     "templates": {
         "k8s-completion-service": {
             "display_name": "Completion Service with Phoenix",
-            "description": "Provision Kubernetes Deployments as Coder workspaces with Arize Phoenix tracing, completion-service cloned, uv and gcloud CLI installed",
+            "description": "Kubernetes workspace with Arize Phoenix tracing, completion-service cloned, uv and gcloud CLI",
             "icon": "/emojis/1f33c.png",
             "directory": "./templates/clinician-k8s"
         },
