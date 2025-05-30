@@ -1,0 +1,16 @@
+{
+    "templates": {
+        "k8s-completion-service": {
+            "display_name": "Completion Service",
+            "description": "Provision Kubernetes Deployments as Coder workspaces, with completion-service cloned, uv and gcloud CLI installed",
+            "icon": "/emojis/1f33c.png",
+            "directory": "./templates/clinician-k8s"
+        },
+        "gpu-k8s": {
+            "display_name": "GPU VMKiller",
+            "description": "Provision Kubernetes Deployments as Coder workspaces with GPU support",
+            "icon": "/emojis/1f35f.png",
+            "directory": "./templates/gpu-k8s"
+        }
+    }
+}

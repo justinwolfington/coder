@@ -1,0 +1,106 @@
+name: Publish Coder Templates
+
+on:
+  # Run after successful build/promotion of artifacts
+  workflow_run:
+    workflows: ["Build and Promote Artifacts"]
+    types:
+      - completed
+    branches:
+      - main
+
+  # Run on pull requests to test templates
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "templates/**"
+      - ".github/workflows/push-coder-templates.yaml"
+
+  # Allow manual trigger for debugging
+  workflow_dispatch:
+    inputs:
+      template_name:
+        description: 'Specific template name to push (optional, pushes all if empty)'
+        required: false
+        type: string
+      environment:
+        description: 'Environment to deploy to (development, staging, production)'
+        required: true
+        default: 'development'
+        type: choice
+        options:
+          - development
+          - staging
+          - production
+
+permissions:
+  contents: read
+
+jobs:
+  push-templates:
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request' || github.event.workflow_run.conclusion == 'success'
+    runs-on: abridge-runner-${{ github.event.inputs.environment || 'development' }}
+    environment: ${{ github.event.inputs.environment || 'development' }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Setup Coder CLI
+        uses: coder/setup-action@v1
+        with:
+          access_url: ${{ vars.CODER_ACCESS_URL }}
+          coder_session_token: ${{ secrets.CODER_SESSION_TOKEN }}
+
+      - name: Get short commit SHA
+        id: vars
+        run: |
+          SHA="${{ github.event_name == 'workflow_dispatch' && github.sha || github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.event.workflow_run.head_sha }}"
+          [[ -z "$SHA" ]] && SHA=$(git rev-parse HEAD)
+          echo "sha_short=${SHA:0:7}" >> $GITHUB_OUTPUT
+
+      - name: Validate templates-config.json
+        run: |
+          CONFIG="./templates/templates-config.json"
+          jq 'has("templates")' "$CONFIG"
+          jq -e '.templates | to_entries[] | .value.directory and .value.display_name and .value.description and .value.icon' "$CONFIG" > /dev/null
+
+      - name: Validate Terraform configuration for all templates
+        run: |
+          CONFIG="./templates/templates-config.json"
+          jq -r '.templates | to_entries[] | .value.directory' "$CONFIG" | while read -r dir; do
+            cd "$dir"
+            terraform init -backend=false > /dev/null
+            terraform validate || { echo "Terraform validation failed in $dir"; exit 1; }
+            cd - > /dev/null
+          done
+
+      - name: Push and test templates
+        run: |
+          CONFIG="./templates/templates-config.json"
+          VERSION="${{ steps.vars.outputs.sha_short }}"
+          FILTER_TEMPLATE="${{ github.event.inputs.template_name }}"
+
+          jq -r '.templates | keys[]' "$CONFIG" | while read -r template; do
+            [[ -n "$FILTER_TEMPLATE" && "$template" != "$FILTER_TEMPLATE" ]] && continue
+
+            eval "$(jq -r --arg t "$template" '.templates[$t] | @sh "DIR=\(.directory) NAME=\(.display_name) DESC=\(.description) ICON=\(.icon)"' "$CONFIG")"
+
+            echo "Pushing: template $template ($NAME) from $DIR"
+            coder templates push "$template" --directory "./$DIR" --name "$VERSION" --message "Auto-deploy $VERSION" --yes
+
+            echo "Editing template metadata"
+            coder templates edit "$template" --display-name "$NAME" --description "$DESC" --icon "$ICON" --yes
+
+            echo "Promoting template version"
+            coder template version promote --template="$template" --template-version="$VERSION"
+          done

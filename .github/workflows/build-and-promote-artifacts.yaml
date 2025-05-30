@@ -1,0 +1,170 @@
+name: Build and Promote Artifacts
+
+on:
+  # Build on PR and commits to PR
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "docker/**"
+      - ".github/workflows/build-and-promote-artifacts.yaml"
+    types: [opened, synchronize, reopened]
+
+  # Build on push to PR branches
+  push:
+    branches:
+      - main
+    paths:
+      - "docker/**"
+      - ".github/workflows/build-and-promote-artifacts.yaml"
+
+  # Promote on workflow_dispatch with PR number
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'PR number to promote artifacts from'
+        required: true
+        type: string
+      promote:
+        description: 'Promote images to latest'
+        required: true
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  detect-changed-images:
+    # Run on PR, push, or manual trigger
+    if: github.event_name == 'pull_request' || github.event_name == 'push' || github.event.inputs.promote == 'true'
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          # When triggered manually for promotion, checkout the PR that was specified
+          ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/pull/{0}/merge', github.event.inputs.pr_number) || '' }}
+
+      - name: Get changed files
+        id: changed-files
+        uses: tj-actions/changed-files@v46
+        with:
+          files: docker/**
+
+      - name: Set matrix for changed images
+        id: set-matrix
+        run: |
+          FILES="${{ steps.changed-files.outputs.all_changed_files }}"
+          echo "Changed files:"
+          echo "$FILES"
+
+          declare -a IMAGES=()
+
+          if grep -q '^docker/' <<< "$FILES"; then
+            for file in docker/*.Dockerfile; do
+              [ -f "$file" ] || continue
+              IMAGE_NAME=$(basename "$file" .Dockerfile)
+              IMAGES+=("{\"name\":\"$IMAGE_NAME\",\"dockerfile\":\"$file\",\"context\":\".\"}")
+            done
+          fi
+
+          MATRIX="{\"image\":[$(IFS=,; echo "${IMAGES[*]}")]}"
+          echo "matrix=$MATRIX"
+          echo "matrix=$MATRIX" >> $GITHUB_OUTPUT
+
+  build-and-push:
+    needs: detect-changed-images
+    # Run on pull_request or push event
+    if: github.event_name == 'pull_request' || github.event_name == 'push'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix: ${{ fromJson(needs.detect-changed-images.outputs.matrix) }}
+    env:
+      REGISTRY: us-central1-docker.pkg.dev
+      PROJECT: abridge-artifact-registry
+      REPO: coder
+      SHORT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - name: Set Short SHA
+        run: echo "SHORT_SHA=${SHORT_SHA:0:7}" >> $GITHUB_ENV
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Authenticate with GCP
+        id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER_ARTIFACT_REGISTRY }}
+          service_account: ${{ vars.GCP_SA_EMAIL_ARTIFACT_REGISTRY }}
+          token_format: "access_token"
+          access_token_lifetime: "900s"
+
+      - name: Login to GAR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: oauth2accesstoken
+          password: ${{ steps.auth.outputs.access_token }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push ${{ matrix.image.name }}
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.image.context }}
+          file: ${{ matrix.image.dockerfile }}
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ env.PROJECT }}/${{ env.REPO }}/${{ matrix.image.name }}:${{ env.SHORT_SHA }}
+
+  promote-artifacts:
+    needs: detect-changed-images
+    # Run ONLY when a PR is merged to main
+    if: github.event_name == 'pull_request' && github.event.pull_request.merged == true && github.base_ref == 'main'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix: ${{ fromJson(needs.detect-changed-images.outputs.matrix) }}
+    env:
+      REGISTRY: us-central1-docker.pkg.dev
+      PROJECT: abridge-artifact-registry
+      REPO: coder
+      # SHORT_SHA is set by the "Set SHA Source for merged PR" step
+    steps:
+      - name: Set SHA Source for merged PR
+        run: |
+          echo "Event: ${{ github.event_name }}, Merged: ${{ github.event.pull_request.merged }}, Base Ref: ${{ github.base_ref }}"
+          HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+          if [[ -z "$HEAD_SHA" ]]; then
+            echo "Error: github.event.pull_request.head.sha was empty for this merged PR event."
+            exit 1
+          fi
+          echo "Original PR Head SHA: $HEAD_SHA"
+          echo "SHORT_SHA=${HEAD_SHA:0:7}" >> $GITHUB_ENV
+          echo "Successfully set SHORT_SHA to ${HEAD_SHA:0:7}"
+
+      - name: Authenticate with GCP
+        id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER_ARTIFACT_REGISTRY }}
+          service_account: ${{ vars.GCP_SA_EMAIL_ARTIFACT_REGISTRY }}
+          token_format: "access_token"
+          access_token_lifetime: "600s"
+
+      - name: Setup gcloud CLI
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Promote images
+        run: |
+          if [[ -z "${{ env.SHORT_SHA }}" ]]; then
+            echo "Error: SHORT_SHA is empty. Cannot promote."
+            exit 1
+          fi
+          echo "Promoting image ${{ matrix.image.name }} from tag ${{ env.SHORT_SHA }} to latest"
+          gcloud container images add-tag ${REGISTRY}/${PROJECT}/${REPO}/${{ matrix.image.name }}:${SHORT_SHA} ${REGISTRY}/${PROJECT}/${REPO}/${{ matrix.image.name }}:latest --quiet
