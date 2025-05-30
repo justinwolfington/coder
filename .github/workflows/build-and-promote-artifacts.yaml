@@ -5,7 +5,6 @@ on:
   pull_request:
     branches:
       - main
-      - taruj/custom-images-for-templates
     paths:
       - "docker/**"
       - ".github/workflows/build-and-promote-artifacts.yaml"

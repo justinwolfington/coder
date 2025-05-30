@@ -1,4 +1,4 @@
-name: Test and Publish Coder Template
+name: Publish Coder Templates
 
 on:
   # Run after successful build/promotion of artifacts
@@ -13,8 +13,6 @@ on:
   pull_request:
     branches:
       - main
-      - taruj/custom-images-for-templates
-      # - add branch name here to test templates on that branch
     paths:
       - "templates/**"
       - ".github/workflows/push-coder-templates.yaml"
@@ -102,19 +100,6 @@ jobs:
 
             echo "Editing template metadata"
             coder templates edit "$template" --display-name "$NAME" --description "$DESC" --icon "$ICON" --yes
-
-            # WORKSPACE_NAME="test-${template}-${VERSION}"
-            # echo "Creating test workspace $WORKSPACE_NAME"
-            # coder create -t "$template" --template-version "$VERSION" "$WORKSPACE_NAME" --yes
-
-            # echo "Configuring SSH access"
-            # coder config-ssh --yes
-
-            # echo "Testing workspace connectivity"
-            # ssh coder."$WORKSPACE_NAME" -- 'ls -la && pwd && whoami && echo "Testing workspace setup"' || echo "Workspace test failed"
-
-            # echo "Cleaning up test workspace"
-            # coder delete "$WORKSPACE_NAME" --yes || echo "Failed to delete workspace"
 
             echo "Promoting template version"
             coder template version promote --template="$template" --template-version="$VERSION"
