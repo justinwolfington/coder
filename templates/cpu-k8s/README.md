@@ -1,5 +1,5 @@
 ---
-display_name: Clinician K8s
+display_name: CPU K8s
 description: CPU-based Kubernetes development workspace with configurable repository cloning
 icon: /emojis/1f33c.png
 maintainer_github: abridgeai
@@ -9,7 +9,7 @@ tags: [kubernetes, container, development, github, cursor]
 
 # CPU K8s Template
 
-This Coder template provisions basic Kubernetes Deployments as workspaces focused on CPU-based development workloads.
+This Coder template provisions Kubernetes Deployments as workspaces optimized for CPU-based development workloads with a lightweight, streamlined approach.
 
 ## Features
 
@@ -17,8 +17,8 @@ This Coder template provisions basic Kubernetes Deployments as workspaces focuse
 - **Git Repository Integration**: Automatically clone repositories with git-config and cursor IDE support
 - **Code Server**: Web-based VS Code environment with Python and Jupyter extensions
 - **Persistent Storage**: Home directory persistence across workspace restarts
-- **Basic Monitoring**: Built-in metrics for CPU, memory, and disk usage
-- **Lightweight**: No additional sidecars or monitoring tools
+- **Advanced Monitoring**: Built-in metrics for CPU, memory, and disk usage
+- **Lightweight Architecture**: Optimized for performance without additional monitoring sidecars
 
 ## Parameters
 
@@ -75,13 +75,14 @@ The template creates:
 
 This template is ideal for:
 
-- **General Development**: CPU-intensive development work
-- **Code Review**: Lightweight workspace for code reviews
-- **Testing**: Basic testing environments
+- **CPU-Intensive Development**: Heavy computation and processing tasks
+- **Code Review**: Lightweight workspace for code reviews and analysis
+- **Testing**: Basic testing environments without monitoring overhead
 - **Learning**: Educational and training purposes
-- **Minimal Overhead**: When you don't need additional monitoring tools
+- **Minimal Overhead**: When you need maximum performance without additional tools
+- **Resource-Conscious**: Projects requiring dedicated CPU resources
 
-For workspaces requiring advanced tracing and monitoring, consider using the `clinician-k8s` template with Arize Phoenix integration.
+For workspaces requiring advanced tracing and monitoring capabilities, consider using the `clinician-k8s` template with Arize Phoenix integration.
 
 ## Configuration
 
@@ -94,46 +95,62 @@ For workspaces requiring advanced tracing and monitoring, consider using the `cl
 
 ## Repository Management
 
-- **Default**: Clones completion-service repository
-- **Custom Repository**: Enter any GitHub repository URL
-- **No Repository**: Clear field for clean workspace
-
-Repository clones to `/home/vscode/{repo-name}` when URL provided.
-
-## Container Details
-
-- **Base Image**: `us-central1-docker.pkg.dev/abridge-artifact-registry/coder/base:de9c4c0`
-- **User**: `vscode` with sudo access
-- **Home**: `/home/vscode`
-
-## Available Tools
-
-- Python 3.11 with UV package manager
-- Google Cloud SDK
-- Git with automatic SSH key management
-- VS Code (browser) and Cursor IDE
+- **Default Repository**: Automatically clones completion-service repository
+- **Custom Repository**: Enter any GitHub repository URL for automatic cloning
+- **No Repository**: Clear the URL field for a clean workspace
+- **Clone Location**: Repository clones to `/home/vscode/{repo-name}` when URL provided
 
 ## Development Environment
 
-**VS Code (Code-Server)**
+### Container Details
+- **Base Image**: `us-central1-docker.pkg.dev/abridge-artifact-registry/coder/base:de9c4c0`
+- **User**: `vscode` with sudo access
+- **Home Directory**: `/home/vscode`
+- **Working Directory**: Opens in repository directory or home
 
-- Full VS Code experience in browser
-- Pre-installed Python and Jupyter extensions
-- Opens in repository directory or home
+### Available Tools
+- **Python 3.11**: With UV package manager for fast dependency management
+- **Google Cloud SDK**: For cloud development and deployment
+- **Git**: Automatic SSH key management and configuration
+- **VS Code Extensions**: Pre-installed Python and Jupyter extensions
+
+### Development IDEs
+
+**VS Code (Code-Server)**
+- Full VS Code experience accessible via web browser
+- Pre-configured with Python and Jupyter extensions
+- Automatically opens in repository directory when available
+- Built-in terminal and debugging capabilities
 
 **Cursor IDE**
+- Desktop IDE with AI assistance capabilities
+- Connect directly from Cursor application
+- Available via workspace applications tab
+- Enhanced AI-powered development features
 
-- Desktop IDE with AI assistance
-- Connect from Cursor application
-- Available via workspace applications
+## Performance Optimizations
+
+- **No Sidecars**: Minimal container footprint for maximum performance
+- **Dedicated Resources**: All allocated CPU and memory available to development
+- **Efficient Storage**: Persistent home directory with configurable sizing
+- **Pod Anti-Affinity**: Ensures optimal node placement and resource distribution
 
 ## Usage
 
-1. Select template and configure parameters
-2. Launch workspace
-3. Access via VS Code or Cursor IDE
+1. **Template Selection**: Choose CPU K8s template from available options
+2. **Parameter Configuration**: Adjust CPU, memory, storage, and repository settings
+3. **Workspace Launch**: Deploy and wait for workspace initialization
+4. **Access Methods**: Connect via VS Code browser interface or Cursor IDE application
+5. **Development**: Begin coding with full access to configured resources
 
 ## Prerequisites
 
-- Kubernetes cluster with storage support
-- GitHub external authentication for Git integration
+- **Kubernetes Cluster**: Active cluster with storage provisioning support
+- **GitHub Authentication**: External authentication configured for Git integration
+- **Resource Availability**: Sufficient cluster resources for requested CPU/memory allocation
+
+## Monitoring and Health
+
+- **Resource Metrics**: Built-in CPU, memory, and disk usage monitoring
+- **Health Checks**: Automatic container health monitoring and restart policies
+- **Workspace Status**: Real-time status updates and resource utilization display

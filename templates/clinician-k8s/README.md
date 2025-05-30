@@ -1,3 +1,12 @@
+---
+display_name: Clinician K8s
+description: Kubernetes development workspace with Arize Phoenix tracing and monitoring
+icon: /emojis/1f33c.png
+maintainer_github: abridgeai
+verified: true
+tags: [kubernetes, container, development, github, cursor, monitoring, tracing]
+---
+
 # Clinician K8s Template with Arize Phoenix
 
 This Coder template provisions Kubernetes Deployments as workspaces with enhanced tracing and monitoring capabilities via Arize Phoenix.
