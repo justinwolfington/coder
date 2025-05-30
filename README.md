@@ -29,7 +29,7 @@ coder/
 - **Purpose**: CPU-based development workspaces for general development
 - **Features**: VS Code, Cursor IDE, simplified repository management, GitHub integration
 - **Resources**: 4-16 CPU cores, 8-64GB RAM, 16-1024GB storage
-- **Base Image**: `us-central1-docker.pkg.dev/abridge-artifact-registry/coder/base:de9c4c0`
+- **Base Image**: `us-central1-docker.pkg.dev/abridge-artifact-registry/coder/base:latest`
 
 ### GPU K8s Template
 
@@ -37,7 +37,7 @@ coder/
 - **Features**: NVIDIA GPU support, VS Code, Cursor IDE, simplified repository management
 - **Resources**: 4-16 CPU cores, 16-1024GB RAM, 16-1024GB storage, configurable GPUs
 - **GPU Support**: NVIDIA L4, H100 (80GB) with multi-GPU configuration
-- **Base Image**: `us-central1-docker.pkg.dev/abridge-artifact-registry/coder/gpu:de9c4c0`
+- **Base Image**: `us-central1-docker.pkg.dev/abridge-artifact-registry/coder/gpu:latest`
 
 ## Quick Start
 

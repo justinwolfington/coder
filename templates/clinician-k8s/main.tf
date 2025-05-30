@@ -85,7 +85,7 @@ locals {
 
   # Image and environment configuration
   base_image_repo = "us-central1-docker.pkg.dev/abridge-artifact-registry/coder/base"
-  base_image_tag  = "298226f"
+  base_image_tag  = "latest"
   base_image      = "${local.base_image_repo}:${local.base_image_tag}"
 
 
