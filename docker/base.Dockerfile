@@ -24,7 +24,7 @@ RUN curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cl
     tar -xf google-cloud-cli-linux-x86_64.tar.gz && \
     ./google-cloud-sdk/install.sh --usage-reporting false --rc-path ~/.bashrc --path-update true --command-completion true --quiet
 
-# Install keyring and create marker files
+# Install keyring and create marker files for Google Artifact Registry authentication
 RUN mkdir -p /usr/local/etc/uv && \
     uv tool install keyring --with keyrings.google-artifactregistry-auth && \
     uv tool list > /usr/local/etc/uv/tools_installed

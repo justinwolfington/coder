@@ -124,9 +124,9 @@ jobs:
           tags: ${{ env.REGISTRY }}/${{ env.PROJECT }}/${{ env.REPO }}/${{ matrix.image.name }}:${{ env.SHORT_SHA }}
 
   promote-artifacts:
-    needs: detect-changed-images
-    # Run ONLY when a PR is merged to main
-    if: github.event_name == 'pull_request' && github.event.pull_request.merged == true && github.base_ref == 'main'
+    needs: [detect-changed-images, build-and-push]
+    # Run when code is pushed to main branch (includes merged PRs)
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     strategy:
       matrix: ${{ fromJson(needs.detect-changed-images.outputs.matrix) }}
@@ -134,17 +134,17 @@ jobs:
       REGISTRY: us-central1-docker.pkg.dev
       PROJECT: abridge-artifact-registry
       REPO: coder
-      # SHORT_SHA is set by the "Set SHA Source for merged PR" step
+      # SHORT_SHA is set by the "Set SHA for push to main" step
     steps:
-      - name: Set SHA Source for merged PR
+      - name: Set SHA for push to main
         run: |
-          echo "Event: ${{ github.event_name }}, Merged: ${{ github.event.pull_request.merged }}, Base Ref: ${{ github.base_ref }}"
-          HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+          echo "Event: ${{ github.event_name }}, Ref: ${{ github.ref }}"
+          HEAD_SHA="${{ github.sha }}"
           if [[ -z "$HEAD_SHA" ]]; then
-            echo "Error: github.event.pull_request.head.sha was empty for this merged PR event."
+            echo "Error: github.sha was empty for this push event."
             exit 1
           fi
-          echo "Original PR Head SHA: $HEAD_SHA"
+          echo "Push SHA: $HEAD_SHA"
           echo "SHORT_SHA=${HEAD_SHA:0:7}" >> $GITHUB_ENV
           echo "Successfully set SHORT_SHA to ${HEAD_SHA:0:7}"
 
@@ -166,5 +166,16 @@ jobs:
             echo "Error: SHORT_SHA is empty. Cannot promote."
             exit 1
           fi
-          echo "Promoting image ${{ matrix.image.name }} from tag ${{ env.SHORT_SHA }} to latest"
-          gcloud container images add-tag ${REGISTRY}/${PROJECT}/${REPO}/${{ matrix.image.name }}:${SHORT_SHA} ${REGISTRY}/${PROJECT}/${REPO}/${{ matrix.image.name }}:latest --quiet
+
+          SOURCE_TAG="${REGISTRY}/${PROJECT}/${REPO}/${{ matrix.image.name }}:${SHORT_SHA}"
+          TARGET_TAG="${REGISTRY}/${PROJECT}/${REPO}/${{ matrix.image.name }}:latest"
+
+          echo "Checking if image exists: $SOURCE_TAG"
+          if gcloud container images describe "$SOURCE_TAG" >/dev/null 2>&1; then
+            echo "Promoting image ${{ matrix.image.name }} from tag ${{ env.SHORT_SHA }} to latest"
+            gcloud container images add-tag "$SOURCE_TAG" "$TARGET_TAG" --quiet
+            echo "Successfully promoted ${{ matrix.image.name }}"
+          else
+            echo "Warning: Image $SOURCE_TAG does not exist. Skipping promotion."
+            echo "This may happen if no changes were made to this Docker image in the current push."
+          fi
