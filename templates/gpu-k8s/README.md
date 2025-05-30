@@ -1,6 +1,6 @@
 ---
 display_name: GPU K8s
-description: GPU-accelerated Kubernetes development workspace for ML/AI workloads
+description: GPU-accelerated Kubernetes workspace for ML/AI development
 icon: /emojis/1f916.png
 maintainer_github: abridgeai
 verified: true
@@ -13,74 +13,50 @@ GPU-accelerated Kubernetes workspace for ML/AI development with NVIDIA GPU suppo
 
 ## Features
 
-- NVIDIA GPU acceleration (L4, H100)
-- VS Code (browser) and Cursor IDE integration
-- Single URL input for repository cloning
-- Configurable resources: CPU, memory, storage, GPUs
-- Real-time monitoring including GPU usage
-- Root access for unrestricted development
+- **NVIDIA GPU Support**: L4, H100 accelerators with multi-GPU support
+- **VS Code & Cursor IDE**: Web-based and desktop development environments
+- **Git Integration**: Automatic repository cloning and configuration
+- **Python & Jupyter**: Pre-installed extensions and ML frameworks
+- **Root Access**: Unrestricted development environment
+- **GPU Monitoring**: Real-time GPU utilization metrics
 
-## Configuration
+## Parameters
 
-| Parameter | Description | Default | Options |
-|-----------|-------------|---------|---------|
-| Repository URL | GitHub repository URL (optional) | `https://github.com/abridgeai/completion-service` | - |
-| CPU Cores | CPU allocation | 4 | 4-16 |
-| Memory | RAM in GB | 16 | 16-1024 |
-| Storage | Disk space in GB | 16 | 16-1024 |
-| GPU Type | GPU accelerator | None | None, NVIDIA L4, NVIDIA H100 (80GB) |
-| GPU Count | Number of GPUs | 1 | 1-8 |
+| Parameter | Range | Default | Description |
+|-----------|-------|---------|-------------|
+| Repository URL | - | completion-service | GitHub repository to clone |
+| CPU Cores | 4-16 | 4 | CPU cores allocated |
+| Memory | 16-1024 GB | 16 GB | Memory allocated |
+| Home Disk | 16-1024 GB | 16 GB | Persistent storage size |
+| GPU Type | - | None | None, NVIDIA L4, NVIDIA H100 (80GB) |
+| GPU Count | 1-8 | 1 | Number of GPUs |
 
-## Repository Management
+## Applications
 
-- **Default**: Clones completion-service repository
-- **Custom Repository**: Enter any GitHub repository URL
-- **No Repository**: Clear field for clean workspace
+### Code Server
+- **Access**: `http://localhost:13337`
+- **Features**: Python, Jupyter, GPU development tools
 
-Repository clones to `/root/{repo-name}` when URL provided.
+## Architecture
 
-## Container Details
+**Main Container:**
+- Development environment with GPU access
+- User-defined resources + GPU allocation
+- Root user with CUDA pre-installed
 
-- **Base Image**: `us-central1-docker.pkg.dev/abridge-artifact-registry/coder/gpu:de9c4c0`
-- **User**: Root with full GPU access
-- **Home**: `/root`
-- **GPU**: NVIDIA drivers and CUDA pre-installed
-
-## Development Environment
-
-**VS Code (code-server)**
-
-- Full VS Code experience in browser
-- Pre-installed Python and Jupyter extensions
-- GPU development tools available
-
-**Cursor IDE**
-
-- Desktop IDE with AI assistance
-- Direct connection from Cursor application
-- Advanced GPU development features
+**Storage:**
+- Persistent home directory
+- Repository clones to `/root/{repo-name}`
 
 ## Prerequisites
 
-- Kubernetes cluster with GPU nodes and NVIDIA device plugin
-- Node pools labeled with `cloud.google.com/gke-accelerator` (for GKE)
-- GitHub external authentication for Git integration
+- Kubernetes cluster with GPU nodes
+- NVIDIA device plugin installed
+- Node pools with `cloud.google.com/gke-accelerator` labels (GKE)
 
-## Usage
+## Use Cases
 
-1. **Create Workspace**
-   - Select template and configure parameters
-   - Choose GPU type and count
-   - Launch workspace
-
-2. **Access Applications**
-   - VS Code opens automatically in browser
-   - Cursor IDE available in workspace applications
-
-## Monitoring
-
-Built-in metrics: CPU, memory, GPU utilization, disk usage
-
----
-
-**Note**: Requires Kubernetes cluster with GPU support and NVIDIA drivers.
+- Machine learning model training
+- GPU-accelerated computation
+- AI/ML research and development
+- CUDA programming
