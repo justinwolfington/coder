@@ -89,9 +89,8 @@ locals {
   base_image      = "${local.base_image_repo}:${local.base_image_tag}"
 
   # Phoenix image configuration
-  # TODO: Revert to latest before merging
   phoenix_image_repo = "us-central1-docker.pkg.dev/abridge-artifact-registry/coder/phoenix"
-  phoenix_image_tag  = "fb3b823"
+  phoenix_image_tag  = "latest"
   phoenix_image      = "${local.phoenix_image_repo}:${local.phoenix_image_tag}"
 
   # Repository configuration - simplified
