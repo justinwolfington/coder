@@ -88,10 +88,6 @@ locals {
   base_image_tag  = "latest"
   base_image      = "${local.base_image_repo}:${local.base_image_tag}"
 
-  # Phoenix image configuration
-  phoenix_image_repo = "us-central1-docker.pkg.dev/abridge-artifact-registry/coder/phoenix"
-  phoenix_image_tag  = "latest"
-  phoenix_image      = "${local.phoenix_image_repo}:${local.phoenix_image_tag}"
 
   # Repository configuration - simplified
   repo_url     = data.coder_parameter.repository_url.value
@@ -215,23 +211,6 @@ resource "coder_app" "code-server" {
   }
 }
 
-# --- Coder Application: Arize Phoenix ---
-resource "coder_app" "arize-phoenix" {
-  agent_id     = coder_agent.main.id
-  slug         = "arize-phoenix"
-  display_name = "Arize Phoenix"
-  icon         = "/icon/database.svg"
-  url          = "http://localhost:6006"
-  subdomain    = false
-  share        = "owner"
-
-  healthcheck {
-    url       = "http://localhost:6006"
-    interval  = 10
-    threshold = 15
-  }
-}
-
 # --- Kubernetes Resources ---
 
 resource "kubernetes_persistent_volume_claim" "home" {
@@ -298,27 +277,6 @@ resource "kubernetes_deployment" "main" {
             value = coder_agent.main.token
           }
 
-          # Arize Phoenix tracing environment variables
-          env {
-            name  = "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT"
-            value = "http://localhost:6006/v1/traces"
-          }
-
-          env {
-            name  = "PF_TRACING_SKIP_EXPORTER_SETUP"
-            value = "true"
-          }
-
-          env {
-            name  = "PF_TRACING_SKIP_LOCAL_SETUP"
-            value = "true"
-          }
-
-          env {
-            name  = "PF_DISABLE_TRACING"
-            value = "false"
-          }
-
           resources {
             requests = {
               cpu    = data.coder_parameter.cpu.value
@@ -337,74 +295,11 @@ resource "kubernetes_deployment" "main" {
           }
         }
 
-        # Arize Phoenix sidecar container
-        container {
-          name              = "arize-phoenix"
-          image             = local.phoenix_image
-          image_pull_policy = "Always"
-
-          port {
-            container_port = 6006
-            name           = "phoenix-http"
-          }
-
-          port {
-            container_port = 4317
-            name           = "phoenix-grpc"
-          }
-
-          resources {
-            requests = {
-              cpu    = "500m"
-              memory = "512Mi"
-            }
-            limits = {
-              cpu    = "1000m"
-              memory = "1Gi"
-            }
-          }
-
-          volume_mount {
-            mount_path = "/tmp/phoenix"
-            name       = "phoenix-data"
-            read_only  = false
-          }
-
-          # Kubernetes health checks (not Docker health checks)
-          liveness_probe {
-            http_get {
-              path = "/"
-              port = 6006
-            }
-            initial_delay_seconds = 30
-            period_seconds        = 10
-            timeout_seconds       = 5
-            failure_threshold     = 3
-          }
-
-          readiness_probe {
-            http_get {
-              path = "/"
-              port = 6006
-            }
-            initial_delay_seconds = 10
-            period_seconds        = 5
-            timeout_seconds       = 3
-            failure_threshold     = 3
-          }
-        }
-
         volume {
           name = "home"
           persistent_volume_claim {
             claim_name = kubernetes_persistent_volume_claim.home.metadata[0].name
           }
-        }
-
-        # Phoenix data volume
-        volume {
-          name = "phoenix-data"
-          empty_dir {}
         }
 
         affinity {
@@ -445,10 +340,6 @@ resource "coder_metadata" "workspace_info" {
   item {
     key   = "Memory"
     value = "${data.coder_parameter.memory.value} GB RAM"
-  }
-  item {
-    key   = "Arize Phoenix"
-    value = "Enabled - http://localhost:6006"
   }
 }
 
