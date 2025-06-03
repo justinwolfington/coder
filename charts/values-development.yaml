@@ -118,7 +118,7 @@ coder:
 networkPolicy:
   allowedServices:
     - name: elms
-      port: 443
+      port: 80
       namespace: elms
       selector:
         app.kubernetes.io/name: elms
@@ -130,3 +130,16 @@ networkPolicy:
       selector:
         app.kubernetes.io/name: eyes
         app.kubernetes.io/instance: eyes
+
+  # Additional egress rules for general internet access
+  additionalEgressRules:
+    - ports:
+        - port: 80
+          protocol: TCP
+      to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 172.32.0.0/12
+              - 172.48.0.0/22
+              - 10.6.0.0/16
