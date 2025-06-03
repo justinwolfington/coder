@@ -55,7 +55,7 @@ CPU-based Kubernetes development workspace with integrated Arize Phoenix tracing
 
 ## Environment Variables
 
-Phoenix tracing is pre-configured with:
+Completion service is pre-configured to send traces to Arize Phoenix:
 - `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://localhost:6006/v1/traces`
 - `PF_TRACING_SKIP_EXPORTER_SETUP=true`
 - `PF_TRACING_SKIP_LOCAL_SETUP=true`
