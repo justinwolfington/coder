@@ -1,5 +1,5 @@
 {{- if .Values.networkPolicy }}
-{{- if .Values.networkPolicy.allowedServices }}
+{{- if or .Values.networkPolicy.allowedServices .Values.networkPolicy.additionalEgressRules }}
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -13,18 +13,23 @@ spec:
     - Egress
   egress:
     {{- range .Values.networkPolicy.allowedServices }}
-    - to:
-        - podSelector:
-            matchLabels:
-              {{- range $key, $value := .selector }}
-                {{ $key }}: {{ $value }}
-              {{- end }}
-          namespaceSelector:
+    - ports:
+        - port: {{ .port }}
+          protocol: TCP
+      to:
+        - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: {{ .namespace }}
-      ports:
-        - protocol: TCP
-          port: {{ .port }}
+          podSelector:
+            matchLabels:
+              {{- range $key, $value := .selector }}
+              {{ $key }}: {{ $value }}
+              {{- end }}
+    {{- end }}
+    {{- if .Values.networkPolicy.additionalEgressRules }}
+    {{- range .Values.networkPolicy.additionalEgressRules }}
+    - {{- toYaml . | nindent 6 }}
+    {{- end }}
     {{- end }}
     - ports:
         - port: 53
