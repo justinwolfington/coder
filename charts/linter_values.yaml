@@ -1,3 +1,12 @@
 coder:
   httpRoute:
     hostname: "coder.abridge.test"
+
+# Dummy network policy configuration for linting validation
+networkPolicy:
+  allowedServices:
+    - name: example-service
+      port: 80
+      namespace: example-namespace
+      selector:
+        app: example-app
