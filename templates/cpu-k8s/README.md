@@ -1,24 +1,24 @@
 ---
-display_name: Clinician K8s
-description: Kubernetes development workspace with Arize Phoenix tracing
+display_name: CPU K8s
+description: CPU-based Kubernetes development workspace
 icon: /emojis/1f33c.png
 maintainer_github: abridgeai
 verified: true
-tags: [kubernetes, development, github, cursor, monitoring, tracing]
+tags: [kubernetes, development, github, cursor]
 ---
 
-# Clinician K8s Template
+# CPU K8s Template
 
-CPU-based Kubernetes development workspace with integrated Arize Phoenix tracing and monitoring.
+Lightweight CPU-based Kubernetes development workspace optimized for performance.
 
 ## Features
 
-- **VS Code & Cursor IDE**: Web-based development environment
-- **Arize Phoenix**: Built-in tracing and monitoring dashboard
+- **VS Code & Cursor IDE**: Web-based and desktop development environments
 - **Git Integration**: Automatic repository cloning and configuration
 - **Python & Jupyter**: Pre-installed extensions and support
 - **Persistent Storage**: Home directory persists across restarts
 - **Resource Monitoring**: Built-in CPU, memory, and disk metrics
+- **Lightweight**: No sidecars for maximum performance
 
 ## Parameters
 
@@ -35,28 +35,20 @@ CPU-based Kubernetes development workspace with integrated Arize Phoenix tracing
 - **Access**: `http://localhost:13337`
 - **Features**: Python, Jupyter extensions
 
-### Arize Phoenix
-- **Access**: `http://localhost:6006`
-- **Features**: Tracing dashboard, OTLP endpoint
-
 ## Architecture
 
 **Main Container:**
 - Development environment with code-server
 - User-defined resources (4-16 CPU, 8-64GB RAM)
-
-**Phoenix Sidecar:**
-- Tracing and monitoring (500m CPU, 512Mi RAM)
-- Automatic health checks
+- Full resource allocation (no sidecars)
 
 **Storage:**
 - Persistent home directory
-- Ephemeral Phoenix data volume
+- Configurable disk size
 
-## Environment Variables
+## Use Cases
 
-Completion service is pre-configured to send traces to Arize Phoenix:
-- `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://localhost:6006/v1/traces`
-- `PF_TRACING_SKIP_EXPORTER_SETUP=true`
-- `PF_TRACING_SKIP_LOCAL_SETUP=true`
-- `PF_DISABLE_TRACING=false`
+- CPU-intensive development
+- Code review and analysis
+- Testing environments
+- Resource-conscious projects

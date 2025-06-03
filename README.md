@@ -18,6 +18,7 @@ coder/
 │   └── create_coder_tokens.sh  # Script to create machine user tokens
 └── templates/             # Workspace templates
     ├── clinician-k8s/     # CPU-based workspace template
+    ├── cpu-k8s/          # Lightweight CPU-based workspace template
     ├── gpu-k8s/          # GPU-based workspace template
     └── templates-config.json  # Template configuration
 ```
@@ -26,10 +27,21 @@ coder/
 
 ### Clinician K8s Template
 
-- **Purpose**: CPU-based development workspaces for general development
-- **Features**: VS Code, Cursor IDE, simplified repository management, GitHub integration
+- **Purpose**: CPU-based development workspaces with integrated Arize Phoenix tracing and monitoring
+- **Features**: VS Code, Cursor IDE, Arize Phoenix dashboard, Git integration, Python & Jupyter support, OTLP tracing pre-configured
+- **Resources**: 4-16 CPU cores, 8-64GB RAM, 16-1024GB storage
+- **Phoenix Sidecar**: 500m-1000m CPU, 512Mi-1Gi RAM for tracing
+- **Base Image**: `us-central1-docker.pkg.dev/abridge-artifact-registry/coder/base:latest`
+- **Phoenix Image**: `us-central1-docker.pkg.dev/abridge-artifact-registry/coder/phoenix:latest`
+- **Use Cases**: Development with observability, debugging, performance monitoring, trace analysis
+
+### CPU K8s Template
+
+- **Purpose**: Lightweight CPU-based development workspaces optimized for performance
+- **Features**: VS Code, Cursor IDE, Git integration, Python & Jupyter support, no sidecars for maximum performance
 - **Resources**: 4-16 CPU cores, 8-64GB RAM, 16-1024GB storage
 - **Base Image**: `us-central1-docker.pkg.dev/abridge-artifact-registry/coder/base:latest`
+- **Use Cases**: CPU-intensive development, code review and analysis, testing environments, resource-conscious projects
 
 ### GPU K8s Template
 
