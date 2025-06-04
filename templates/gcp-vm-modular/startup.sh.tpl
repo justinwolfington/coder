@@ -45,10 +45,13 @@ fi
 # GPU Drivers (if needed)
 if [[ "${gpu_type}" != "none" ]]; then
   echo "🔧 GPU requested, ensuring drivers..."
-  if ! command -v nvidia-smi &>/dev/null && [ -f /opt/deeplearning/install-driver.sh ]; then
-      /opt/deeplearning/install-driver.sh --quiet --accept-license || echo 'Driver installation attempted'
+  if ! command -v nvidia-smi &>/dev/null; then
+    if [ -f /opt/deeplearning/install-driver.sh ]; then
+      echo "Installing Nvidia drivers automatically..."
+      yes | /opt/deeplearning/install-driver.sh --quiet --accept-license || echo 'Driver installation attempted'
+    fi
   fi
-  nvidia-smi || echo 'nvidia-smi not available yet.'
+  nvidia-smi || echo 'nvidia-smi not available yet - drivers may need reboot'
 fi
 
 # Mount local SSDs if available (for H100 instances)

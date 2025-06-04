@@ -19,9 +19,9 @@
             "directory": "./templates/gpu-k8s"
         },
         "gcp-vm-modular": {
-            "display_name": "GCP VM Modular",
+            "display_name": "VM Modular",
             "description": "GPU-accelerated Google Cloud VM workspace for ML/AI workloads with modular configuration",
-            "icon": "/emojis/1f4bb.png",
+            "icon": "/icon/gcp.png",
             "directory": "./templates/gcp-vm-modular"
         }
     }
