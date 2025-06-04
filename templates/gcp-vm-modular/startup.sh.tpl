@@ -34,29 +34,9 @@ if ! command -v node &>/dev/null; then
     apt-get install -y nodejs
 fi
 
-# Go (if not present)
-if ! command -v go &>/dev/null; then
-    wget -q https://go.dev/dl/go1.21.5.linux-amd64.tar.gz
-    tar -C /usr/local -xzf go1.21.5.linux-amd64.tar.gz
-    echo 'export PATH=$PATH:/usr/local/go/bin' >> /etc/profile
-    rm go1.21.5.linux-amd64.tar.gz
-fi
-
-# GPU Drivers (if needed)
-if [[ "${gpu_type}" != "none" ]]; then
-  echo "🔧 GPU requested, ensuring drivers..."
-  if ! command -v nvidia-smi &>/dev/null; then
-    if [ -f /opt/deeplearning/install-driver.sh ]; then
-      echo "Installing Nvidia drivers automatically..."
-      yes | /opt/deeplearning/install-driver.sh --quiet --accept-license || echo 'Driver installation attempted'
-    fi
-  fi
-  nvidia-smi || echo 'nvidia-smi not available yet - drivers may need reboot'
-fi
-
 # Mount local SSDs if available (for H100 instances)
 if [[ "${gpu_type}" == "nvidia-h100-80gb" ]]; then
-    echo "🔧 Setting up local NVMe storage..."
+    echo "Setting up local NVMe storage..."
     mkdir -p /mnt/nvme
     # Find and mount NVMe devices
     for device in /dev/nvme*n1; do
