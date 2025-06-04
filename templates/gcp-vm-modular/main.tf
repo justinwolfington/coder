@@ -329,7 +329,6 @@ resource "google_compute_instance" "workspace" {
     "coder_replaceable" = "yes"
     "workspace-type"    = local.gpu_config.gpu_count > 0 ? "gpu" : "cpu"
     "owner"             = lower(data.coder_workspace_owner.me.name)
-    "owner-email"       = replace(lower(data.coder_workspace_owner.me.email), "@", "-at-")
     "workspace-name"    = lower(data.coder_workspace.me.name)
     "gpu-type"          = local.gpu_config.gpu_count > 0 ? local.gpu_config.gpu_type : "none"
     "gpu-count"         = tostring(local.gpu_config.gpu_count)
