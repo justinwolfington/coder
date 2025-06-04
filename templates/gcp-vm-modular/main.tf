@@ -19,33 +19,6 @@ provider "google" {
 }
 
 ############################
-# VARIABLES
-############################
-variable "project_id" { default = "client-dev-e301d" }
-variable "zone" {
-  default = "us-central1-a"
-  validation {
-    condition = contains([
-      "us-central1-a", "us-central1-b", "us-central1-c", "us-central1-f"
-    ], var.zone)
-    error_message = "Zone must be in us-central1 region."
-  }
-}
-variable "disk_size" {
-  default = 100
-  validation {
-    condition     = var.disk_size >= 50 && var.disk_size <= 2000
-    error_message = "Disk size must be between 50-2000 GB."
-  }
-}
-variable "service_account_email" {
-  description = "Service account email with least permissions required"
-  default     = "467615904598-compute@developer.gserviceaccount.com"
-}
-variable "network" { default = "development-vpc" }
-variable "subnetwork" { default = "development-ml" }
-
-############################
 # DATA SOURCES
 ############################
 data "coder_workspace" "me" {}
@@ -170,7 +143,7 @@ locals {
     }
   ] : []
 
-  startup_script = templatefile("${path.module}/startup.sh.tpl", {
+  startup_script = templatefile("${path.module}/startup.tftpl", {
     username  = lower(data.coder_workspace_owner.me.name)
     useremail = data.coder_workspace_owner.me.email
     gpu_type  = data.coder_parameter.gpu_type.value
@@ -395,32 +368,4 @@ resource "coder_metadata" "workspace_info" {
     key   = "Internal IP"
     value = google_compute_instance.workspace[0].network_interface[0].network_ip
   }
-}
-
-############################
-# OUTPUTS
-############################
-output "instance_name" {
-  description = "Name of the created GCP compute instance"
-  value       = data.coder_workspace.me.start_count > 0 ? google_compute_instance.workspace[0].name : ""
-}
-output "internal_ip" {
-  description = "Internal IP address of the compute instance"
-  value       = data.coder_workspace.me.start_count > 0 ? google_compute_instance.workspace[0].network_interface[0].network_ip : ""
-}
-output "machine_type" {
-  description = "Machine type used for the compute instance"
-  value       = local.gpu_config.machine_type
-}
-output "gpu_config" {
-  description = "GPU configuration selected for the workspace"
-  value       = data.coder_parameter.gpu_type.value
-}
-output "dl_image" {
-  description = "Deep learning image selected for the workspace"
-  value       = data.coder_parameter.dl_image.value
-}
-output "zone" {
-  description = "GCP zone where the instance is running"
-  value       = var.zone
 }
