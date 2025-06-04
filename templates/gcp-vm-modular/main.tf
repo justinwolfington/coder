@@ -91,6 +91,20 @@ data "coder_parameter" "dl_image" {
   }
 }
 
+data "coder_parameter" "disk_size" {
+  name         = "disk_size"
+  display_name = "Boot Disk Size (GB)"
+  description  = "Size of the boot disk in GB"
+  type         = "number"
+  default      = 256
+  mutable      = true
+
+  validation {
+    min = 50
+    max = 2000
+  }
+}
+
 ############################
 # LOCALS
 ############################
@@ -119,6 +133,16 @@ locals {
   }
 
   gpu_config = local.gpu_configs[data.coder_parameter.gpu_type.value]
+
+  # Reservation mapping based on GPU selection
+  reservation_mappings = {
+    "none"             = ""
+    "nvidia-l4-1x"     = "shared-g2-standard-24-usc1-l4"
+    "nvidia-l4-2x"     = "shared-g2-standard-24-usc1-l4-2"
+    "nvidia-h100-80gb" = "shared-a3-highgpu-8g-usc1-a-h100"
+  }
+
+  selected_reservation = local.reservation_mappings[data.coder_parameter.gpu_type.value]
 
   gpu_accelerators = local.gpu_config.gpu_count > 0 ? [{
     type  = "projects/${var.project_id}/zones/${var.zone}/acceleratorTypes/${local.gpu_config.gpu_type}"
@@ -252,7 +276,7 @@ resource "google_compute_instance" "workspace" {
   boot_disk {
     initialize_params {
       image = local.image
-      size  = var.disk_size
+      size  = data.coder_parameter.disk_size.value
       type  = "pd-standard"
     }
   }
@@ -270,6 +294,17 @@ resource "google_compute_instance" "workspace" {
     content {
       type  = guest_accelerator.value.type
       count = guest_accelerator.value.count
+    }
+  }
+
+  dynamic "reservation_affinity" {
+    for_each = local.selected_reservation != "" ? [1] : []
+    content {
+      type = "SPECIFIC_RESERVATION"
+      specific_reservation {
+        key    = "compute.googleapis.com/reservation-name"
+        values = [local.selected_reservation]
+      }
     }
   }
 
@@ -312,7 +347,7 @@ resource "google_compute_instance" "workspace" {
   }
 
   shielded_instance_config {
-    enable_secure_boot          = true
+    enable_secure_boot          = false
     enable_vtpm                 = true
     enable_integrity_monitoring = true
   }
@@ -356,12 +391,17 @@ resource "coder_metadata" "workspace_info" {
 
   item {
     key   = "Disk Size"
-    value = "${var.disk_size} GB"
+    value = "${data.coder_parameter.disk_size.value} GB"
   }
 
   item {
     key   = "Local SSDs"
     value = length(local.local_ssds) > 0 ? "${length(local.local_ssds)}x 375GB NVMe" : "None"
+  }
+
+  item {
+    key   = "Reservation"
+    value = local.selected_reservation != "" ? local.selected_reservation : "None"
   }
 
   item {
