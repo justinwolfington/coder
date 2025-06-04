@@ -9,21 +9,33 @@ terraform {
   }
 }
 
+############################
+# PROVIDERS
+############################
 provider "coder" {}
 
 provider "kubernetes" {
   config_path = null
 }
 
+############################
+# VARIABLES
+############################
 variable "namespace" {
   type        = string
   description = "Target Kubernetes namespace for workspace deployments."
   default     = "coder"
 }
 
+############################
+# DATA SOURCES
+############################
 data "coder_workspace" "me" {}
 data "coder_workspace_owner" "me" {}
 
+############################
+# PARAMETERS
+############################
 data "coder_parameter" "repository_url" {
   name         = "repository_url"
   display_name = "Repository URL"
@@ -79,6 +91,9 @@ data "coder_parameter" "home_disk_size" {
   }
 }
 
+############################
+# LOCALS
+############################
 locals {
   # Directory configuration
   home_dir = "/home/vscode"
@@ -150,7 +165,9 @@ locals {
   }
 }
 
-# --- Coder Agent ---
+############################
+# CODER AGENT
+############################
 resource "coder_agent" "main" {
   os             = "linux"
   arch           = "amd64"
@@ -168,6 +185,9 @@ resource "coder_agent" "main" {
   }
 }
 
+############################
+# IDE MODULES
+############################
 # --- Git Repository Cloning ---
 module "git-clone" {
   count    = data.coder_workspace.me.start_count > 0 && local.should_clone ? 1 : 0
@@ -211,6 +231,9 @@ resource "coder_app" "code-server" {
   }
 }
 
+############################
+# INFRASTRUCTURE RESOURCES
+############################
 # --- Kubernetes Resources ---
 
 resource "kubernetes_persistent_volume_claim" "home" {
@@ -324,6 +347,9 @@ resource "kubernetes_deployment" "main" {
   }
 }
 
+############################
+# METADATA
+############################
 # --- Coder Metadata (for UI display) ---
 resource "coder_metadata" "workspace_info" {
   count       = data.coder_workspace.me.start_count
@@ -354,4 +380,42 @@ resource "coder_metadata" "home_pvc_info" {
     key   = "Namespace"
     value = var.namespace
   }
+}
+
+############################
+# OUTPUTS
+############################
+output "workspace_name" {
+  description = "Name of the created workspace"
+  value       = data.coder_workspace.me.name
+}
+
+output "workspace_owner" {
+  description = "Owner of the workspace"
+  value       = data.coder_workspace_owner.me.name
+}
+
+output "cpu_cores" {
+  description = "Number of CPU cores allocated"
+  value       = data.coder_parameter.cpu.value
+}
+
+output "memory_gb" {
+  description = "Amount of memory allocated in GB"
+  value       = data.coder_parameter.memory.value
+}
+
+output "home_disk_size" {
+  description = "Size of home disk in GB"
+  value       = data.coder_parameter.home_disk_size.value
+}
+
+output "repository_url" {
+  description = "Repository URL being used"
+  value       = data.coder_parameter.repository_url.value
+}
+
+output "namespace" {
+  description = "Kubernetes namespace where workspace is deployed"
+  value       = var.namespace
 }
