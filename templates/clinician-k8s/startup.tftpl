@@ -1,1 +1,23 @@
- 
+#!/bin/bash
+set -e
+
+export USER_HOME="/home/vscode"
+export BASHRC_FILE="$USER_HOME/.bashrc"
+export ROOT_BASHRC_FILE="/root/.bashrc"
+
+sudo cp "$ROOT_BASHRC_FILE" "$BASHRC_FILE"
+sudo chown vscode:vscode "$BASHRC_FILE"
+
+# Install and start code-server
+export CODE_SERVER_DIR="/tmp/code-server"
+
+if [ ! -f "$CODE_SERVER_DIR/bin/code-server" ]; then
+  mkdir -p "$CODE_SERVER_DIR"
+  curl -fsSL https://code-server.dev/install.sh | sh -s -- --method=standalone --prefix="$CODE_SERVER_DIR" || exit 1
+fi
+
+# Install VS Code extensions
+$CODE_SERVER_DIR/bin/code-server --install-extension ms-python.python
+$CODE_SERVER_DIR/bin/code-server --install-extension ms-toolsai.jupyter
+
+$CODE_SERVER_DIR/bin/code-server --auth none --port 13337 >/tmp/code-server.log 2>&1 &
