@@ -20,6 +20,7 @@ coder/
     ├── clinician-k8s/     # CPU-based workspace template
     ├── cpu-k8s/          # Lightweight CPU-based workspace template
     ├── gpu-k8s/          # GPU-based workspace template
+    ├── gcp-vm-modular/    # GCP VM-based workspace template
     └── templates-config.json  # Template configuration
 ```
 
@@ -50,6 +51,14 @@ coder/
 - **Resources**: 4-16 CPU cores, 16-1024GB RAM, 16-1024GB storage, configurable GPUs
 - **GPU Support**: NVIDIA L4, H100 (80GB) with multi-GPU configuration
 - **Base Image**: `us-central1-docker.pkg.dev/abridge-artifact-registry/coder/gpu:latest`
+
+### GCP VM Modular Template
+
+- **Purpose**: GPU-accelerated Google Cloud VM workspaces for ML/AI development
+- **Features**: NVIDIA GPU support, VS Code, Cursor IDE, deep learning environments, security hardening
+- **Resources**: e2-standard-4 to a3-highgpu-8g machine types, configurable disk size
+- **GPU Support**: NVIDIA L4 (1x, 2x), H100 80GB (8x) with local SSD for H100
+- **Base Image**: Google Deep Learning Platform images (PyTorch, TensorFlow, Common Framework, Ubuntu 22.04)
 
 ## Quick Start
 
@@ -84,6 +93,7 @@ Use the provided script to create machine user tokens:
 
 - Kubernetes cluster with proper storage configuration
 - For GPU template: GPU nodes with NVIDIA device plugin installed
+- For GCP VM template: Google Cloud Platform project with Compute Engine API enabled, VPC network configured, and sufficient GPU quotas
 - GitHub external authentication configured for Git integration
 
 ## Troubleshooting
@@ -102,6 +112,12 @@ Use the provided script to create machine user tokens:
 - Verify GPU device plugin is installed: `kubectl get daemonset -n kube-system`
 - Check GPU node labels match template configuration
 - Ensure sufficient GPU resources are available
+
+**GCP VM Template Issues**
+- Verify GCP credentials and project permissions
+- Check GPU quotas in the specified region/zone
+- Ensure VPC network and subnet are properly configured
+- Confirm service account has required compute instance permissions
 
 **Performance Issues**
 - Adjust resource limits based on workload requirements

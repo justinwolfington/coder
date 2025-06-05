@@ -9,21 +9,24 @@ terraform {
   }
 }
 
+############################
+# PROVIDERS
+############################
 provider "coder" {}
 
 provider "kubernetes" {
   config_path = null
 }
 
-variable "namespace" {
-  type        = string
-  description = "Target Kubernetes namespace for workspace deployments."
-  default     = "coder"
-}
-
+############################
+# DATA SOURCES
+############################
 data "coder_workspace" "me" {}
 data "coder_workspace_owner" "me" {}
 
+############################
+# PARAMETERS
+############################
 data "coder_parameter" "repository_url" {
   name         = "repository_url"
   display_name = "Repository URL"
@@ -79,6 +82,9 @@ data "coder_parameter" "home_disk_size" {
   }
 }
 
+############################
+# LOCALS
+############################
 locals {
   # Directory configuration
   home_dir = "/home/vscode"
@@ -114,30 +120,7 @@ locals {
   }
 
   # Startup script for the workspace
-  init_script = <<-EOT
-    set -e
-
-    export USER_HOME="/home/vscode"
-    export BASHRC_FILE="$USER_HOME/.bashrc"
-    export ROOT_BASHRC_FILE="/root/.bashrc"
-
-    sudo cp "$ROOT_BASHRC_FILE" "$BASHRC_FILE"
-    sudo chown vscode:vscode "$BASHRC_FILE"
-
-    # Install and start code-server
-    export CODE_SERVER_DIR="/tmp/code-server"
-
-    if [ ! -f "$CODE_SERVER_DIR/bin/code-server" ]; then
-      mkdir -p "$CODE_SERVER_DIR"
-      curl -fsSL https://code-server.dev/install.sh | sh -s -- --method=standalone --prefix="$CODE_SERVER_DIR" || exit 1
-    fi
-
-    # Install VS Code extensions
-    $CODE_SERVER_DIR/bin/code-server --install-extension ms-python.python
-    $CODE_SERVER_DIR/bin/code-server --install-extension ms-toolsai.jupyter
-
-    $CODE_SERVER_DIR/bin/code-server --auth none --port 13337 >/tmp/code-server.log 2>&1 &
-  EOT
+  init_script = templatefile("${path.module}/startup.tftpl", {})
 
   # Metrics for workspace monitoring
   metrics = {
@@ -150,7 +133,9 @@ locals {
   }
 }
 
-# --- Coder Agent ---
+############################
+# CODER AGENT
+############################
 resource "coder_agent" "main" {
   os             = "linux"
   arch           = "amd64"
@@ -168,6 +153,9 @@ resource "coder_agent" "main" {
   }
 }
 
+############################
+# IDE MODULES
+############################
 # --- Git Repository Cloning ---
 module "git-clone" {
   count    = data.coder_workspace.me.start_count > 0 && local.should_clone ? 1 : 0
@@ -211,6 +199,9 @@ resource "coder_app" "code-server" {
   }
 }
 
+############################
+# INFRASTRUCTURE RESOURCES
+############################
 # --- Kubernetes Resources ---
 
 resource "kubernetes_persistent_volume_claim" "home" {
@@ -324,6 +315,9 @@ resource "kubernetes_deployment" "main" {
   }
 }
 
+############################
+# METADATA
+############################
 # --- Coder Metadata (for UI display) ---
 resource "coder_metadata" "workspace_info" {
   count       = data.coder_workspace.me.start_count

@@ -17,6 +17,12 @@
             "description": "Provision Kubernetes Deployments as Coder workspaces with GPU support",
             "icon": "/emojis/1f35f.png",
             "directory": "./templates/gpu-k8s"
+        },
+        "gcp-vm-modular": {
+            "display_name": "VM Modular",
+            "description": "GPU-accelerated Google Cloud VM workspace for ML/AI workloads with modular configuration",
+            "icon": "/icon/gcp.png",
+            "directory": "./templates/gcp-vm-modular"
         }
     }
 }
