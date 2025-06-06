@@ -65,16 +65,18 @@ jobs:
 
           declare -a IMAGES=()
 
-          if grep -q '^docker/' <<< "$FILES"; then
-            for file in docker/*.Dockerfile; do
+          # Only process changed Dockerfiles, not all Dockerfiles
+          for file in $FILES; do
+            if [[ "$file" == docker/*.Dockerfile ]]; then
               [ -f "$file" ] || continue
               IMAGE_NAME=$(basename "$file" .Dockerfile)
               IMAGES+=("{\"name\":\"$IMAGE_NAME\",\"dockerfile\":\"$file\",\"context\":\".\"}")
-            done
-          fi
+              echo "Added changed image: $IMAGE_NAME from $file"
+            fi
+          done
 
           MATRIX="{\"image\":[$(IFS=,; echo "${IMAGES[*]}")]}"
-          echo "matrix=$MATRIX"
+          echo "Final matrix: $MATRIX"
           echo "matrix=$MATRIX" >> $GITHUB_OUTPUT
 
   build-and-push:
