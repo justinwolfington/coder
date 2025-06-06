@@ -113,4 +113,33 @@ coder:
             memory: 1Gi
             # CPU scales with database I/O
             cpu: 100m
-# Staging-specific overrides
+
+# Staging-specific network policy configuration
+networkPolicy:
+  allowedServices:
+    - name: elms
+      port: 80
+      namespace: elms
+      selector:
+        app.kubernetes.io/name: elms
+        app.kubernetes.io/instance: elms
+
+    - name: eyes
+      port: 80
+      namespace: eyes
+      selector:
+        app.kubernetes.io/name: eyes
+        app.kubernetes.io/instance: eyes
+
+  # Additional egress rules for general internet access
+  additionalEgressRules:
+    - ports:
+        - port: 80
+          protocol: TCP
+      to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 172.32.0.0/12
+              - 172.48.0.0/22
+              - 10.6.0.0/16
