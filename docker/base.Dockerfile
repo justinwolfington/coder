@@ -16,10 +16,14 @@ COPY --from=ghcr.io/astral-sh/uv:0.7.3 /uv /bin/uv
 # Install build dependencies
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
+    gcc \
     build-essential \
     vim \
     curl \
-    tmux && \
+    apt-utils \
+    screen \
+    tmux \
+    byobu && \
     rm -rf /var/lib/apt/lists/*
 
 # Install Google Cloud SDK

@@ -16,18 +16,20 @@ COPY --from=ghcr.io/astral-sh/uv:0.7.3 /uv /bin/uv
 # Install build dependencies and system packages
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-    build-essential \
-    curl \
     git \
     gcc \
+    build-essential \
     rsync \
     sudo \
     patch \
     vim \
     wget \
+    curl \
+    net-tools \
     apt-utils \
     screen \
     tmux \
+    byobu \
     ranger \
     openssh-client && \
     rm -rf /var/lib/apt/lists/*
