@@ -258,6 +258,16 @@ module "cursor" {
   agent_id = coder_agent.main.id
 }
 
+module "jetbrains_gateway" {
+  count          = data.coder_workspace.me.start_count
+  source         = "registry.coder.com/coder/jetbrains-gateway/coder"
+  version        = "1.2.0"
+  agent_id       = coder_agent.main.id
+  folder         = "/home/${lower(data.coder_workspace_owner.me.name)}"
+  jetbrains_ides = ["IU", "PY"]
+  default        = "PY"
+}
+
 ############################
 # INFRASTRUCTURE RESOURCES
 ############################

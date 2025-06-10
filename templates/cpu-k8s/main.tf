@@ -182,6 +182,17 @@ module "git-config" {
   allow_email_change    = false
 }
 
+# --- JetBrains Gateway ---
+module "jetbrains_gateway" {
+  count          = data.coder_workspace.me.start_count
+  source         = "registry.coder.com/coder/jetbrains-gateway/coder"
+  version        = "1.2.0"
+  agent_id       = coder_agent.main.id
+  folder         = local.home_dir
+  jetbrains_ides = ["IU", "PY"]
+  default        = "PY"
+}
+
 # --- Coder Application: code-server ---
 resource "coder_app" "code-server" {
   agent_id     = coder_agent.main.id
