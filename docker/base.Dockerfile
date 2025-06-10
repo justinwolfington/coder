@@ -19,7 +19,7 @@ RUN apt-get update && \
     build-essential \
     vim \
     curl \
-    tmux \
+    tmux && \
     rm -rf /var/lib/apt/lists/*
 
 # Install Google Cloud SDK
