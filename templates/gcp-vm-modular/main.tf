@@ -14,7 +14,7 @@ terraform {
 ############################
 provider "coder" {}
 provider "google" {
-  project = var.project_id
+  project = local.env_config.project_id
   zone    = var.zone
 }
 
@@ -38,10 +38,6 @@ data "coder_parameter" "gpu_type" {
   option {
     name  = "No GPU"
     value = "none"
-  }
-  option {
-    name  = "NVIDIA L4 (1x)"
-    value = "nvidia-l4-1x"
   }
   option {
     name  = "NVIDIA L4 (2x)"
@@ -78,8 +74,8 @@ data "coder_parameter" "dl_image" {
     value = "tf-latest-cpu"
   }
   option {
-    name  = "Common Framework GPU"
-    value = "common-gpu"
+    name  = "Common Framework GPU (CUDA 12.4)"
+    value = "common-gpu-cu124"
   }
   option {
     name  = "Common Framework CPU"
@@ -94,14 +90,36 @@ data "coder_parameter" "dl_image" {
 data "coder_parameter" "disk_size" {
   name         = "disk_size"
   display_name = "Boot Disk Size (GB)"
-  description  = "Size of the boot disk in GB"
+  description  = "Boot disk size in GB. Recommended: 500GB+ for L4 instances, 1TB+ for H100 instances to accommodate datasets and models."
   type         = "number"
-  default      = 256
+  default      = 500
   mutable      = true
 
   validation {
-    min = 50
+    min = 100
     max = 2000
+  }
+}
+
+data "coder_parameter" "environment" {
+  name         = "environment"
+  display_name = "Environment"
+  description  = "Select deployment environment"
+  type         = "string"
+  default      = "development"
+  mutable      = false
+
+  option {
+    name  = "Development"
+    value = "development"
+  }
+  option {
+    name  = "Staging"
+    value = "staging"
+  }
+  option {
+    name  = "Production"
+    value = "production"
   }
 }
 
@@ -109,43 +127,72 @@ data "coder_parameter" "disk_size" {
 # LOCALS
 ############################
 locals {
+  # Environment-specific configurations
+  environment_configs = {
+    "development" = {
+      project_id            = "client-dev-e301d"
+      service_account_email = "467615904598-compute@developer.gserviceaccount.com"
+      network               = "development-vpc"
+      subnetwork            = "development-ml"
+    }
+    "staging" = {
+      project_id            = "abridge-client-staging"
+      service_account_email = "146004356782-compute@abridge-client-staging.iam.gserviceaccount.com"
+      network               = "staging-vpc"
+      subnetwork            = "staging-ml"
+    }
+    "production" = {
+      project_id            = "abridge-client-prod"
+      service_account_email = "146004356782-compute@abridge-client-prod.iam.gserviceaccount.com"
+      network               = "production-vpc"
+      subnetwork            = "production-ml"
+    }
+  }
+
+  # Selected environment configuration
+  env_config = local.environment_configs[data.coder_parameter.environment.value]
+
   gpu_configs = {
     "none" = {
-      machine_type = "e2-standard-4"
-      gpu_type     = ""
-      gpu_count    = 0
-    }
-    "nvidia-l4-1x" = {
-      machine_type = "g2-standard-8"
-      gpu_type     = "nvidia-l4"
-      gpu_count    = 1
+      machine_type          = "e2-standard-4"
+      gpu_type              = ""
+      gpu_count             = 0
+      disk_type             = "pd-standard"
+      recommended_disk_size = 256
+      local_ssd_description = "None"
     }
     "nvidia-l4-2x" = {
-      machine_type = "g2-standard-24"
-      gpu_type     = "nvidia-l4"
-      gpu_count    = 2
+      machine_type          = "g2-standard-24"
+      gpu_type              = "nvidia-l4"
+      gpu_count             = 2
+      disk_type             = "pd-ssd"
+      recommended_disk_size = 500
+      local_ssd_description = "None (L4 instances use persistent disks)"
     }
     "nvidia-h100-80gb" = {
-      machine_type = "a3-highgpu-8g"
-      gpu_type     = "nvidia-h100-80gb"
-      gpu_count    = 8
+      machine_type          = "a3-highgpu-8g"
+      gpu_type              = "nvidia-h100-80gb"
+      gpu_count             = 8
+      disk_type             = "pd-ssd"
+      recommended_disk_size = 1000
+      local_ssd_description = "16x 375GB NVMe (Total: 6000 GB)"
     }
   }
 
   gpu_config = local.gpu_configs[data.coder_parameter.gpu_type.value]
 
   # Reservation mapping based on GPU selection
+
   reservation_mappings = {
     "none"             = ""
-    "nvidia-l4-1x"     = "shared-g2-standard-24-usc1-l4"
-    "nvidia-l4-2x"     = "shared-g2-standard-24-usc1-l4-2"
-    "nvidia-h100-80gb" = "shared-a3-highgpu-8g-usc1-a-h100"
+    "nvidia-l4-2x"     = "" #"projects/abridge-client-prod/reservations/shared-g2-standard-24-usc1-a-l4-4"
+    "nvidia-h100-80gb" = "projects/abridge-client-prod/reservations/shared-a3-highgpu-8g-usc1-a-h100"
   }
 
-  selected_reservation = local.reservation_mappings[data.coder_parameter.gpu_type.value]
+  selected_reservation = lookup(local.reservation_mappings, data.coder_parameter.gpu_type.value, null)
 
   gpu_accelerators = local.gpu_config.gpu_count > 0 ? [{
-    type  = "projects/${var.project_id}/zones/${var.zone}/acceleratorTypes/${local.gpu_config.gpu_type}"
+    type  = "projects/${local.env_config.project_id}/zones/${var.zone}/acceleratorTypes/${local.gpu_config.gpu_type}"
     count = local.gpu_config.gpu_count
   }] : []
 
@@ -154,12 +201,13 @@ locals {
     "pytorch-latest-cpu" = "projects/deeplearning-platform-release/global/images/family/pytorch-latest-cpu"
     "tf-latest-gpu"      = "projects/deeplearning-platform-release/global/images/family/tf-latest-gpu"
     "tf-latest-cpu"      = "projects/deeplearning-platform-release/global/images/family/tf-latest-cpu"
-    "common-gpu"         = "projects/deeplearning-platform-release/global/images/family/common-gpu"
+    "common-gpu-cu124"   = "projects/deeplearning-platform-release/global/images/family/common-gpu-cu124"
     "common-cpu"         = "projects/deeplearning-platform-release/global/images/family/common-cpu"
     "ubuntu-2204"        = "projects/ubuntu-os-cloud/global/images/family/ubuntu-2204-lts"
   }
   image = local.dl_images[data.coder_parameter.dl_image.value]
 
+  # Local SSDs only for H100 instances, L4 instances use persistent disks
   local_ssds = data.coder_parameter.gpu_type.value == "nvidia-h100-80gb" ? [
     for i in range(16) : {
       device_name = "local-ssd-${i}"
@@ -173,6 +221,9 @@ locals {
     gpu_type  = data.coder_parameter.gpu_type.value
     dl_image  = data.coder_parameter.dl_image.value
   })
+
+  # Recommended disk size based on GPU configuration
+  recommended_disk_size = local.gpu_config.recommended_disk_size
 }
 
 ############################
@@ -278,8 +329,8 @@ resource "google_compute_instance" "workspace" {
   zone         = var.zone
 
   network_interface {
-    network    = "projects/${var.project_id}/global/networks/${var.network}"
-    subnetwork = "projects/${var.project_id}/regions/us-central1/subnetworks/${var.subnetwork}"
+    network    = "projects/${local.env_config.project_id}/global/networks/${local.env_config.network}"
+    subnetwork = "projects/${local.env_config.project_id}/regions/us-central1/subnetworks/${local.env_config.subnetwork}"
     nic_type   = "GVNIC"
   }
 
@@ -287,7 +338,7 @@ resource "google_compute_instance" "workspace" {
     initialize_params {
       image = local.image
       size  = data.coder_parameter.disk_size.value
-      type  = "pd-standard"
+      type  = local.gpu_config.disk_type
     }
   }
 
@@ -308,13 +359,21 @@ resource "google_compute_instance" "workspace" {
   }
 
   dynamic "reservation_affinity" {
-    for_each = local.selected_reservation != "" ? [1] : []
+    for_each = local.selected_reservation != null && local.selected_reservation != "" ? [1] : []
     content {
       type = "SPECIFIC_RESERVATION"
       specific_reservation {
         key    = "compute.googleapis.com/reservation-name"
         values = [local.selected_reservation]
       }
+    }
+  }
+
+  # For instances without specific reservations (like L4), use ANY_RESERVATION to get cost benefits
+  dynamic "reservation_affinity" {
+    for_each = local.selected_reservation == null || local.selected_reservation == "" ? [1] : []
+    content {
+      type = "ANY_RESERVATION"
     }
   }
 
@@ -325,11 +384,14 @@ resource "google_compute_instance" "workspace" {
   }
 
   service_account {
-    email = var.service_account_email
+    email = local.env_config.service_account_email
     scopes = [
       "https://www.googleapis.com/auth/devstorage.read_only",
       "https://www.googleapis.com/auth/logging.write",
-      "https://www.googleapis.com/auth/monitoring.write"
+      "https://www.googleapis.com/auth/monitoring.write",
+      "https://www.googleapis.com/auth/service.management.readonly",
+      "https://www.googleapis.com/auth/servicecontrol",
+      "https://www.googleapis.com/auth/trace.append",
     ]
   }
 
@@ -352,7 +414,7 @@ resource "google_compute_instance" "workspace" {
     "gpu-count"         = tostring(local.gpu_config.gpu_count)
     "machine-type"      = local.gpu_config.machine_type
     "dl-image"          = data.coder_parameter.dl_image.value
-    "environment"       = "development"
+    "environment"       = data.coder_parameter.environment.value
     "managed-by"        = "coder"
   }
 
@@ -401,17 +463,22 @@ resource "coder_metadata" "workspace_info" {
 
   item {
     key   = "Disk Size"
-    value = "${data.coder_parameter.disk_size.value} GB"
+    value = "${data.coder_parameter.disk_size.value} GB (Recommended: ${local.recommended_disk_size} GB for ${local.gpu_config.gpu_count > 0 ? "GPU" : "CPU"} workloads)"
   }
 
   item {
     key   = "Local SSDs"
-    value = length(local.local_ssds) > 0 ? "${length(local.local_ssds)}x 375GB NVMe" : "None"
+    value = local.gpu_config.local_ssd_description
   }
 
   item {
     key   = "Reservation"
-    value = local.selected_reservation != "" ? local.selected_reservation : "None"
+    value = "Shared reservations used automatically when available"
+  }
+
+  item {
+    key   = "Reservation Strategy"
+    value = local.selected_reservation != null && local.selected_reservation != "" ? "Specific reservation: ${local.selected_reservation}" : "Any available reservation (cost-optimized)"
   }
 
   item {

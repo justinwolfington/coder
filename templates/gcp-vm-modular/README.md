@@ -1,18 +1,19 @@
 ---
 display_name: GCP VM Modular
-description: GPU-accelerated Google Cloud VM workspace for ML/AI workloads with modular configuration
+description: Environment-aware GPU-accelerated Google Cloud VM workspace for ML/AI workloads with modular configuration
 icon: /emojis/1f4bb.png
 maintainer_github: abridgeai
 verified: true
-tags: [gcp, gpu, machine-learning, development, vm, cursor]
+tags: [gcp, gpu, machine-learning, development, vm, cursor, multi-environment]
 ---
 
 # GCP VM Modular Template
 
-GPU-accelerated Google Cloud VM workspace for ML/AI development with NVIDIA GPU support and deep learning environments.
+Environment-aware GPU-accelerated Google Cloud VM workspace for ML/AI development with NVIDIA GPU support and deep learning environments. Automatically configures project settings, networking, and service accounts based on the selected environment.
 
 ## Features
 
+- **Multi-Environment Support**: Development, staging, and production configurations
 - **GPU Support**: NVIDIA L4 and H100 configurations
 - **Deep Learning Images**: Pre-configured ML environments (PyTorch, TensorFlow)
 - **IDE Integration**: VS Code Server and Cursor IDE
@@ -24,8 +25,10 @@ GPU-accelerated Google Cloud VM workspace for ML/AI development with NVIDIA GPU 
 
 | Parameter | Description | Default | Options |
 |-----------|-------------|---------|---------|
-| GPU Configuration | GPU setup | No GPU | No GPU, NVIDIA L4 (1x), NVIDIA L4 (2x), NVIDIA H100 80GB (8x) |
+| Environment | Deployment environment | Development | Development, Staging, Production |
+| GPU Configuration | GPU setup | No GPU | No GPU, NVIDIA L4 (2x), NVIDIA H100 80GB (8x) |
 | Deep Learning Image | ML platform image | PyTorch Latest GPU | PyTorch GPU/CPU, TensorFlow GPU/CPU, Common Framework GPU/CPU, Ubuntu 22.04 LTS |
+| Boot Disk Size | Storage size in GB | 256 | 50-2000 GB |
 
 ## GPU Configurations
 
