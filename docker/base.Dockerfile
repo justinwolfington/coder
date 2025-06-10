@@ -4,6 +4,7 @@ FROM mcr.microsoft.com/devcontainers/python:3.11
 # Set up environment variables
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
+    DEBIAN_FRONTEND=noninteractive \
     PATH="/google-cloud-sdk/bin:${PATH}"
 
 ENV UV_COMPILE_BYTECODE=1 \
@@ -15,8 +16,13 @@ COPY --from=ghcr.io/astral-sh/uv:0.7.3 /uv /bin/uv
 # Install build dependencies
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
+    gcc \
     build-essential \
-    curl && \
+    vim \
+    curl \
+    apt-utils \
+    screen \
+    tmux && \
     rm -rf /var/lib/apt/lists/*
 
 # Install Google Cloud SDK
