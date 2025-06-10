@@ -175,8 +175,8 @@ locals {
   # Reservation mapping based on GPU selection
   reservation_mappings = {
     "none"             = ""
-    "nvidia-l4-2x"     = "projects/abridge-client-prod/zones/us-central1-c/reservations/shared-g2-standard-24-usc1-c-l4"
-    "nvidia-h100-80gb" = "projects/abridge-client-prod/zones/us-central1-c/reservations/shared-a3-highgpu-8g-usc1-c-h100"
+    "nvidia-l4-2x"     = "projects/abridge-client-prod/reservations/shared-g2-standard-24-usc1-a-l4-4"
+    "nvidia-h100-80gb" = "projects/abridge-client-prod/reservations/shared-a3-highgpu-8g-usc1-a-h100"
   }
 
   selected_reservation = lookup(local.reservation_mappings, data.coder_parameter.gpu_type.value, null)
