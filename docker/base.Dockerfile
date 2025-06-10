@@ -22,8 +22,7 @@ RUN apt-get update && \
     curl \
     apt-utils \
     screen \
-    tmux \
-    byobu && \
+    tmux && \
     rm -rf /var/lib/apt/lists/*
 
 # Install Google Cloud SDK
