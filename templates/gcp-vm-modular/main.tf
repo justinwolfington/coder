@@ -14,7 +14,7 @@ terraform {
 ############################
 provider "coder" {}
 provider "google" {
-  project = var.project_id
+  project = local.env_config.project_id
   zone    = var.zone
 }
 
@@ -38,10 +38,6 @@ data "coder_parameter" "gpu_type" {
   option {
     name  = "No GPU"
     value = "none"
-  }
-  option {
-    name  = "NVIDIA L4 (1x)"
-    value = "nvidia-l4-1x"
   }
   option {
     name  = "NVIDIA L4 (2x)"
@@ -105,20 +101,65 @@ data "coder_parameter" "disk_size" {
   }
 }
 
+data "coder_parameter" "environment" {
+  name         = "environment"
+  display_name = "Environment"
+  description  = "Select deployment environment"
+  type         = "string"
+  default      = "development"
+  mutable      = false
+
+  option {
+    name  = "Development"
+    value = "development"
+  }
+  option {
+    name  = "Staging"
+    value = "staging"
+  }
+  option {
+    name  = "Production"
+    value = "production"
+  }
+}
+
 ############################
 # LOCALS
 ############################
 locals {
+  # Environment-specific configurations
+  environment_configs = {
+    "development" = {
+      project_id            = "client-dev-e301d"
+      service_account_email = "467615904598-compute@developer.gserviceaccount.com"
+      network               = "development-vpc"
+      subnetwork            = "development-ml"
+      reservation_project   = "abridge-client-dev"
+    }
+    "staging" = {
+      project_id            = "abridge-client-staging"
+      service_account_email = "146004356782-compute@abridge-client-staging.iam.gserviceaccount.com"
+      network               = "staging-vpc"
+      subnetwork            = "staging-ml"
+      reservation_project   = "abridge-client-staging"
+    }
+    "production" = {
+      project_id            = "abridge-client-prod"
+      service_account_email = "146004356782-compute@abridge-client-prod.iam.gserviceaccount.com"
+      network               = "production-vpc"
+      subnetwork            = "production-ml"
+      reservation_project   = "abridge-client-prod"
+    }
+  }
+
+  # Selected environment configuration
+  env_config = local.environment_configs[data.coder_parameter.environment.value]
+
   gpu_configs = {
     "none" = {
       machine_type = "e2-standard-4"
       gpu_type     = ""
       gpu_count    = 0
-    }
-    "nvidia-l4-1x" = {
-      machine_type = "g2-standard-8"
-      gpu_type     = "nvidia-l4"
-      gpu_count    = 1
     }
     "nvidia-l4-2x" = {
       machine_type = "g2-standard-24"
@@ -137,15 +178,14 @@ locals {
   # Reservation mapping based on GPU selection
   reservation_mappings = {
     "none"             = ""
-    "nvidia-l4-1x"     = "shared-g2-standard-24-usc1-l4"
-    "nvidia-l4-2x"     = "shared-g2-standard-24-usc1-l4-2"
-    "nvidia-h100-80gb" = "shared-a3-highgpu-8g-usc1-a-h100"
+    "nvidia-l4-2x"     = "projects/abridge-client-prod/reservations/shared-g2-standard-24-usc1-a-l4"
+    "nvidia-h100-80gb" = "projects/abridge-client-prod/reservations/shared-a3-highgpu-8g-usc1-a-h100"
   }
 
   selected_reservation = local.reservation_mappings[data.coder_parameter.gpu_type.value]
 
   gpu_accelerators = local.gpu_config.gpu_count > 0 ? [{
-    type  = "projects/${var.project_id}/zones/${var.zone}/acceleratorTypes/${local.gpu_config.gpu_type}"
+    type  = "projects/${local.env_config.project_id}/zones/${var.zone}/acceleratorTypes/${local.gpu_config.gpu_type}"
     count = local.gpu_config.gpu_count
   }] : []
 
@@ -268,8 +308,8 @@ resource "google_compute_instance" "workspace" {
   zone         = var.zone
 
   network_interface {
-    network    = "projects/${var.project_id}/global/networks/${var.network}"
-    subnetwork = "projects/${var.project_id}/regions/us-central1/subnetworks/${var.subnetwork}"
+    network    = "projects/${local.env_config.project_id}/global/networks/${local.env_config.network}"
+    subnetwork = "projects/${local.env_config.project_id}/regions/us-central1/subnetworks/${local.env_config.subnetwork}"
     nic_type   = "GVNIC"
   }
 
@@ -315,7 +355,7 @@ resource "google_compute_instance" "workspace" {
   }
 
   service_account {
-    email = var.service_account_email
+    email = local.env_config.service_account_email
     scopes = [
       "https://www.googleapis.com/auth/devstorage.read_only",
       "https://www.googleapis.com/auth/logging.write",
@@ -342,7 +382,7 @@ resource "google_compute_instance" "workspace" {
     "gpu-count"         = tostring(local.gpu_config.gpu_count)
     "machine-type"      = local.gpu_config.machine_type
     "dl-image"          = data.coder_parameter.dl_image.value
-    "environment"       = "development"
+    "environment"       = data.coder_parameter.environment.value
     "managed-by"        = "coder"
   }
 
