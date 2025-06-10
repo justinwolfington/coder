@@ -157,25 +157,29 @@ locals {
       machine_type = "e2-standard-4"
       gpu_type     = ""
       gpu_count    = 0
+      disk_type    = "pd-standard"
     }
     "nvidia-l4-2x" = {
       machine_type = "g2-standard-24"
       gpu_type     = "nvidia-l4"
       gpu_count    = 2
+      disk_type    = "pd-standard"
     }
     "nvidia-h100-80gb" = {
       machine_type = "a3-highgpu-8g"
       gpu_type     = "nvidia-h100-80gb"
       gpu_count    = 8
+      disk_type    = "pd-ssd"
     }
   }
 
   gpu_config = local.gpu_configs[data.coder_parameter.gpu_type.value]
 
   # Reservation mapping based on GPU selection
+
   reservation_mappings = {
     "none"             = ""
-    "nvidia-l4-2x"     = "projects/abridge-client-prod/reservations/shared-g2-standard-24-usc1-a-l4-4"
+    "nvidia-l4-2x"     = "" #"projects/abridge-client-prod/reservations/shared-g2-standard-24-usc1-a-l4-4"
     "nvidia-h100-80gb" = "projects/abridge-client-prod/reservations/shared-a3-highgpu-8g-usc1-a-h100"
   }
 
@@ -324,7 +328,7 @@ resource "google_compute_instance" "workspace" {
     initialize_params {
       image = local.image
       size  = data.coder_parameter.disk_size.value
-      type  = "pd-standard"
+      type  = local.gpu_config.disk_type
     }
   }
 
@@ -345,13 +349,20 @@ resource "google_compute_instance" "workspace" {
   }
 
   dynamic "reservation_affinity" {
-    for_each = local.selected_reservation != null ? [1] : []
+    for_each = local.selected_reservation != null && local.selected_reservation != "" ? [1] : []
     content {
       type = "SPECIFIC_RESERVATION"
       specific_reservation {
         key    = "compute.googleapis.com/reservation-name"
         values = [local.selected_reservation]
       }
+    }
+  }
+
+  dynamic "reservation_affinity" {
+    for_each = local.selected_reservation == null || local.selected_reservation == "" ? [1] : []
+    content {
+      type = "ANY_RESERVATION"
     }
   }
 
