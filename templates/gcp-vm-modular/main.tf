@@ -264,7 +264,7 @@ module "jetbrains_gateway" {
   version        = "1.2.0"
   agent_id       = coder_agent.main.id
   folder         = "/home/${lower(data.coder_workspace_owner.me.name)}"
-  jetbrains_ides = ["IU", "PY"]
+  jetbrains_ides = ["PY"]
   default        = "PY"
 }
 
