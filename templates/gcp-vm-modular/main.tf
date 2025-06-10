@@ -74,8 +74,8 @@ data "coder_parameter" "dl_image" {
     value = "tf-latest-cpu"
   }
   option {
-    name  = "Common Framework GPU"
-    value = "common-gpu"
+    name  = "Common Framework GPU (CUDA 12.4)"
+    value = "common-gpu-cu124"
   }
   option {
     name  = "Common Framework CPU"
@@ -90,13 +90,13 @@ data "coder_parameter" "dl_image" {
 data "coder_parameter" "disk_size" {
   name         = "disk_size"
   display_name = "Boot Disk Size (GB)"
-  description  = "Size of the boot disk in GB"
+  description  = "Boot disk size in GB. Recommended: 500GB+ for L4 instances, 1TB+ for H100 instances to accommodate datasets and models."
   type         = "number"
-  default      = 256
+  default      = 500
   mutable      = true
 
   validation {
-    min = 50
+    min = 100
     max = 2000
   }
 }
@@ -154,22 +154,28 @@ locals {
 
   gpu_configs = {
     "none" = {
-      machine_type = "e2-standard-4"
-      gpu_type     = ""
-      gpu_count    = 0
-      disk_type    = "pd-standard"
+      machine_type          = "e2-standard-4"
+      gpu_type              = ""
+      gpu_count             = 0
+      disk_type             = "pd-standard"
+      recommended_disk_size = 256
+      local_ssd_description = "None"
     }
     "nvidia-l4-2x" = {
-      machine_type = "g2-standard-24"
-      gpu_type     = "nvidia-l4"
-      gpu_count    = 2
-      disk_type    = "pd-standard"
+      machine_type          = "g2-standard-24"
+      gpu_type              = "nvidia-l4"
+      gpu_count             = 2
+      disk_type             = "pd-ssd"
+      recommended_disk_size = 500
+      local_ssd_description = "None (L4 instances use persistent disks)"
     }
     "nvidia-h100-80gb" = {
-      machine_type = "a3-highgpu-8g"
-      gpu_type     = "nvidia-h100-80gb"
-      gpu_count    = 8
-      disk_type    = "pd-ssd"
+      machine_type          = "a3-highgpu-8g"
+      gpu_type              = "nvidia-h100-80gb"
+      gpu_count             = 8
+      disk_type             = "pd-ssd"
+      recommended_disk_size = 1000
+      local_ssd_description = "16x 375GB NVMe (Total: 6000 GB)"
     }
   }
 
@@ -195,12 +201,13 @@ locals {
     "pytorch-latest-cpu" = "projects/deeplearning-platform-release/global/images/family/pytorch-latest-cpu"
     "tf-latest-gpu"      = "projects/deeplearning-platform-release/global/images/family/tf-latest-gpu"
     "tf-latest-cpu"      = "projects/deeplearning-platform-release/global/images/family/tf-latest-cpu"
-    "common-gpu"         = "projects/deeplearning-platform-release/global/images/family/common-gpu"
+    "common-gpu-cu124"   = "projects/deeplearning-platform-release/global/images/family/common-gpu-cu124"
     "common-cpu"         = "projects/deeplearning-platform-release/global/images/family/common-cpu"
     "ubuntu-2204"        = "projects/ubuntu-os-cloud/global/images/family/ubuntu-2204-lts"
   }
   image = local.dl_images[data.coder_parameter.dl_image.value]
 
+  # Local SSDs only for H100 instances, L4 instances use persistent disks
   local_ssds = data.coder_parameter.gpu_type.value == "nvidia-h100-80gb" ? [
     for i in range(16) : {
       device_name = "local-ssd-${i}"
@@ -214,6 +221,9 @@ locals {
     gpu_type  = data.coder_parameter.gpu_type.value
     dl_image  = data.coder_parameter.dl_image.value
   })
+
+  # Recommended disk size based on GPU configuration
+  recommended_disk_size = local.gpu_config.recommended_disk_size
 }
 
 ############################
@@ -359,6 +369,7 @@ resource "google_compute_instance" "workspace" {
     }
   }
 
+  # For instances without specific reservations (like L4), use ANY_RESERVATION to get cost benefits
   dynamic "reservation_affinity" {
     for_each = local.selected_reservation == null || local.selected_reservation == "" ? [1] : []
     content {
@@ -452,17 +463,22 @@ resource "coder_metadata" "workspace_info" {
 
   item {
     key   = "Disk Size"
-    value = "${data.coder_parameter.disk_size.value} GB"
+    value = "${data.coder_parameter.disk_size.value} GB (Recommended: ${local.recommended_disk_size} GB for ${local.gpu_config.gpu_count > 0 ? "GPU" : "CPU"} workloads)"
   }
 
   item {
     key   = "Local SSDs"
-    value = length(local.local_ssds) > 0 ? "${length(local.local_ssds)}x 375GB NVMe" : "None"
+    value = local.gpu_config.local_ssd_description
   }
 
   item {
     key   = "Reservation"
     value = "Shared reservations used automatically when available"
+  }
+
+  item {
+    key   = "Reservation Strategy"
+    value = local.selected_reservation != null && local.selected_reservation != "" ? "Specific reservation: ${local.selected_reservation}" : "Any available reservation (cost-optimized)"
   }
 
   item {
