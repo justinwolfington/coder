@@ -4,6 +4,7 @@ FROM nvcr.io/nvidia/cuda:12.6.3-cudnn-devel-ubuntu22.04
 # Set up environment variables
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
+    DEBIAN_FRONTEND=noninteractive \
     PATH="/root/.local/bin:/google-cloud-sdk/bin:${PATH}"
 
 ENV UV_COMPILE_BYTECODE=1 \

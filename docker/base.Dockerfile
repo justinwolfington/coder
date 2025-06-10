@@ -4,6 +4,7 @@ FROM mcr.microsoft.com/devcontainers/python:3.11
 # Set up environment variables
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
+    DEBIAN_FRONTEND=noninteractive \
     PATH="/google-cloud-sdk/bin:${PATH}"
 
 ENV UV_COMPILE_BYTECODE=1 \
