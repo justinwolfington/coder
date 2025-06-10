@@ -29,7 +29,6 @@ RUN apt-get update && \
     apt-utils \
     screen \
     tmux \
-    byobu \
     ranger \
     openssh-client && \
     rm -rf /var/lib/apt/lists/*
