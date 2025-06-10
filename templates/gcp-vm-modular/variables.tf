@@ -1,7 +1,7 @@
 variable "zone" {
   description = "Google Cloud zone for the compute instance"
   type        = string
-  default     = "us-central1-a"
+  default     = "us-central1-c"
   validation {
     condition = contains([
       "us-central1-a", "us-central1-b", "us-central1-c", "us-central1-f"

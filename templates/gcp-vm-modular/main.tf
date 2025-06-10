@@ -134,21 +134,18 @@ locals {
       service_account_email = "467615904598-compute@developer.gserviceaccount.com"
       network               = "development-vpc"
       subnetwork            = "development-ml"
-      reservation_project   = "abridge-client-dev"
     }
     "staging" = {
       project_id            = "abridge-client-staging"
       service_account_email = "146004356782-compute@abridge-client-staging.iam.gserviceaccount.com"
       network               = "staging-vpc"
       subnetwork            = "staging-ml"
-      reservation_project   = "abridge-client-staging"
     }
     "production" = {
       project_id            = "abridge-client-prod"
       service_account_email = "146004356782-compute@abridge-client-prod.iam.gserviceaccount.com"
       network               = "production-vpc"
       subnetwork            = "production-ml"
-      reservation_project   = "abridge-client-prod"
     }
   }
 
@@ -178,11 +175,11 @@ locals {
   # Reservation mapping based on GPU selection
   reservation_mappings = {
     "none"             = ""
-    "nvidia-l4-2x"     = "projects/abridge-client-prod/reservations/shared-g2-standard-24-usc1-a-l4"
-    "nvidia-h100-80gb" = "projects/abridge-client-prod/reservations/shared-a3-highgpu-8g-usc1-a-h100"
+    "nvidia-l4-2x"     = "projects/abridge-client-prod/reservations/shared-g2-standard-24-usc1-c-l4"
+    "nvidia-h100-80gb" = "projects/abridge-client-prod/reservations/shared-a3-highgpu-8g-usc1-c-h100"
   }
 
-  selected_reservation = local.reservation_mappings[data.coder_parameter.gpu_type.value]
+  selected_reservation = lookup(local.reservation_mappings, data.coder_parameter.gpu_type.value, null)
 
   gpu_accelerators = local.gpu_config.gpu_count > 0 ? [{
     type  = "projects/${local.env_config.project_id}/zones/${var.zone}/acceleratorTypes/${local.gpu_config.gpu_type}"
@@ -338,7 +335,7 @@ resource "google_compute_instance" "workspace" {
   }
 
   dynamic "reservation_affinity" {
-    for_each = local.selected_reservation != "" ? [1] : []
+    for_each = local.selected_reservation != null ? [1] : []
     content {
       type = "SPECIFIC_RESERVATION"
       specific_reservation {
@@ -359,7 +356,10 @@ resource "google_compute_instance" "workspace" {
     scopes = [
       "https://www.googleapis.com/auth/devstorage.read_only",
       "https://www.googleapis.com/auth/logging.write",
-      "https://www.googleapis.com/auth/monitoring.write"
+      "https://www.googleapis.com/auth/monitoring.write",
+      "https://www.googleapis.com/auth/service.management.readonly",
+      "https://www.googleapis.com/auth/servicecontrol",
+      "https://www.googleapis.com/auth/trace.append",
     ]
   }
 
@@ -441,7 +441,7 @@ resource "coder_metadata" "workspace_info" {
 
   item {
     key   = "Reservation"
-    value = local.selected_reservation != "" ? local.selected_reservation : "None"
+    value = "Shared reservations used automatically when available"
   }
 
   item {
