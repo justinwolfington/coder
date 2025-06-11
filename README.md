@@ -30,7 +30,7 @@ coder/
 
 - **Purpose**: CPU-based development workspaces with integrated Arize Phoenix tracing and monitoring
 - **Features**: VS Code, Cursor IDE, Arize Phoenix dashboard, Git integration, Python & Jupyter support, OTLP tracing pre-configured
-- **Resources**: 4-16 CPU cores, 8-64GB RAM, 16-1024GB storage
+- **Resources**: 4-16 CPU cores, 8-32GB RAM, 16-1024GB storage
 - **Phoenix Sidecar**: 500m-1000m CPU, 512Mi-1Gi RAM for tracing
 - **Base Image**: `us-central1-docker.pkg.dev/abridge-artifact-registry/coder/base:latest`
 - **Phoenix Image**: `us-central1-docker.pkg.dev/abridge-artifact-registry/coder/phoenix:latest`
@@ -40,7 +40,7 @@ coder/
 
 - **Purpose**: Lightweight CPU-based development workspaces optimized for performance
 - **Features**: VS Code, Cursor IDE, Git integration, Python & Jupyter support, no sidecars for maximum performance
-- **Resources**: 4-16 CPU cores, 8-64GB RAM, 16-1024GB storage
+- **Resources**: 4-16 CPU cores, 8-32GB RAM, 16-1024GB storage
 - **Base Image**: `us-central1-docker.pkg.dev/abridge-artifact-registry/coder/base:latest`
 - **Use Cases**: CPU-intensive development, code review and analysis, testing environments, resource-conscious projects
 
