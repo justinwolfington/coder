@@ -72,7 +72,7 @@ jobs:
         run: |
           CONFIG="./templates/templates-config.json"
           jq 'has("templates")' "$CONFIG"
-          jq -e '.templates | to_entries[] | .value.directory and .value.display_name and .value.description and .value.icon' "$CONFIG" > /dev/null
+          jq -e '.templates | to_entries[] | .value.directory and .value.display_name and .value.description and .value.icon and .value.environments' "$CONFIG" > /dev/null
 
       - name: Validate Terraform configuration for all templates
         run: |
@@ -89,14 +89,24 @@ jobs:
           CONFIG="./templates/templates-config.json"
           VERSION="${{ steps.vars.outputs.sha_short }}"
           FILTER_TEMPLATE="${{ github.event.inputs.template_name }}"
+          TARGET_ENV="${{ github.event.inputs.environment || 'development' }}"
+
+          echo "Deploying templates to environment: $TARGET_ENV"
 
           jq -r '.templates | keys[]' "$CONFIG" | while read -r template; do
             [[ -n "$FILTER_TEMPLATE" && "$template" != "$FILTER_TEMPLATE" ]] && continue
 
+            # Check if template should be deployed to this environment
+            TEMPLATE_ENVS=$(jq -r --arg t "$template" '.templates[$t].environments // []' "$CONFIG")
+            if ! echo "$TEMPLATE_ENVS" | jq -e --arg env "$TARGET_ENV" 'any(. == $env)' > /dev/null; then
+              echo "Skipping template $template: not configured for environment $TARGET_ENV"
+              continue
+            fi
+
             eval "$(jq -r --arg t "$template" '.templates[$t] | @sh "DIR=\(.directory) NAME=\(.display_name) DESC=\(.description) ICON=\(.icon)"' "$CONFIG")"
 
-            echo "Pushing: template $template ($NAME) from $DIR"
-            coder templates push "$template" --directory "./$DIR" --name "$VERSION" --message "Auto-deploy $VERSION" --yes
+            echo "Pushing: template $template ($NAME) from $DIR to $TARGET_ENV"
+            coder templates push "$template" --directory "./$DIR" --name "$VERSION" --message "Auto-deploy $VERSION to $TARGET_ENV" --yes
 
             echo "Editing template metadata"
             coder templates edit "$template" --display-name "$NAME" --description "$DESC" --icon "$ICON" --yes
