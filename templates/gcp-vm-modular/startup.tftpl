@@ -5,11 +5,12 @@ echo "Initializing environment for ${username}..."
 
 # Harden OS: Update and upgrade
 export DEBIAN_FRONTEND=noninteractive
-apt-get update -y
-apt-get upgrade -y
 
-# Install essential tools
-apt-get install -y curl wget git vim htop unzip jq sudo build-essential
+# Update and install packages (with built-in retry via apt)
+echo "Updating and installing packages..."
+apt-get update -y
+apt-get upgrade -y --fix-missing || apt-get upgrade -y --fix-missing  # Simple retry
+apt-get install -y --fix-missing curl wget git vim htop unzip jq sudo build-essential
 
 # User setup with sudo and docker
 if ! id "${username}" &>/dev/null; then
@@ -70,11 +71,8 @@ su - "${username}" -c "
 echo "export HOME=/home/${username}" >> /etc/environment
 echo "export USER=${username}" >> /etc/environment
 
-echo "Workspace setup complete for ${username}!"
-echo "Machine: ${gpu_type}"
-echo "Image: ${dl_image}"
-echo "User: ${username}"
-echo "Email: ${useremail}"
+echo "Workspace setup complete for ${username}: Machine: ${gpu_type} | Image: ${dl_image}"
 
 # Cleanup (optional, for security)
 apt-get clean
+echo "Startup script completed!"
