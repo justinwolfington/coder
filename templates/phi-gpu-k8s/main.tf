@@ -31,7 +31,7 @@ data "coder_parameter" "repository_url" {
   name         = "repository_url"
   display_name = "Repository URL"
   description  = "GitHub repository URL (leave empty for no repository)"
-  default      = "https://github.com/abridgeai/phi-service"
+  default      = "https://github.com/abridgeai/completion-service"
   mutable      = true
   order        = 1
   type         = "string"
@@ -128,7 +128,7 @@ locals {
   home_dir = "/root"
 
   # Image and environment configuration
-  base_image_repo = "us-central1-docker.pkg.dev/abridge-artifact-registry/coder/phi-gpu"
+  base_image_repo = "us-central1-docker.pkg.dev/abridge-artifact-registry/coder/gpu"
   base_image_tag  = "latest"
   base_image      = "${local.base_image_repo}:${local.base_image_tag}"
 
@@ -210,8 +210,8 @@ resource "coder_agent" "main" {
       display_name = metadata.value.name
       key          = metadata.key
       script       = metadata.value.script
-      interval     = 10
-      timeout      = 1
+      interval     = 15
+      timeout      = 5
     }
   }
 }
