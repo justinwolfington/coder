@@ -31,7 +31,7 @@ coder:
 
       # Restrict to specific GitHub teams
       - name: CODER_OAUTH2_GITHUB_ALLOWED_TEAMS
-        value: "abridgeai/coder"
+        value: "abridgeai/coder-staging"
 
       # Prevent direct (IP-based) access; enforce use of ingress/proxy
       - name: CODER_BLOCK_DIRECT
