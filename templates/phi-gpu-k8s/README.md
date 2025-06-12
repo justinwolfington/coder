@@ -1,5 +1,5 @@
 ---
-display_name: PHI GPU K8s
+display_name: PHI Workspace
 description: PHI-compliant GPU-accelerated Kubernetes workspace for secure ML/AI development
 icon: /emojis/1f510.png
 maintainer_github: abridgeai
