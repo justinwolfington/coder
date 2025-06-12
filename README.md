@@ -20,6 +20,7 @@ coder/
     ├── clinician-k8s/     # CPU-based workspace template
     ├── cpu-k8s/          # Lightweight CPU-based workspace template
     ├── gpu-k8s/          # GPU-based workspace template
+    ├── phi-gpu-k8s/      # PHI-compliant secure GPU workspace template
     ├── gcp-vm-modular/    # GCP VM-based workspace template
     └── templates-config.json  # Template configuration
 ```
@@ -51,6 +52,17 @@ coder/
 - **Resources**: 4-16 CPU cores, 16-1024GB RAM, 16-1024GB storage, configurable GPUs
 - **GPU Support**: NVIDIA L4, H100 (80GB) with multi-GPU configuration
 - **Base Image**: `us-central1-docker.pkg.dev/abridge-artifact-registry/coder/gpu:latest`
+
+### PHI GPU K8s Template
+
+- **Purpose**: PHI-compliant GPU-accelerated workspaces for secure healthcare ML/AI development
+- **Features**: NVIDIA GPU support, browser-only VS Code, complete network isolation, PHI compliance mode
+- **Security**: Zero egress network traffic, disabled SSH/port forwarding/desktop apps, air-gapped environment
+- **Resources**: 4-16 CPU cores, 16-1024GB RAM, 16-1024GB storage, configurable GPUs
+- **GPU Support**: NVIDIA L4, H100 (80GB) with multi-GPU configuration
+- **Base Image**: `us-central1-docker.pkg.dev/abridge-artifact-registry/coder/phi-gpu:latest`
+- **Network Policy**: Dedicated `networkPolicyPhi` with complete egress blocking for HIPAA/PHI compliance
+- **Use Cases**: Healthcare data analysis, PHI-compliant ML training, secure AI research, protected health information processing
 
 ### GCP VM Modular Template
 
@@ -93,6 +105,7 @@ Use the provided script to create machine user tokens:
 
 - Kubernetes cluster with proper storage configuration
 - For GPU template: GPU nodes with NVIDIA device plugin installed
+- For PHI template: Kubernetes cluster with network policy support and `networkPolicyPhi` configuration enabled
 - For GCP VM template: Google Cloud Platform project with Compute Engine API enabled, VPC network configured, and sufficient GPU quotas
 - GitHub external authentication configured for Git integration
 
@@ -112,6 +125,13 @@ Use the provided script to create machine user tokens:
 - Verify GPU device plugin is installed: `kubectl get daemonset -n kube-system`
 - Check GPU node labels match template configuration
 - Ensure sufficient GPU resources are available
+
+**PHI Template Issues**
+- Verify network policies are enabled: `kubectl get networkpolicy -n coder`
+- Check `networkPolicyPhi` configuration in values files
+- Confirm PHI workspaces have `coder-phi-workspace` label
+- Ensure complete network isolation is working (no egress traffic allowed)
+- Verify browser-only access restrictions (SSH/desktop apps disabled)
 
 **GCP VM Template Issues**
 - Verify GCP credentials and project permissions

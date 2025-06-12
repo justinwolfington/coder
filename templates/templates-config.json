@@ -23,6 +23,12 @@
             "description": "GPU-accelerated Google Cloud VM workspace for ML/AI workloads with modular configuration",
             "icon": "/icon/gcp.png",
             "directory": "./templates/gcp-vm-modular"
+        },
+        "phi-gpu-k8s": {
+            "display_name": "PHI Workspace",
+            "description": "PHI-compliant GPU-accelerated Kubernetes workspace for secure ML/AI development with healthcare data compliance",
+            "icon": "/emojis/1f510.png",
+            "directory": "./templates/phi-gpu-k8s"
         }
     }
 }
