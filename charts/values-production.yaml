@@ -147,3 +147,9 @@ networkPolicy:
               - 172.32.0.0/12
               - 172.48.0.0/22
               - 10.6.0.0/16
+
+# PHI-specific network policy configuration
+# Complete network isolation for PHI compliance
+networkPolicyPhi:
+  enabled: true
+  # No allowed services or egress rules for maximum security

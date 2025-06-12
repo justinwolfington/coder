@@ -4,25 +4,54 @@
             "display_name": "Completion Service with Phoenix",
             "description": "Kubernetes workspace with Arize Phoenix tracing, completion-service cloned, uv and gcloud CLI",
             "icon": "/emojis/1f33c.png",
-            "directory": "./templates/clinician-k8s"
+            "directory": "./templates/clinician-k8s",
+            "environments": [
+                "development",
+                "staging",
+                "production"
+            ]
         },
         "cpu-k8s": {
             "display_name": "CPU VMKiller",
             "description": "Basic Kubernetes Deployments as Coder workspaces for CPU-based development without additional monitoring tools",
             "icon": "/emojis/1f4bb.png",
-            "directory": "./templates/cpu-k8s"
+            "directory": "./templates/cpu-k8s",
+            "environments": [
+                "development",
+                "staging",
+                "production"
+            ]
         },
         "gpu-k8s": {
             "display_name": "GPU VMKiller",
             "description": "Provision Kubernetes Deployments as Coder workspaces with GPU support",
             "icon": "/emojis/1f35f.png",
-            "directory": "./templates/gpu-k8s"
+            "directory": "./templates/gpu-k8s",
+            "environments": [
+                "development",
+                "staging",
+                "production"
+            ]
         },
         "gcp-vm-modular": {
             "display_name": "VM Modular",
             "description": "GPU-accelerated Google Cloud VM workspace for ML/AI workloads with modular configuration",
             "icon": "/icon/gcp.png",
-            "directory": "./templates/gcp-vm-modular"
+            "directory": "./templates/gcp-vm-modular",
+            "environments": [
+                "development",
+                "staging"
+            ]
+        },
+        "phi-gpu-k8s": {
+            "display_name": "PHI Workspace",
+            "description": "PHI-compliant GPU-accelerated Kubernetes workspace for secure ML/AI development with healthcare data compliance",
+            "icon": "/emojis/1f510.png",
+            "directory": "./templates/phi-gpu-k8s",
+            "environments": [
+                "development",
+                "production"
+            ]
         }
     }
 }
