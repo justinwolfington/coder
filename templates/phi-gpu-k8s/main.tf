@@ -216,14 +216,16 @@ resource "coder_agent" "main" {
   }
 }
 
-# --- Git Clone Module ---
+############################
+# IDE MODULES
+############################
+# --- Git Repository Cloning ---
 module "git-clone" {
-  count     = local.should_clone ? data.coder_workspace.me.start_count : 0
-  source    = "registry.coder.com/coder/git-clone/coder"
-  version   = "1.0.18"
-  agent_id  = coder_agent.main.id
-  url       = local.repo_url
-  directory = local.repo_dir
+  count    = data.coder_workspace.me.start_count > 0 && local.should_clone ? 1 : 0
+  source   = "registry.coder.com/coder/git-clone/coder"
+  version  = "1.0.18"
+  agent_id = coder_agent.main.id
+  url      = local.repo_url
 }
 
 # --- Git Configuration ---
