@@ -1,8 +1,8 @@
 {
     "templates": {
         "k8s-completion-service": {
-            "display_name": "Completion Service with Phoenix",
-            "description": "Kubernetes workspace with Arize Phoenix tracing, completion-service cloned, uv and gcloud CLI",
+            "display_name": "Kubernetes Completion Service with Phoenix",
+            "description": "Kubernetes workspace with Arize Phoenix. Includes completion service, uv package manager, and gcloud CLI.",
             "icon": "/emojis/1f33c.png",
             "directory": "./templates/clinician-k8s",
             "environments": [
@@ -12,8 +12,8 @@
             ]
         },
         "cpu-k8s": {
-            "display_name": "CPU VMKiller",
-            "description": "Basic Kubernetes Deployments as Coder workspaces for CPU-based development without additional monitoring tools",
+            "display_name": "Kubernetes CPU Workspace",
+            "description": "Lightweight Kubernetes workspace for CPU-intensive tasks with development tools.",
             "icon": "/emojis/1f4bb.png",
             "directory": "./templates/cpu-k8s",
             "environments": [
@@ -23,8 +23,8 @@
             ]
         },
         "gpu-k8s": {
-            "display_name": "GPU VMKiller",
-            "description": "Provision Kubernetes Deployments as Coder workspaces with GPU support",
+            "display_name": "Kubernetes GPU Workspace",
+            "description": "Kubernetes workspace with GPU support for ML Scientists (no docker container support).",
             "icon": "/emojis/1f35f.png",
             "directory": "./templates/gpu-k8s",
             "environments": [
@@ -34,8 +34,8 @@
             ]
         },
         "gcp-vm-modular": {
-            "display_name": "VM Modular",
-            "description": "GPU-accelerated Google Cloud VM workspace for ML/AI workloads with modular configuration",
+            "display_name": "GCP VM Workspace with Docker",
+            "description": "GCP VM workspace with GPU support and Docker. Features ML development tools for ML Ops and Scientists.",
             "icon": "/icon/gcp.png",
             "directory": "./templates/gcp-vm-modular",
             "environments": [
@@ -44,8 +44,8 @@
             ]
         },
         "phi-gpu-k8s": {
-            "display_name": "PHI Workspace",
-            "description": "PHI-compliant GPU-accelerated Kubernetes workspace for secure ML/AI development with healthcare data compliance",
+            "display_name": "Kubernetes PHI Workspace",
+            "description": "Secure Kubernetes workspace with GPU support and enhanced security for PHI compliance.",
             "icon": "/emojis/1f510.png",
             "directory": "./templates/phi-gpu-k8s",
             "environments": [
