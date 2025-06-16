@@ -2,7 +2,7 @@
     "templates": {
         "k8s-completion-service": {
             "display_name": "Kubernetes Completion Service with Phoenix",
-            "description": "A Kubernetes workspace featuring Arize Phoenix for real-time AI model monitoring and performance tracking. Includes pre-configured completion service, uv package manager, and gcloud CLI. Best for clinician scientists.",
+            "description": "Kubernetes workspace with Arize Phoenix for AI monitoring. Includes completion service, uv package manager, and gcloud CLI. Best for clinician scientists.",
             "icon": "/emojis/1f33c.png",
             "directory": "./templates/clinician-k8s",
             "environments": [
@@ -13,7 +13,7 @@
         },
         "cpu-k8s": {
             "display_name": "Kubernetes CPU Workspace",
-            "description": "A lightweight, cost-effective Kubernetes workspace optimized for CPU-intensive development tasks. Features pre-configured development tools, debugging capabilities, and resource optimization. Perfect for general software development, testing, and non-GPU workloads.",
+            "description": "Lightweight Kubernetes workspace for CPU-intensive tasks. Features development tools and resource optimization.",
             "icon": "/emojis/1f4bb.png",
             "directory": "./templates/cpu-k8s",
             "environments": [
@@ -24,7 +24,7 @@
         },
         "gpu-k8s": {
             "display_name": "Kubernetes GPU Workspace",
-            "description": "A Kubernetes-based workspace with GPU support for machine learning and AI development. Best for ML Scientists that want to develop on GPUs (does not support docker containers).",
+            "description": "Kubernetes workspace with GPU support. Best for ML Scientists (does not support docker containers).",
             "icon": "/emojis/1f35f.png",
             "directory": "./templates/gpu-k8s",
             "environments": [
@@ -35,7 +35,7 @@
         },
         "gcp-vm-modular": {
             "display_name": "GCP VM Workspace",
-            "description": "A Google Cloud VM-based workspace with GPU support and Docker containerization capabilities. Features customizable configurations, full VM environment, and comprehensive ML development tools. Perfect for ML Ops Engineers and ML Scientists requiring containerized development environments.",
+            "description": "GCP VM workspace with GPU support and Docker. Features customizable configs and ML development tools. Best for ML Ops and ML Scientists.",
             "icon": "/icon/gcp.png",
             "directory": "./templates/gcp-vm-modular",
             "environments": [
@@ -45,7 +45,7 @@
         },
         "phi-gpu-k8s": {
             "display_name": "Kubernetes PHI Workspace",
-            "description": "A secure, Kubernetes workspace with GPU support. Includes enhanced security features and compliance tools for working with protected health information (PHI).",
+            "description": "Secure Kubernetes workspace with GPU support. Includes enhanced security for PHI compliance.",
             "icon": "/emojis/1f510.png",
             "directory": "./templates/phi-gpu-k8s",
             "environments": [
