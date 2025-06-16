@@ -128,12 +128,12 @@ networkPolicy:
         app.kubernetes.io/name: elms
         app.kubernetes.io/instance: elms
 
-    - name: eyes
+    - name: eyes-v1-eyes-new-api
       port: 80
-      namespace: eyes
+      namespace: eyes-v1
       selector:
-        app.kubernetes.io/name: eyes
-        app.kubernetes.io/instance: eyes
+        app.kubernetes.io/name: eyes-new
+        app.kubernetes.io/instance: eyes-v1
 
   # Additional egress rules for general internet access
   additionalEgressRules:
