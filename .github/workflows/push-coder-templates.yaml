@@ -36,6 +36,8 @@ on:
 
 permissions:
   contents: read
+  # Allow the workflow to authenticate to private repos
+  actions: read
 
 jobs:
   push-templates:
@@ -54,6 +56,10 @@ jobs:
 
       - name: Set up Terraform
         uses: hashicorp/setup-terraform@v3
+
+      - name: Configure Git for private repos
+        run: |
+          git config --global url."https://${{ github.token }}@github.com/".insteadOf "https://github.com/"
 
       - name: Setup Coder CLI
         uses: coder/setup-action@v1
