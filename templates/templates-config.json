@@ -34,7 +34,7 @@
             ]
         },
         "gcp-vm-modular": {
-            "display_name": "GCP VM Workspace",
+            "display_name": "GCP VM Workspace with Docker",
             "description": "GCP VM workspace with GPU support and Docker. Features ML development tools for ML Ops and Scientists.",
             "icon": "/icon/gcp.png",
             "directory": "./templates/gcp-vm-modular",
