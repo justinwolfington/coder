@@ -128,8 +128,8 @@ networkPolicy:
         app.kubernetes.io/name: elms
         app.kubernetes.io/instance: elms
 
-    - name: eyes-v1-eyes-new-api
-      port: 80
+    - name: eyes
+      port: 8000
       namespace: eyes-v1
       selector:
         app.kubernetes.io/name: eyes-new
