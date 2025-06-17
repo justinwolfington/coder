@@ -442,7 +442,7 @@ resource "coder_agent_instance" "main" {
 ############################
 
 module "common_costs" {
-  source = "git::https://github.com/abridge-ai/coder.git//modules/costs?ref=shubh/add-user-quotas"
+  source = "git::https://github.com/abridgeai/coder.git//modules/costs?ref=shubh/add-user-quotas"
 }
 ############################
 # METADATA
