@@ -451,9 +451,7 @@ module "common_costs" {
 resource "coder_metadata" "workspace_info" {
   count       = data.coder_workspace.me.start_count
   resource_id = google_compute_instance.workspace[0].id
-  daily_cost = (local.gpu_config.daily_cost +
-    module.common_costs.disk_cost_per_gb * data.coder_parameter.disk_size.value
-  )
+  daily_cost = local.gpu_config.daily_cost 
 
   item {
     key   = "Machine Type"
