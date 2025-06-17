@@ -135,6 +135,13 @@ networkPolicy:
         app.kubernetes.io/name: eyes-new
         app.kubernetes.io/instance: eyes-v1
 
+    - name: eyes-v1-eyes-new-api-8000
+      port: 8000
+      namespace: eyes-v1
+      selector:
+        app.kubernetes.io/name: eyes-new
+        app.kubernetes.io/instance: eyes-v1
+
   # Additional egress rules for general internet access
   additionalEgressRules:
     - ports:
