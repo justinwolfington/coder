@@ -13,7 +13,6 @@ Centralizes frequently used utility modules to avoid duplication across template
 - `git-config` - Configure git user settings
 
 ### IDE Utilities (ide/)
-- `code-server` - VS Code Server
 - `cursor` - Cursor IDE
 - `jetbrains_gateway` - JetBrains Gateway with PyCharm
 
