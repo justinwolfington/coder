@@ -6,7 +6,6 @@ module "git-clone" {
   url      = var.repo_url
 }
 
-# --- Git Configuration ---
 module "git-config" {
   source                = "registry.coder.com/coder/git-config/coder"
   version               = "1.0.15"
