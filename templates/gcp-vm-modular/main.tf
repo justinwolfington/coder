@@ -31,8 +31,16 @@ module "gpu_resources" {
   source = "git::https://github.com/abridgeai/coder.git//modules/gpu_resources?ref=shubh/add-user-quotas"
 }
 
+module "git_utilities" {
+  source = "git::https://github.com/abridgeai/coder.git//modules/utilities/git?ref=shubh/add-user-quotas"
+  start_count = data.coder_workspace.me.start_count
+  agent_id = coder_agent.main.id
+  repo_url = ""
+  should_clone = false
+}
+
 module "ide_modules" {
-  source = "git::https://github.com/abridgeai/coder.git//modules/ide_modules?ref=shubh/add-user-quotas"
+  source = "git::https://github.com/abridgeai/coder.git//modules/utilities/ide?ref=shubh/add-user-quotas"
   start_count = data.coder_workspace.me.start_count
   agent_id = coder_agent.main.id
   user_name = data.coder_workspace_owner.me.name

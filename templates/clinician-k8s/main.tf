@@ -25,6 +25,21 @@ module "resources" {
   source = "git::https://github.com/abridgeai/coder.git//modules/resources?ref=shubh/add-user-quotas"
 }
 
+module "git_utilities" {
+  source = "git::https://github.com/abridgeai/coder.git//modules/utilities/git?ref=shubh/add-user-quotas"
+  start_count = data.coder_workspace.me.start_count
+  agent_id = coder_agent.main.id
+  repo_url = data.coder_parameter.repository_url.value
+  should_clone = data.coder_parameter.repository_url.value != ""
+}
+
+module "ide_utilities" {
+  source = "git::https://github.com/abridgeai/coder.git//modules/utilities/ide?ref=shubh/add-user-quotas"
+  start_count = data.coder_workspace.me.start_count
+  agent_id = coder_agent.main.id
+  user_name = data.coder_workspace_owner.me.name
+}
+
 ############################
 # DATA SOURCES
 ############################
@@ -117,46 +132,6 @@ resource "coder_agent" "main" {
       timeout      = 5
     }
   }
-}
-
-############################
-# IDE MODULES
-############################
-# --- Git Repository Cloning ---
-module "git-clone" {
-  count    = data.coder_workspace.me.start_count > 0 && local.should_clone ? 1 : 0
-  source   = "registry.coder.com/coder/git-clone/coder"
-  version  = "1.0.18"
-  agent_id = coder_agent.main.id
-  url      = local.repo_url
-}
-
-# --- Cursor IDE Integration ---
-module "cursor" {
-  count    = data.coder_workspace.me.start_count
-  source   = "registry.coder.com/coder/cursor/coder"
-  version  = "1.1.0"
-  agent_id = coder_agent.main.id
-}
-
-# --- Git Configuration ---
-module "git-config" {
-  source                = "registry.coder.com/coder/git-config/coder"
-  version               = "1.0.15"
-  agent_id              = coder_agent.main.id
-  allow_username_change = false
-  allow_email_change    = false
-}
-
-# --- JetBrains Gateway ---
-module "jetbrains_gateway" {
-  count          = data.coder_workspace.me.start_count
-  source         = "registry.coder.com/coder/jetbrains-gateway/coder"
-  version        = "1.2.0"
-  agent_id       = coder_agent.main.id
-  folder         = local.home_dir
-  jetbrains_ides = ["PY"]
-  default        = "PY"
 }
 
 ############################
