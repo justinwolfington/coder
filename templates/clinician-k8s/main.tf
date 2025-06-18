@@ -22,11 +22,11 @@ provider "kubernetes" {
 # SHARED MODULES
 ############################
 module "resources" {
-  source = "git::https://github.com/abridgeai/coder.git//modules/resources?ref=shubh/add-user-quotas"
+  source = "git::https://github.com/abridgeai/coder.git//modules/resources?ref=845d31c"
 }
 
 module "git_utilities" {
-  source = "git::https://github.com/abridgeai/coder.git//modules/utilities/git?ref=shubh/add-user-quotas"
+  source = "git::https://github.com/abridgeai/coder.git//modules/utilities/git?ref=845d31c"
   start_count = data.coder_workspace.me.start_count
   agent_id = coder_agent.main.id
   repo_url = data.coder_parameter.repository_url.value
@@ -34,7 +34,7 @@ module "git_utilities" {
 }
 
 module "ide_utilities" {
-  source = "git::https://github.com/abridgeai/coder.git//modules/utilities/ide?ref=shubh/add-user-quotas"
+  source = "git::https://github.com/abridgeai/coder.git//modules/utilities/ide?ref=845d31c"
   start_count = data.coder_workspace.me.start_count
   agent_id = coder_agent.main.id
   user_name = data.coder_workspace_owner.me.name
