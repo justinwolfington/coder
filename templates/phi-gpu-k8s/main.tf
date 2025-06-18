@@ -345,7 +345,7 @@ resource "coder_metadata" "workspace_info" {
   count       = data.coder_workspace.me.start_count
   resource_id = kubernetes_deployment.main[0].id
   daily_cost = (module.resources.cpu_cost_per_core * module.resources.cpu.value +
-  module.resources.ram_cost_per_gb * module.resources.memory.value)
+  module.resources.ram_cost_per_gb * module.resources.memory.value) + lookup(module.resources.gpu_cost_per_unit, data.coder_parameter.gpu_accelerator.value, 0) * data.coder_parameter.gpu_count.value
 
   item {
     key   = "Image Used"
