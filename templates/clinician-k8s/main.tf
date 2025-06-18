@@ -47,51 +47,6 @@ data "coder_parameter" "repository_url" {
   type         = "string"
 }
 
-data "coder_parameter" "cpu" {
-  name         = "cpu"
-  display_name = "CPU Cores"
-  description  = "The number of CPU cores (between 4-16)"
-  default      = "4"
-  icon         = "/icon/memory.svg"
-  mutable      = true
-  order        = 2
-  type         = "number"
-  validation {
-    min = 4
-    max = 16
-  }
-}
-
-data "coder_parameter" "memory" {
-  name         = "memory"
-  display_name = "Memory (GB)"
-  description  = "The amount of memory in GB (between 8-32)"
-  default      = "8"
-  icon         = "/icon/memory.svg"
-  mutable      = true
-  order        = 3
-  type         = "number"
-  validation {
-    min = 8
-    max = 32
-  }
-}
-
-data "coder_parameter" "home_disk_size" {
-  name         = "home_disk_size"
-  display_name = "Home disk size (GB)"
-  description  = "The size of the home disk in GB (between 16-1024)"
-  default      = "16"
-  type         = "number"
-  icon         = "/icon/folder.svg"
-  mutable      = true
-  order        = 4
-  validation {
-    min = 16
-    max = 1024
-  }
-}
-
 ############################
 # LOCALS
 ############################
@@ -258,7 +213,7 @@ resource "kubernetes_persistent_volume_claim" "home" {
     access_modes = ["ReadWriteOnce"]
     resources {
       requests = {
-        storage = "${data.coder_parameter.home_disk_size.value}Gi"
+        storage = "${module.resources.home_disk_size.value}Gi"
       }
     }
   }
@@ -333,12 +288,12 @@ resource "kubernetes_deployment" "main" {
 
           resources {
             requests = {
-              cpu    = data.coder_parameter.cpu.value
-              memory = "${data.coder_parameter.memory.value}Gi"
+              cpu    = module.resources.cpu.value
+              memory = "${module.resources.memory.value}Gi"
             }
             limits = {
-              cpu    = data.coder_parameter.cpu.value
-              memory = "${data.coder_parameter.memory.value}Gi"
+              cpu    = module.resources.cpu.value
+              memory = "${module.resources.memory.value}Gi"
             }
           }
 
@@ -448,8 +403,8 @@ resource "kubernetes_deployment" "main" {
 resource "coder_metadata" "workspace_info" {
   count       = data.coder_workspace.me.start_count
   resource_id = kubernetes_deployment.main[0].id
-  daily_cost = (module.resource_costs.cpu_cost_per_core * data.coder_parameter.cpu.value +
-  module.resource_costs.ram_cost_per_gb * data.coder_parameter.memory.value)
+  daily_cost = (module.resource_costs.cpu_cost_per_core * module.resources.cpu.value +
+  module.resource_costs.ram_cost_per_gb * module.resources.memory.value)
 
   item {
     key   = "Image Used"
@@ -457,11 +412,11 @@ resource "coder_metadata" "workspace_info" {
   }
   item {
     key   = "CPU Cores"
-    value = "${data.coder_parameter.cpu.value} vCPU"
+    value = "${module.resources.cpu.value} vCPU"
   }
   item {
     key   = "Memory"
-    value = "${data.coder_parameter.memory.value} GB RAM"
+    value = "${module.resources.memory.value} GB RAM"
   }
   item {
     key   = "Arize Phoenix"
@@ -474,7 +429,7 @@ resource "coder_metadata" "home_pvc_info" {
 
   item {
     key   = "Home Volume Size"
-    value = "${data.coder_parameter.home_disk_size.value} GB"
+    value = "${module.resources.home_disk_size.value} GB"
   }
   item {
     key   = "Namespace"
