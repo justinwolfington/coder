@@ -19,6 +19,16 @@ provider "kubernetes" {
 }
 
 ############################
+# SHARED MODULES
+############################
+module "resource_costs" {
+  source = "git::https://github.com/abridgeai/coder.git//modules/costs?ref=shubh/add-user-quotas"
+}
+module "resources" {
+  source = "git::https://github.com/abridgeai/coder.git//modules/resources?ref=shubh/add-user-quotas"
+}
+
+############################
 # DATA SOURCES
 ############################
 data "coder_workspace" "me" {}
@@ -37,20 +47,21 @@ data "coder_parameter" "repository_url" {
   type         = "string"
 }
 
-data "coder_parameter" "cpu" {
-  name         = "cpu"
-  display_name = "CPU Cores"
-  description  = "The number of CPU cores (between 4-16)"
-  default      = "4"
-  icon         = "/icon/memory.svg"
-  mutable      = true
-  order        = 2
-  type         = "number"
-  validation {
-    min = 4
-    max = 16
-  }
-}
+# data "coder_parameter" "cpu" {
+#   name         = "cpu"
+#   display_name = "CPU Cores"
+#   description  = "The number of CPU cores (between 4-16)"
+#   default      = "4"
+#   icon         = "/icon/memory.svg"
+#   mutable      = true
+#   order        = 2
+#   type         = "number"
+#   validation {
+#     min = 4
+#     max = 16
+#   }
+# }
+
 
 data "coder_parameter" "memory" {
   name         = "memory"
@@ -281,7 +292,7 @@ resource "kubernetes_deployment" "main" {
 
           resources {
             requests = {
-              cpu    = data.coder_parameter.cpu.value
+              cpu    = module.resources.cpu
               memory = "${data.coder_parameter.memory.value}Gi"
             }
             limits = {
@@ -333,6 +344,8 @@ resource "kubernetes_deployment" "main" {
 resource "coder_metadata" "workspace_info" {
   count       = data.coder_workspace.me.start_count
   resource_id = kubernetes_deployment.main[0].id
+  daily_cost = (module.resource_costs.cpu_cost_per_core * data.coder_parameter.cpu.value +
+  module.resource_costs.ram_cost_per_gb * data.coder_parameter.memory.value)
 
   item {
     key   = "Image Used"
