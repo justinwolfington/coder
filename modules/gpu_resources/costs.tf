@@ -3,7 +3,7 @@ variable "gpu_cost_per_unit" {
   type        = map(number)
   default = {
     ""                   = 0
-    "nvidia-l4"          = 4
-    "nvidia-h100-80gb"   = 10
+    "nvidia-l4"          = 2
+    "nvidia-h100-80gb"   = 5
   }
 }
