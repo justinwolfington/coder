@@ -438,14 +438,6 @@ resource "coder_agent_instance" "main" {
 }
 
 ############################
-# COSTS
-############################
-
-module "common_costs" {
-  source = "git::https://github.com/abridgeai/coder.git//modules/costs?ref=shubh/add-user-quotas"
-}
-
-############################
 # METADATA
 ############################
 resource "coder_metadata" "workspace_info" {
