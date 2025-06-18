@@ -292,11 +292,11 @@ resource "kubernetes_deployment" "main" {
 
           resources {
             requests = {
-              cpu    = module.resources.cpu
+              cpu    = "${module.resources.cpu}"
               memory = "${data.coder_parameter.memory.value}Gi"
             }
             limits = {
-              cpu    = module.resources.cpu
+              cpu    = "${module.resources.cpu}"
               memory = "${data.coder_parameter.memory.value}Gi"
             }
           }
