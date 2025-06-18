@@ -292,11 +292,11 @@ resource "kubernetes_deployment" "main" {
 
           resources {
             requests = {
-              cpu    = "${module.resources.cpu}"
+              cpu    = "${module.resources.cpu.value}"
               memory = "${data.coder_parameter.memory.value}Gi"
             }
             limits = {
-              cpu    = "${module.resources.cpu}"
+              cpu    = "${module.resources.cpu.value}"
               memory = "${data.coder_parameter.memory.value}Gi"
             }
           }
@@ -344,7 +344,7 @@ resource "kubernetes_deployment" "main" {
 resource "coder_metadata" "workspace_info" {
   count       = data.coder_workspace.me.start_count
   resource_id = kubernetes_deployment.main[0].id
-  daily_cost = (module.resource_costs.cpu_cost_per_core * module.resources.cpu +
+  daily_cost = (module.resource_costs.cpu_cost_per_core * module.resources.cpu.value +
   module.resource_costs.ram_cost_per_gb * data.coder_parameter.memory.value)
 
   item {
@@ -353,7 +353,7 @@ resource "coder_metadata" "workspace_info" {
   }
   item {
     key   = "CPU Cores"
-    value = "${module.resources.cpu} vCPU"
+    value = "${module.resources.cpu.value} vCPU"
   }
   item {
     key   = "Memory"
