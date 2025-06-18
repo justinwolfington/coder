@@ -25,6 +25,16 @@ data "coder_workspace" "me" {}
 data "coder_workspace_owner" "me" {}
 
 ############################
+# SHARED MODULES
+############################
+module "resource_costs" {
+  source = "git::https://github.com/abridgeai/coder.git//modules/costs?ref=shubh/add-user-quotas"
+}
+module "resources" {
+  source = "git::https://github.com/abridgeai/coder.git//modules/resources?ref=shubh/add-user-quotas"
+}
+
+############################
 # PARAMETERS
 ############################
 data "coder_parameter" "repository_url" {
