@@ -353,7 +353,7 @@ resource "coder_metadata" "workspace_info" {
   }
   item {
     key   = "CPU Cores"
-    value = "${data.coder_parameter.cpu.value} vCPU"
+    value = "${module.resources.cpu} vCPU"
   }
   item {
     key   = "Memory"
