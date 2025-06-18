@@ -4,5 +4,5 @@
 
 output "cpu" {
   description = "CPU cores parameter"
-  value       = data.coder_parameter.cpux.value
+  value       = data.coder_parameter.cpux
 }
