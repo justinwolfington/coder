@@ -31,6 +31,13 @@ module "gpu_resources" {
   source = "git::https://github.com/abridgeai/coder.git//modules/gpu_resources?ref=shubh/add-user-quotas"
 }
 
+module "ide_modules" {
+  source = "git::https://github.com/abridgeai/coder.git//modules/ide_modules?ref=shubh/add-user-quotas"
+  start_count = data.coder_workspace.me.start_count
+  agent_id = coder_agent.main.id
+  user_name = data.coder_workspace_owner.me.name
+}
+
 ############################
 # PARAMETERS
 ############################
@@ -287,43 +294,6 @@ resource "coder_agent" "main" {
       timeout      = 10
     }
   }
-}
-
-############################
-# IDE MODULES
-############################
-module "code-server" {
-  count    = data.coder_workspace.me.start_count
-  source   = "registry.coder.com/coder/code-server/coder"
-  version  = "~> 1.0"
-  agent_id = coder_agent.main.id
-  folder   = "/home/${lower(data.coder_workspace_owner.me.name)}"
-}
-
-module "git-config" {
-  count                 = data.coder_workspace.me.start_count
-  source                = "registry.coder.com/coder/git-config/coder"
-  version               = "1.0.15"
-  agent_id              = coder_agent.main.id
-  allow_username_change = false
-  allow_email_change    = false
-}
-
-module "cursor" {
-  count    = data.coder_workspace.me.start_count
-  source   = "registry.coder.com/coder/cursor/coder"
-  version  = "1.1.0"
-  agent_id = coder_agent.main.id
-}
-
-module "jetbrains_gateway" {
-  count          = data.coder_workspace.me.start_count
-  source         = "registry.coder.com/coder/jetbrains-gateway/coder"
-  version        = "1.2.0"
-  agent_id       = coder_agent.main.id
-  folder         = "/home/${lower(data.coder_workspace_owner.me.name)}"
-  jetbrains_ides = ["PY"]
-  default        = "PY"
 }
 
 ############################
