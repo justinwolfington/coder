@@ -19,6 +19,16 @@ provider "kubernetes" {
 }
 
 ############################
+# SHARED MODULES
+############################
+module "resource_costs" {
+  source = "git::https://github.com/abridgeai/coder.git//modules/costs?ref=shubh/add-user-quotas"
+}
+module "resources" {
+  source = "git::https://github.com/abridgeai/coder.git//modules/resources?ref=shubh/add-user-quotas"
+}
+
+############################
 # DATA SOURCES
 ############################
 data "coder_workspace" "me" {}
@@ -429,13 +439,6 @@ resource "kubernetes_deployment" "main" {
       }
     }
   }
-}
-
-############################
-# SHARED MODULES
-############################
-module "resource_costs" {
-  source = "git::https://github.com/abridgeai/coder.git//modules/costs?ref=shubh/add-user-quotas"
 }
 
 ############################
