@@ -307,8 +307,6 @@ resource "coder_agent" "main" {
 ############################
 # CODER APPLICATIONS
 ############################
-# module not shared with other templates as other templates are k8s based, this is a VM based template
-
 module "code-server" {
   count    = data.coder_workspace.me.start_count
   source   = "registry.coder.com/coder/code-server/coder"
