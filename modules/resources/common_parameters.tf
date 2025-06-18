@@ -7,7 +7,7 @@
 # Repository URL parameter - used in all k8s templates
 # CPU cores parameter - used in all k8s templates
 data "coder_parameter" "cpux" {
-  name         = "cpu"
+  name         = "cpux"
   display_name = "CPU Cores NEW"
   description  = "The number of CPU cores (between 4-16)"
   default      = "4"
