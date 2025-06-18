@@ -10,7 +10,7 @@ output "workspace_owner" {
 
 output "cpu_cores" {
   description = "Number of CPU cores allocated"
-  value       = data.coder_parameter.cpu.value
+  value       = module.resources.cpu
 }
 
 output "memory_gb" {

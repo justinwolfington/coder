@@ -296,7 +296,7 @@ resource "kubernetes_deployment" "main" {
               memory = "${data.coder_parameter.memory.value}Gi"
             }
             limits = {
-              cpu    = data.coder_parameter.cpu.value
+              cpu    = module.resources.cpu
               memory = "${data.coder_parameter.memory.value}Gi"
             }
           }
