@@ -24,3 +24,7 @@ output "ram_cost_per_gb" {
 output "cpu_cost_per_core" {
     value = var.cpu_cost_per_core
 }
+
+output "gpu_cost_per_unit" {
+    value = var.gpu_cost_per_unit
+}

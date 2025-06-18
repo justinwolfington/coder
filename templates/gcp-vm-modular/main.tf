@@ -160,7 +160,6 @@ locals {
       disk_type             = "pd-standard"
       recommended_disk_size = 256
       local_ssd_description = "None"
-      daily_cost            = 10
     }
     "nvidia-l4-2x" = {
       machine_type          = "g2-standard-24"
@@ -169,7 +168,6 @@ locals {
       disk_type             = "pd-ssd"
       recommended_disk_size = 500
       local_ssd_description = "None (L4 instances use persistent disks)"
-      daily_cost            = 20
     }
     "nvidia-h100-80gb" = {
       machine_type          = "a3-highgpu-8g"
@@ -178,7 +176,6 @@ locals {
       disk_type             = "pd-ssd"
       recommended_disk_size = 1000
       local_ssd_description = "16x 375GB NVMe (Total: 6000 GB)"
-      daily_cost            = 50
     }
   }
 
@@ -443,7 +440,7 @@ resource "coder_agent_instance" "main" {
 resource "coder_metadata" "workspace_info" {
   count       = data.coder_workspace.me.start_count
   resource_id = google_compute_instance.workspace[0].id
-  daily_cost = local.gpu_config.daily_cost 
+  daily_cost = lookup(module.resources.gpu_cost_per_unit, local.gpu_config.gpu_type, 0) * local.gpu_config.gpu_count
 
   item {
     key   = "Machine Type"
