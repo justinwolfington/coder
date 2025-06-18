@@ -15,12 +15,12 @@ output "cpu_cores" {
 
 output "memory_gb" {
   description = "Amount of memory allocated in GB"
-  value       = data.coder_parameter.memory.value
+  value       = module.resources.memory.value
 }
 
 output "home_disk_size" {
   description = "Size of home disk in GB"
-  value       = data.coder_parameter.home_disk_size.value
+  value       = module.resources.home_disk_size.value
 }
 
 output "repository_url" {
