@@ -31,6 +31,10 @@ module "resources" {
   source = "git::https://github.com/abridgeai/coder.git//modules/resources?ref=shubh/add-user-quotas"
 }
 
+module "gpu_resources" {
+  source = "git::https://github.com/abridgeai/coder.git//modules/gpu_resources?ref=shubh/add-user-quotas"
+}
+
 ############################
 # PARAMETERS
 ############################
@@ -447,7 +451,7 @@ resource "coder_agent_instance" "main" {
 resource "coder_metadata" "workspace_info" {
   count       = data.coder_workspace.me.start_count
   resource_id = google_compute_instance.workspace[0].id
-  daily_cost = lookup(module.resources.gpu_cost_per_unit, local.gpu_config.gpu_type, 0) * local.gpu_config.gpu_count
+  daily_cost = lookup(module.gpu_resources.gpu_cost_per_unit, local.gpu_config.gpu_type, 0) * local.gpu_config.gpu_count
 
   item {
     key   = "Machine Type"
