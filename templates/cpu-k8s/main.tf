@@ -55,7 +55,7 @@ data "coder_parameter" "repository_url" {
 #   icon         = "/icon/memory.svg"
 #   mutable      = true
 #   order        = 2
-#   type         = "number"
+#   type         = "number" 
 #   validation {
 #     min = 4
 #     max = 16
