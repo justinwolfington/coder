@@ -27,10 +27,6 @@ data "coder_workspace_owner" "me" {}
 ############################
 # SHARED MODULES
 ############################
-module "resources" {
-  source = "git::https://github.com/abridgeai/coder.git//modules/resources?ref=shubh/add-user-quotas"
-}
-
 module "gpu_resources" {
   source = "git::https://github.com/abridgeai/coder.git//modules/gpu_resources?ref=shubh/add-user-quotas"
 }
