@@ -190,21 +190,21 @@ resource "coder_agent" "main" {
 # INFRASTRUCTURE RESOURCES
 ############################
 # # --- Coder Application: code-server ---
-# resource "coder_app" "code-server" {
-#   agent_id     = coder_agent.main.id
-#   slug         = "code-server"
-#   display_name = "code-server"
-#   icon         = "/icon/code.svg"
-#   url          = "http://localhost:13337?folder=${local.repo_dir}"
-#   subdomain    = false
-#   share        = "owner"
+resource "coder_app" "code-server" {
+  agent_id     = coder_agent.main.id
+  slug         = "code-server"
+  display_name = "code-server"
+  icon         = "/icon/code.svg"
+  url          = "http://localhost:13337?folder=${local.repo_dir}"
+  subdomain    = false
+  share        = "owner"
 
-#   healthcheck {
-#     url       = "http://localhost:13337/healthz"
-#     interval  = 3
-#     threshold = 10
-#   }
-# }
+  healthcheck {
+    url       = "http://localhost:13337/healthz"
+    interval  = 3
+    threshold = 10
+  }
+}
 
 # --- Kubernetes Resources ---
 

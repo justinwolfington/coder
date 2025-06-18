@@ -305,6 +305,19 @@ resource "coder_agent" "main" {
 }
 
 ############################
+# CODER APPLICATIONS
+############################
+# module not shared with other templates as other templates are k8s based, this is a VM based template
+
+module "code-server" {
+  count    = data.coder_workspace.me.start_count
+  source   = "registry.coder.com/coder/code-server/coder"
+  version  = "~> 1.0"
+  agent_id = coder_agent.main.id
+  folder   = "/home/${lower(data.coder_workspace_owner.me.name)}"
+}
+
+############################
 # INFRASTRUCTURE RESOURCES
 ############################
 resource "google_compute_instance" "workspace" {

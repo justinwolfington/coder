@@ -1,11 +1,3 @@
-module "code-server" {
-  count    = var.start_count
-  source   = "registry.coder.com/coder/code-server/coder"
-  version  = "~> 1.0"
-  agent_id = var.agent_id
-  folder   = "/home/${lower(var.user_name)}"
-}
-
 module "cursor" {
   count    = var.start_count
   source   = "registry.coder.com/coder/cursor/coder"
