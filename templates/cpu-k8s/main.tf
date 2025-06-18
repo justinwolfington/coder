@@ -344,7 +344,7 @@ resource "kubernetes_deployment" "main" {
 resource "coder_metadata" "workspace_info" {
   count       = data.coder_workspace.me.start_count
   resource_id = kubernetes_deployment.main[0].id
-  daily_cost = (module.resource_costs.cpu_cost_per_core * data.coder_parameter.cpu.value +
+  daily_cost = (module.resource_costs.cpu_cost_per_core * module.resources.cpu +
   module.resource_costs.ram_cost_per_gb * data.coder_parameter.memory.value)
 
   item {
