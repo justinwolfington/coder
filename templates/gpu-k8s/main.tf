@@ -27,9 +27,6 @@ data "coder_workspace_owner" "me" {}
 ############################
 # SHARED MODULES
 ############################
-module "resource_costs" {
-  source = "git::https://github.com/abridgeai/coder.git//modules/costs?ref=shubh/add-user-quotas"
-}
 module "resources" {
   source = "git::https://github.com/abridgeai/coder.git//modules/resources?ref=shubh/add-user-quotas"
 }
@@ -344,8 +341,8 @@ resource "kubernetes_deployment" "main" {
 resource "coder_metadata" "workspace_info" {
   count       = data.coder_workspace.me.start_count
   resource_id = kubernetes_deployment.main[0].id
-  daily_cost = (module.resource_costs.cpu_cost_per_core * module.resources.cpu.value +
-  module.resource_costs.ram_cost_per_gb * module.resources.memory.value)
+  daily_cost = (module.resources.cpu_cost_per_core * module.resources.cpu.value +
+  module.resources.ram_cost_per_gb * module.resources.memory.value)
 
   item {
     key   = "Image Used"
