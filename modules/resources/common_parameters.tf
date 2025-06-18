@@ -8,7 +8,7 @@
 # CPU cores parameter - used in all k8s templates
 data "coder_parameter" "cpux" {
   name         = "cpu"
-  display_name = "CPU Cores"
+  display_name = "CPU Cores NEW"
   description  = "The number of CPU cores (between 4-16)"
   default      = "4"
   icon         = "/icon/memory.svg"
