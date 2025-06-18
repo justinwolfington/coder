@@ -1,5 +1,5 @@
 ############################
-# OUTPUTS FOR CODER PARAMETERS
+# OUTPUTS FOR CODER PARAMETERS AND COSTS
 ############################
 
 output "cpu" {

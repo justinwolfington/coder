@@ -75,6 +75,8 @@ coder:
       - name: CODER_LOGGING_HUMAN
         value: /dev/stdout
 
+    # mount the git secrets to enable coder to pull modules from coder repo
+    # the following secrets have read only access to the coder repo
     volumes: 
       - name: git-secrets
         secret: 

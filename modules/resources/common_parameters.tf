@@ -4,8 +4,6 @@
 # This module contains coder_parameter definitions that are commonly used
 # across multiple templates in the coder workspace setup.
 
-# Repository URL parameter - used in all k8s templates
-# CPU cores parameter - used in all k8s templates
 data "coder_parameter" "cpu" {
   name         = "cpu"
   display_name = "CPU Cores"
