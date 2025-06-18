@@ -37,8 +37,6 @@ on:
 
 permissions:
   contents: read
-  # Allow the workflow to authenticate to private repos
-  actions: read
 
 jobs:
   push-templates:
