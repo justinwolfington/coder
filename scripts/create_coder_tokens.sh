@@ -21,8 +21,8 @@ coder users create \
   --email "$EMAIL" \
   --login-type none || echo "User may already exist, continuing..."
 
-echo "Note: Template admin role must be assigned manually via the web UI or a newer CLI version"
-# TODO: bump to 2.22.1 and use https://coder.com/docs/@v2.22.1/reference/cli/users_edit-roles
+echo "Upgrading access level of user to template-admin"
+coder users edit-roles $USERNAME --roles template-admin
 
 echo "Creating long-lived token..."
 TOKEN=$(coder tokens create --user "$USERNAME" --lifetime "$TOKEN_LIFETIME" --url "$CODER_URL" | tail -n 1)
