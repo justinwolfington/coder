@@ -21,12 +21,12 @@ provider "kubernetes" {
 ############################
 # SHARED MODULES
 ############################
-module "resources" {
-  source = "git::https://github.com/abridgeai/coder.git//modules/resources?ref=845d31c"
+module "cpu_resources" {
+  source = "git::https://github.com/abridgeai/coder.git//modules/resources/cpu?ref=ccafd58a"
 }
 
 module "git_utilities" {
-  source = "git::https://github.com/abridgeai/coder.git//modules/utilities/git?ref=845d31c"
+  source = "git::https://github.com/abridgeai/coder.git//modules/utilities/git?ref=ccafd58a"
   start_count = data.coder_workspace.me.start_count
   agent_id = coder_agent.main.id
   repo_url = data.coder_parameter.repository_url.value
@@ -34,7 +34,7 @@ module "git_utilities" {
 }
 
 module "ide_utilities" {
-  source = "git::https://github.com/abridgeai/coder.git//modules/utilities/ide?ref=845d31c"
+  source = "git::https://github.com/abridgeai/coder.git//modules/utilities/ide?ref=ccafd58a"
   start_count = data.coder_workspace.me.start_count
   agent_id = coder_agent.main.id
   user_name = data.coder_workspace_owner.me.name
@@ -185,7 +185,7 @@ resource "kubernetes_persistent_volume_claim" "home" {
     access_modes = ["ReadWriteOnce"]
     resources {
       requests = {
-        storage = "${module.resources.home_disk_size.value}Gi"
+        storage = "${module.cpu_resources.home_disk_size.value}Gi"
       }
     }
   }
@@ -260,12 +260,12 @@ resource "kubernetes_deployment" "main" {
 
           resources {
             requests = {
-              cpu    = module.resources.cpu.value
-              memory = "${module.resources.memory.value}Gi"
+              cpu    = module.cpu_resources.cpu.value
+              memory = "${module.cpu_resources.memory.value}Gi"
             }
             limits = {
-              cpu    = module.resources.cpu.value
-              memory = "${module.resources.memory.value}Gi"
+              cpu    = module.cpu_resources.cpu.value
+              memory = "${module.cpu_resources.memory.value}Gi"
             }
           }
 
@@ -375,8 +375,8 @@ resource "kubernetes_deployment" "main" {
 resource "coder_metadata" "workspace_info" {
   count       = data.coder_workspace.me.start_count
   resource_id = kubernetes_deployment.main[0].id
-  daily_cost = (module.resources.cpu_cost_per_core * module.resources.cpu.value +
-  module.resources.ram_cost_per_gb * module.resources.memory.value)
+  daily_cost = (module.cpu_resources.cpu_cost_per_core * module.cpu_resources.cpu.value +
+  module.cpu_resources.ram_cost_per_gb * module.cpu_resources.memory.value)
 
   item {
     key   = "Image Used"
@@ -384,11 +384,11 @@ resource "coder_metadata" "workspace_info" {
   }
   item {
     key   = "CPU Cores"
-    value = "${module.resources.cpu.value} vCPU"
+    value = "${module.cpu_resources.cpu.value} vCPU"
   }
   item {
     key   = "Memory"
-    value = "${module.resources.memory.value} GB RAM"
+    value = "${module.cpu_resources.memory.value} GB RAM"
   }
   item {
     key   = "Arize Phoenix"
@@ -401,7 +401,7 @@ resource "coder_metadata" "home_pvc_info" {
 
   item {
     key   = "Home Volume Size"
-    value = "${module.resources.home_disk_size.value} GB"
+    value = "${module.cpu_resources.home_disk_size.value} GB"
   }
   item {
     key   = "Namespace"
