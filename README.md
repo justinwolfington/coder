@@ -12,17 +12,24 @@ These environments are accessible at:
 
 ``` bash
 coder/
-├── docker-compose.yaml     # Local development setup
-├── charts/                # Helm chart for Coder deployment
-├── scripts/               # Utility scripts for setup and management
-│   └── create_coder_tokens.sh  # Script to create machine user tokens
-└── templates/             # Workspace templates
-    ├── clinician-k8s/     # CPU-based workspace template
-    ├── cpu-k8s/          # Lightweight CPU-based workspace template
-    ├── gpu-k8s/          # GPU-based workspace template
-    ├── phi-gpu-k8s/      # PHI-compliant secure GPU workspace template
-    ├── gcp-vm-modular/    # GCP VM-based workspace template
-    └── templates-config.json  # Template configuration
+├── docker-compose.yaml           # Local development setup
+├── charts/                       # Helm chart for Coder deployment
+├── scripts/                      # Utility scripts for setup and management
+│   └── create_coder_tokens.sh    # Script to create machine user tokens
+├── modules/                      # Shared modules for Coder templates
+│   ├── resources/                # Resource parameter modules
+│   │   ├── cpu/                  # CPU resource parameters and costs
+│   │   └── gpu/                  # GPU resource parameters and costs
+│   └── utilities/                # Utility modules
+│       ├── git/                  # Git configuration
+│       └── ide/                  # IDE configuration
+└── templates/                    # Workspace templates
+    ├── clinician-k8s/            # CPU-based workspace template
+    ├── cpu-k8s/                  # Lightweight CPU-based workspace template
+    ├── gpu-k8s/                  # GPU-based workspace template
+    ├── phi-gpu-k8s/              # PHI-compliant secure GPU workspace template
+    ├── gcp-vm-modular/           # GCP VM-based workspace template
+    └── templates-config.json     # Template configuration
 ```
 
 ## Available Templates
