@@ -1,4 +1,4 @@
-# Shared Coder Parameters Module
+# Coder Resources Module
 
 This module contains shared coder_parameter definitions that are commonly used across multiple Coder workspace templates.
 
@@ -6,22 +6,34 @@ This module contains shared coder_parameter definitions that are commonly used a
 
 Instead of duplicating the same parameter definitions in each template, this module centralizes common parameters to ensure consistency and ease of maintenance.
 
-## Available Parameters
+## Available Modules
 
-### Common Parameters (common_parameters.tf)
+### CPU Module (`cpu/`)
+Contains CPU-specific resource parameters:
 - `memory` - RAM
 - `cpu` - CPU cores
 - `home_disk_size` - Home disk size
+
+Cost definitions are in `cpu/costs.tf`
+
+### GPU Module (`gpu/`)
+Contains GPU-specific resource parameters and cost definitions in `gpu/costs.tf`
 
 ## Usage Example
 
 To use these shared parameters in your template, you would need to:
 
-1. Import the module in your template's main.tf:
+1. Import the specific module in your template's main.tf:
 
 ```hcl
-module "resources" {
-  source = "git::ref"
+# For CPU resources
+module "cpu_resources" {
+  source = "git::ref//modules/resources/cpu"
+}
+
+# For GPU resources
+module "gpu_resources" {
+  source = "git::ref//modules/resources/gpu"
 }
 ```
 
@@ -31,7 +43,7 @@ module "resources" {
 # Example: Using CPU parameter in resource allocation
 resources {
   requests = {
-    cpu = module.shared_params.cpu.value
+    cpu = module.cpu_resources.cpu.value
   }
 }
 ```
