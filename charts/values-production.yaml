@@ -75,6 +75,10 @@ coder:
       - name: CODER_LOGGING_HUMAN
         value: /dev/stdout
 
+      # only store audit logs
+      - name: CODER_LOG_FILTER
+        value: ".*coderd: audit_log.*"
+
     # coder.service -- The Service object to expose for Coder.
     service:
       # coder.service.type -- Set to ClusterIP when using Ingress.
