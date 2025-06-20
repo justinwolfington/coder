@@ -49,7 +49,7 @@ resources {
 ```
 
 ## Note
-* The coder_parameter are automatically available in all the templates that import the module. While this has no effect on the correctness of workspace creation, the Workspace Builder UI will have redundant parameters. Coder does not support hiding specific parameters within templates as of now hence, exercise caution while adding parameters to the module.
+* The coder_parameter are automatically available in all the templates that import the module. While this has no effect on the correctness of workspace creation, the Workspace Builder UI will have redundant parameters. Coder does not support hiding specific parameters within templates as of now hence, exercise caution while adding parameters to the module. 
 
 * The daily cost of the workspace is enforced in the `"coder_metadata" "workspace_info"` resource as a `daily_cost` field. For example, the gcp-vm-modular template has the following: 
 
