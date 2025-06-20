@@ -49,4 +49,14 @@ resources {
 ```
 
 ## Note
-The coder_parameter are automatically available in all the templates that import the module. While this has no effect on the correctness of workspace creation, the Workspace Builder UI will have redundant parameters. Coder does not support hiding specific parameters within templates as of now hence, exercise caution while adding parameters to the module.
+* The coder_parameter are automatically available in all the templates that import the module. While this has no effect on the correctness of workspace creation, the Workspace Builder UI will have redundant parameters. Coder does not support hiding specific parameters within templates as of now hence, exercise caution while adding parameters to the module.
+
+* The daily cost of the workspace is enforced in the `"coder_metadata" "workspace_info"` resource as a `daily_cost` field. For example, the gcp-vm-modular template has the following: 
+
+  ```hcl
+  resource "coder_metadata" "workspace_info" {
+    count       = data.coder_workspace.me.start_count
+    resource_id = google_compute_instance.workspace[0].id
+    daily_cost = lookup(module.gpu_resources.gpu_cost_per_unit, local.gpu_config.gpu_type, 0) * local.gpu_config.gpu_count
+  }
+  ```

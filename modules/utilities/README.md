@@ -20,7 +20,7 @@ Centralizes frequently used utility modules to avoid duplication across template
 
 ```hcl
 module "git_utils" {
-  source       = "../modules/utilities/git"
+  source       = "git::ref//modules/utilities/git"
   start_count  = 1
   agent_id     = coder_agent.main.id
   repo_url     = data.coder_parameter.repo_url.value
@@ -28,7 +28,7 @@ module "git_utils" {
 }
 
 module "ide_utils" {
-  source      = "../modules/utilities/ide"
+  source      = "git::ref//modules/utilities/ide"
   start_count = 1
   agent_id    = coder_agent.main.id
   user_name   = data.coder_workspace.me.owner

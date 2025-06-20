@@ -3,6 +3,8 @@
 ############################
 # This module contains coder_parameter definitions that are commonly used
 # across multiple templates in the coder workspace setup.
+# The resource with the lower order is presented before the one with greater value.
+# The order of parameters in the UI : cpu -> memory -> home_disk_size
 
 data "coder_parameter" "cpu" {
   name         = "cpu"
