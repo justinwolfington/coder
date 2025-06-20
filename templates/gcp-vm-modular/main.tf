@@ -2,6 +2,7 @@ terraform {
   required_providers {
     coder = {
       source = "coder/coder"
+      version = "2.7.0"
     }
     google = {
       source = "hashicorp/google"
@@ -23,6 +24,28 @@ provider "google" {
 ############################
 data "coder_workspace" "me" {}
 data "coder_workspace_owner" "me" {}
+
+############################
+# SHARED MODULES
+############################
+module "gpu_resources" {
+  source = "git::https://github.com/abridgeai/coder.git//modules/resources/gpu?ref=91c30bbd"
+}
+
+module "git_utilities" {
+  source = "git::https://github.com/abridgeai/coder.git//modules/utilities/git?ref=91c30bbd"
+  start_count = data.coder_workspace.me.start_count
+  agent_id = coder_agent.main.id
+  repo_url = ""
+  should_clone = false
+}
+
+module "ide_modules" {
+  source = "git::https://github.com/abridgeai/coder.git//modules/utilities/ide?ref=91c30bbd"
+  start_count = data.coder_workspace.me.start_count
+  agent_id = coder_agent.main.id
+  user_name = data.coder_workspace_owner.me.name
+}
 
 ############################
 # PARAMETERS
@@ -283,7 +306,7 @@ resource "coder_agent" "main" {
 }
 
 ############################
-# IDE MODULES
+# CODER APPLICATIONS
 ############################
 module "code-server" {
   count    = data.coder_workspace.me.start_count
@@ -291,32 +314,6 @@ module "code-server" {
   version  = "~> 1.0"
   agent_id = coder_agent.main.id
   folder   = "/home/${lower(data.coder_workspace_owner.me.name)}"
-}
-
-module "git-config" {
-  count                 = data.coder_workspace.me.start_count
-  source                = "registry.coder.com/coder/git-config/coder"
-  version               = "1.0.15"
-  agent_id              = coder_agent.main.id
-  allow_username_change = false
-  allow_email_change    = false
-}
-
-module "cursor" {
-  count    = data.coder_workspace.me.start_count
-  source   = "registry.coder.com/coder/cursor/coder"
-  version  = "1.1.0"
-  agent_id = coder_agent.main.id
-}
-
-module "jetbrains_gateway" {
-  count          = data.coder_workspace.me.start_count
-  source         = "registry.coder.com/coder/jetbrains-gateway/coder"
-  version        = "1.2.0"
-  agent_id       = coder_agent.main.id
-  folder         = "/home/${lower(data.coder_workspace_owner.me.name)}"
-  jetbrains_ides = ["PY"]
-  default        = "PY"
 }
 
 ############################
@@ -440,6 +437,7 @@ resource "coder_agent_instance" "main" {
 resource "coder_metadata" "workspace_info" {
   count       = data.coder_workspace.me.start_count
   resource_id = google_compute_instance.workspace[0].id
+  daily_cost = lookup(module.gpu_resources.gpu_cost_per_unit, local.gpu_config.gpu_type, 0) * local.gpu_config.gpu_count
 
   item {
     key   = "Machine Type"

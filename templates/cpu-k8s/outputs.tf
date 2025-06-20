@@ -10,17 +10,17 @@ output "workspace_owner" {
 
 output "cpu_cores" {
   description = "Number of CPU cores allocated"
-  value       = data.coder_parameter.cpu.value
+  value       = module.cpu_resources.cpu
 }
 
 output "memory_gb" {
   description = "Amount of memory allocated in GB"
-  value       = data.coder_parameter.memory.value
+  value       = module.cpu_resources.memory.value
 }
 
 output "home_disk_size" {
   description = "Size of home disk in GB"
-  value       = data.coder_parameter.home_disk_size.value
+  value       = module.cpu_resources.home_disk_size.value
 }
 
 output "repository_url" {
