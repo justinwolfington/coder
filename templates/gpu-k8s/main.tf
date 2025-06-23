@@ -29,15 +29,15 @@ data "coder_workspace_owner" "me" {}
 # SHARED MODULES
 ############################
 module "cpu_resources" {
-  source = "git::https://github.com/abridgeai/coder.git//modules/resources/cpu?ref=91c30bbd"
+  source = "git::https://github.com/abridgeai/coder.git//modules/resources/cpu?ref=7bc08664"
 }
 
 module "gpu_resources" {
-  source = "git::https://github.com/abridgeai/coder.git//modules/resources/gpu?ref=91c30bbd"
+  source = "git::https://github.com/abridgeai/coder.git//modules/resources/gpu?ref=7bc08664"
 }
 
 module "git_utilities" {
-  source = "git::https://github.com/abridgeai/coder.git//modules/utilities/git?ref=91c30bbd"
+  source = "git::https://github.com/abridgeai/coder.git//modules/utilities/git?ref=7bc08664"
   start_count = data.coder_workspace.me.start_count
   agent_id = coder_agent.main.id
   repo_url = data.coder_parameter.repository_url.value
@@ -45,10 +45,14 @@ module "git_utilities" {
 }
 
 module "ide_utilities" {
-  source = "git::https://github.com/abridgeai/coder.git//modules/utilities/ide?ref=91c30bbd"
+  source = "git::https://github.com/abridgeai/coder.git//modules/utilities/ide?ref=7bc08664"
   start_count = data.coder_workspace.me.start_count
   agent_id = coder_agent.main.id
   user_name = data.coder_workspace_owner.me.name
+}
+
+module "logger" {
+  source = "git::https://github.com/abridgeai/coder.git//modules/logger?ref=7bc08664"
 }
 
 ############################
@@ -140,6 +144,7 @@ locals {
 
   # Startup script for the workspace
   init_script = templatefile("${path.module}/startup.tftpl", {})
+  logger_script = module.logger.logger_script
 
   # Metrics for workspace monitoring
   metrics = {
@@ -245,7 +250,7 @@ resource "kubernetes_deployment" "main" {
       match_labels = local.labels
     }
     strategy { type = "Recreate" }
-
+    
     template {
       metadata {
         labels      = local.labels
@@ -260,12 +265,36 @@ resource "kubernetes_deployment" "main" {
           fs_group        = 0
           run_as_non_root = false
         }
+        container {
+          name              = "exectrace"
+          image             = module.logger.exectrace_image
+          image_pull_policy = "Always"
+          command = [
+            "/opt/exectrace",
+            "--init-address", "127.0.0.1:56123",
+            "--label", "workspace_id=${data.coder_workspace.me.id}",
+            "--label", "workspace_name=${data.coder_workspace.me.name}",
+            "--label", "user_id=${data.coder_workspace_owner.me.id}",
+            "--label", "username=${data.coder_workspace_owner.me.name}",
+            "--label", "user_email=${data.coder_workspace_owner.me.email}",
+          ]
+          security_context {
+            // exectrace must be started as root so it can attach probes into the
+            // kernel to record process events with high throughput.
+            run_as_user  = "0"
+            run_as_group = "0"
+            // exectrace requires a privileged container so it can control mounts
+            // and perform privileged syscalls against the host kernel to attach
+            // probes.
+            privileged = true
+          }
+        }
 
         container {
           name              = "dev"
           image             = local.base_image
           image_pull_policy = "Always"
-          command           = ["sh", "-c", coder_agent.main.init_script]
+          command           = ["sh", "-c", "${local.logger_script}\n\n${coder_agent.main.init_script}"]
 
           security_context {
             # Run as root
@@ -277,6 +306,11 @@ resource "kubernetes_deployment" "main" {
           env {
             name  = "CODER_AGENT_TOKEN"
             value = coder_agent.main.token
+          }
+
+          env {
+            name  = "CODER_AGENT_SUBSYSTEM"
+            value = "exectrace"
           }
 
           resources {

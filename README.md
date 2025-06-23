@@ -150,3 +150,54 @@ Use the provided script to create machine user tokens:
 - Adjust resource limits based on workload requirements
 - Monitor workspace metrics via built-in monitoring
 - Use higher memory allocations for resource-intensive tasks
+
+## Extra Features
+
+### Audit Logging
+
+Audit logging enables auditors to monitor user operations across the deployment. This feature tracks events at the Coder server level (does not track logs for in-workspace processes), providing visibility into administrative actions and user activities.
+
+**Access Methods:**
+- **UI**: Navigate to Coder Homepage → Admin Settings → Audit Logs
+- **GCP Logs Explorer**: Use the following query:
+
+```logql
+resource.labels.location="us-central1"
+resource.labels.cluster_name="ml-triton-cluster"
+resource.type="k8s_container"
+resource.labels.namespace_name="coder"
+resource.labels.container_name="coder"
+SEARCH("`coderd: audit_log`")
+```
+
+For detailed information about logged events, see the [Coder Audit Logs documentation](https://coder.com/docs/admin/security/audit-logs).
+
+### Process Logging
+
+Process logging captures all system-level processes executing within workspaces, providing fine-grained visibility into workspace activities. This feature complements audit logging by tracking workspace-level events.
+
+**Requirements:**
+- Only available on Linux in Kubernetes environments
+- Additional configuration required (see documentation)
+
+**Access via GCP Logs Explorer:**
+
+```logql
+resource.labels.location="us-central1"
+resource.labels.cluster_name="ml-triton-cluster"
+resource.type="k8s_container"
+resource.labels.namespace_name="coder"
+resource.labels.container_name="exectrace"
+```
+
+For configuration details, see the [Workspace Process Logging documentation](https://coder.com/docs/admin/templates/extending-templates/process-logging#configuring-custom-templates-to-use-workspace-process-logging).
+
+### Feature Availability by Template
+
+| Template | Process Logging |
+|----------|-----------------|
+| Clinician K8s | Yes |
+| CPU K8s | Yes |
+| GPU K8s | Yes |
+| PHI GPU K8s | No |
+| GCP VM Modular | No |

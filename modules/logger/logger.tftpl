@@ -1,0 +1,45 @@
+# the following bash file has been copied directly from 
+# https://coder.com/docs/admin/templates/extending-templates/process-logging#configuring-custom-templates-to-use-workspace-process-logging
+set -eu
+pidns_inum=$(readlink /proc/self/ns/pid | sed 's/[^0-9]//g')
+if [ -z "$pidns_inum" ]; then
+    echo "Could not determine process ID namespace inum"
+    exit 1
+fi
+
+# Before we start the script, does curl exist?
+if ! command -v curl >/dev/null 2>&1; then
+    echo "curl is required to download the Coder binary"
+    echo "Please install curl to your image and try again"
+    # 127 is command not found.
+    exit 127
+fi
+
+echo "Sending process ID namespace inum to exectrace sidecar"
+rc=0
+max_retry=5
+counter=0
+until [ $counter -ge $max_retry ]; do
+    set +e
+    curl \
+    --fail \
+    --silent \
+    --connect-timeout 5 \
+    -X POST \
+    -H "Content-Type: text/plain" \
+    --data "$pidns_inum" \
+    http://127.0.0.1:56123
+    rc=$?
+    set -e
+    if [ $rc -eq 0 ]; then
+    break
+    fi
+
+    counter=$((counter+1))
+    echo "Curl failed with exit code $${rc}, attempt $${counter}/$${max_retry}; Retrying in 3 seconds..."
+    sleep 3
+done
+if [ $rc -ne 0 ]; then
+    echo "Failed to send process ID namespace inum to exectrace sidecar"
+    exit $rc
+fi
