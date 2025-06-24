@@ -29,7 +29,8 @@ coder/
     ├── gpu-k8s/                  # GPU-based workspace template
     ├── phi-gpu-k8s/              # PHI-compliant secure GPU workspace template
     ├── gcp-vm-modular/           # GCP VM-based workspace template
-    └── templates-config.json     # Template configuration
+    └── templates-config.tf       # Template configuration
+    └── main.tf                   # Template Publisher
 ```
 
 ## Available Templates

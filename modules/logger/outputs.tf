@@ -1,6 +1,6 @@
 locals {
   exectrace_image_repo = "us-central1-docker.pkg.dev/abridge-artifact-registry/coder/exectrace"
-  exectrace_image_tag  = "64e8e00"
+  exectrace_image_tag  = "latest"
 }
 
 output "logger_script" {

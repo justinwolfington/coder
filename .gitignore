@@ -3,3 +3,8 @@
 **/.terraform/
 **/.terraform.lock.hcl
 **/.coder/
+
+# Test files
+templates/*.tfvars
+*.tfstate
+*.tfstate.*

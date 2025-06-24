@@ -73,49 +73,53 @@ jobs:
           [[ -z "$SHA" ]] && SHA=$(git rev-parse HEAD)
           echo "sha_short=${SHA:0:7}" >> $GITHUB_OUTPUT
 
-      - name: Validate templates-config.json
+      - name: Initialize Terraform
+        working-directory: ./templates
+        run: terraform init
+        
+      - name: Create tfvars file
+        working-directory: ./templates
         run: |
-          CONFIG="./templates/templates-config.json"
-          jq 'has("templates")' "$CONFIG"
-          jq -e '.templates | to_entries[] | .value.directory and .value.display_name and .value.description and .value.icon and .value.environments' "$CONFIG" > /dev/null
-
-      - name: Validate Terraform configuration for all templates
+          cat > terraform.auto.tfvars <<EOF
+          coder_url = "${{ vars.CODER_ACCESS_URL }}"
+          coder_token = "${{ secrets.CODER_SESSION_TOKEN }}"
+          environment = "${{ github.event.inputs.environment || 'development' }}"
+          template_name = "${{ github.event.inputs.template_name || '' }}"
+          commit_sha = "${{ steps.vars.outputs.sha_short }}"
+          EOF
+        
+      - name: Import existing templates
+        working-directory: ./templates
         run: |
-          CONFIG="./templates/templates-config.json"
-          jq -r '.templates | to_entries[] | .value.directory' "$CONFIG" | while read -r dir; do
-            cd "$dir"
-            terraform init -backend=false > /dev/null
-            terraform validate || { echo "Terraform validation failed in $dir"; exit 1; }
-            cd - > /dev/null
-          done
+          # Import terraform state for templates that already exist
+          # This prevents "already exists" errors by recognizing existing templates
+          terraform import 'coderd_template.templates["gcp-vm-modular"]' coder/gcp-vm-modular || true
+          terraform import 'coderd_template.templates["k8s-completion-service"]' coder/k8s-completion-service || true
+          terraform import 'coderd_template.templates["cpu-k8s"]' coder/cpu-k8s || true
+          terraform import 'coderd_template.templates["gpu-k8s"]' coder/gpu-k8s || true
+          terraform import 'coderd_template.templates["phi-gpu-k8s"]' coder/phi-gpu-k8s || true
+          
+        
+      - name: Validate Terraform configuration
+        working-directory: ./templates
+        run: terraform validate
 
-      - name: Push and test templates
+      - name: Plan Terraform deployment
+        working-directory: ./templates
+        run: terraform plan -out=tfplan
+
+      - name: Apply Terraform deployment
+        working-directory: ./templates
+        run: terraform apply -auto-approve tfplan
+
+      - name: Show deployment summary
+        working-directory: ./templates
+        if: always()
+        run: terraform output -json deployed_templates
+      
+      - name: Clean up sensitive files
+        working-directory: ./templates
+        if: always()
         run: |
-          CONFIG="./templates/templates-config.json"
-          VERSION="${{ steps.vars.outputs.sha_short }}"
-          FILTER_TEMPLATE="${{ github.event.inputs.template_name }}"
-          TARGET_ENV="${{ github.event.inputs.environment || 'development' }}"
-
-          echo "Deploying templates to environment: $TARGET_ENV"
-
-          jq -r '.templates | keys[]' "$CONFIG" | while read -r template; do
-            [[ -n "$FILTER_TEMPLATE" && "$template" != "$FILTER_TEMPLATE" ]] && continue
-
-            # Check if template should be deployed to this environment
-            TEMPLATE_ENVS=$(jq -r --arg t "$template" '.templates[$t].environments // []' "$CONFIG")
-            if ! echo "$TEMPLATE_ENVS" | jq -e --arg env "$TARGET_ENV" 'any(. == $env)' > /dev/null; then
-              echo "Skipping template $template: not configured for environment $TARGET_ENV"
-              continue
-            fi
-
-            eval "$(jq -r --arg t "$template" '.templates[$t] | @sh "DIR=\(.directory) NAME=\(.display_name) DESC=\(.description) ICON=\(.icon)"' "$CONFIG")"
-
-            echo "Pushing: template $template ($NAME) from $DIR to $TARGET_ENV"
-            coder templates push "$template" --directory "./$DIR" --name "$VERSION" --message "Auto-deploy $VERSION to $TARGET_ENV" --yes
-
-            echo "Editing template metadata"
-            coder templates edit "$template" --display-name "$NAME" --description "$DESC" --icon "$ICON" --yes
-
-            echo "Promoting template version"
-            coder template version promote --template="$template" --template-version="$VERSION"
-          done
+          rm -f terraform.auto.tfvars
+          rm -f terraform.tfstate* 
