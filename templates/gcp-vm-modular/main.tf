@@ -85,24 +85,12 @@ data "coder_parameter" "dl_image" {
     value = "pytorch-latest-gpu"
   }
   option {
-    name  = "PyTorch Latest CPU"
-    value = "pytorch-latest-cpu"
-  }
-  option {
     name  = "TensorFlow Latest GPU"
-    value = "tf-latest-gpu"
-  }
-  option {
-    name  = "TensorFlow Latest CPU"
-    value = "tf-latest-cpu"
+    value = "tf-ent-latest-gpu-ubuntu-2204-conda"
   }
   option {
     name  = "Common Framework GPU (CUDA 12.4)"
-    value = "common-gpu-cu124"
-  }
-  option {
-    name  = "Common Framework CPU"
-    value = "common-cpu"
+    value = "common-cu124"
   }
   option {
     name  = "Ubuntu 22.04 LTS"
@@ -219,13 +207,15 @@ locals {
     count = local.gpu_config.gpu_count
   }] : []
 
+  # Run the following command to get a list of supported images
+  # gcloud compute images list \                                                                                                                  
+  #   --project deeplearning-platform-release \
+  #   --format="value(NAME)"
+
   dl_images = {
     "pytorch-latest-gpu" = "projects/deeplearning-platform-release/global/images/family/pytorch-latest-gpu"
-    "pytorch-latest-cpu" = "projects/deeplearning-platform-release/global/images/family/pytorch-latest-cpu"
-    "tf-latest-gpu"      = "projects/deeplearning-platform-release/global/images/family/tf-latest-gpu"
-    "tf-latest-cpu"      = "projects/deeplearning-platform-release/global/images/family/tf-latest-cpu"
-    "common-gpu-cu124"   = "projects/deeplearning-platform-release/global/images/family/common-gpu-cu124"
-    "common-cpu"         = "projects/deeplearning-platform-release/global/images/family/common-cpu"
+    "tf-ent-latest-gpu-ubuntu-2204-conda"  = "projects/deeplearning-platform-release/global/images/family/tf-ent-latest-gpu-ubuntu-2204-conda"
+    "common-cu124"       = "projects/deeplearning-platform-release/global/images/family/common-cu124"
     "ubuntu-2204"        = "projects/ubuntu-os-cloud/global/images/family/ubuntu-2204-lts"
   }
   image = local.dl_images[data.coder_parameter.dl_image.value]
