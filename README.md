@@ -28,6 +28,7 @@ coder/
     ├── cpu-k8s/                  # Lightweight CPU-based workspace template
     ├── gpu-k8s/                  # GPU-based workspace template
     ├── phi-gpu-k8s/              # PHI-compliant secure GPU workspace template
+    ├── skypilot-k8s/             # SkyPilot-enabled CPU workspace template
     ├── gcp-vm-modular/           # GCP VM-based workspace template
     └── templates-config.tf       # Template configuration
     └── main.tf                   # Template Publisher
@@ -39,7 +40,7 @@ coder/
 
 - **Purpose**: CPU-based development workspaces with integrated Arize Phoenix tracing and monitoring
 - **Features**: VS Code, Cursor IDE, Arize Phoenix dashboard, Git integration, Python & Jupyter support, OTLP tracing pre-configured
-- **Resources**: 4-16 CPU cores, 8-32GB RAM, 16-1024GB storage
+- **Resources**: 8-16 CPU cores, 16-32GB RAM, 64-1024GB storage
 - **Phoenix Sidecar**: 500m-1000m CPU, 512Mi-1Gi RAM for tracing
 - **Base Image**: `us-central1-docker.pkg.dev/abridge-artifact-registry/coder/base:latest`
 - **Phoenix Image**: `us-central1-docker.pkg.dev/abridge-artifact-registry/coder/phoenix:latest`
@@ -49,7 +50,7 @@ coder/
 
 - **Purpose**: Lightweight CPU-based development workspaces optimized for performance
 - **Features**: VS Code, Cursor IDE, Git integration, Python & Jupyter support, no sidecars for maximum performance
-- **Resources**: 4-16 CPU cores, 8-32GB RAM, 16-1024GB storage
+- **Resources**: 8-16 CPU cores, 16-32GB RAM, 64-1024GB storage
 - **Base Image**: `us-central1-docker.pkg.dev/abridge-artifact-registry/coder/base:latest`
 - **Use Cases**: CPU-intensive development, code review and analysis, testing environments, resource-conscious projects
 
@@ -57,7 +58,7 @@ coder/
 
 - **Purpose**: GPU-accelerated workspaces for ML/AI development
 - **Features**: NVIDIA GPU support, VS Code, Cursor IDE, simplified repository management
-- **Resources**: 4-16 CPU cores, 16-1024GB RAM, 16-1024GB storage, configurable GPUs
+- **Resources**: 8-16 CPU cores, 16-32GB RAM, 64-1024GB storage, configurable GPUs
 - **GPU Support**: NVIDIA L4, H100 (80GB) with multi-GPU configuration
 - **Base Image**: `us-central1-docker.pkg.dev/abridge-artifact-registry/coder/gpu:latest`
 
@@ -66,11 +67,20 @@ coder/
 - **Purpose**: PHI-compliant GPU-accelerated workspaces for secure healthcare ML/AI development
 - **Features**: NVIDIA GPU support, browser-only VS Code, complete network isolation, PHI compliance mode
 - **Security**: Zero egress network traffic, disabled SSH/port forwarding/desktop apps, air-gapped environment
-- **Resources**: 4-16 CPU cores, 16-1024GB RAM, 16-1024GB storage, configurable GPUs
+- **Resources**: 8-16 CPU cores, 16-32GB RAM, 64-1024GB storage, configurable GPUs
 - **GPU Support**: NVIDIA L4, H100 (80GB) with multi-GPU configuration
 - **Base Image**: `us-central1-docker.pkg.dev/abridge-artifact-registry/coder/phi-gpu:latest`
 - **Network Policy**: Dedicated `networkPolicyPhi` with complete egress blocking for HIPAA/PHI compliance
 - **Use Cases**: Healthcare data analysis, PHI-compliant ML training, secure AI research, protected health information processing
+
+### SkyPilot K8s Template
+
+- **Purpose**: CPU-based development workspaces with integrated SkyPilot for multi-cloud orchestration
+- **Features**: VS Code, Cursor IDE, Git integration, Python & Jupyter support, SkyPilot pre-installed for multi-cloud deployments
+- **Resources**: 8-16 CPU cores, 16-32GB RAM, 64-1024GB storage
+- **SkyPilot**: Pre-installed `skypilot-nightly[kubernetes,gcp]==1.0.0.dev20250624` for cloud resource management
+- **Base Image**: `us-central1-docker.pkg.dev/abridge-artifact-registry/coder/base:latest`
+- **Use Cases**: Multi-cloud ML workload orchestration, SkyPilot development and testing, cloud-native application development, distributed computing experiments
 
 ### GCP VM Modular Template
 
@@ -114,6 +124,7 @@ Use the provided script to create machine user tokens:
 - Kubernetes cluster with proper storage configuration
 - For GPU template: GPU nodes with NVIDIA device plugin installed
 - For PHI template: Kubernetes cluster with network policy support and `networkPolicyPhi` configuration enabled
+- For SkyPilot template: Kubernetes cluster with internet access for SkyPilot installation and API communication
 - For GCP VM template: Google Cloud Platform project with Compute Engine API enabled, VPC network configured, and sufficient GPU quotas
 - GitHub external authentication configured for Git integration
 
@@ -140,6 +151,13 @@ Use the provided script to create machine user tokens:
 - Confirm PHI workspaces have `coder-phi-workspace` label
 - Ensure complete network isolation is working (no egress traffic allowed)
 - Verify browser-only access restrictions (SSH/desktop apps disabled)
+
+**SkyPilot Template Issues**
+- Verify internet connectivity from workspace for SkyPilot installation
+- Check SkyPilot configuration: `sky check` within the workspace
+- Ensure proper API endpoint configuration for your environment
+- Verify GCP and Kubernetes backend setup if using those clouds
+- Check SkyPilot logs for authentication or connectivity issues
 
 **GCP VM Template Issues**
 - Verify GCP credentials and project permissions
@@ -201,4 +219,5 @@ For configuration details, see the [Workspace Process Logging documentation](htt
 | CPU K8s | Yes |
 | GPU K8s | Yes |
 | PHI GPU K8s | No |
+| SkyPilot K8s | Yes |
 | GCP VM Modular | No |

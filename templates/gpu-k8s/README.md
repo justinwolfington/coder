@@ -25,9 +25,9 @@ GPU-accelerated Kubernetes workspace for ML/AI development with NVIDIA GPU suppo
 | Parameter | Range | Default | Description |
 |-----------|-------|---------|-------------|
 | Repository URL | - | completion-service | GitHub repository to clone |
-| CPU Cores | 4-16 | 4 | CPU cores allocated |
-| Memory | 16-1024 GB | 16 GB | Memory allocated |
-| Home Disk | 16-1024 GB | 16 GB | Persistent storage size |
+| CPU Cores | 8-16 | 8 | CPU cores allocated |
+| Memory | 16-32 GB | 16 GB | Memory allocated |
+| Home Disk | 64-1024 GB | 64 GB | Persistent storage size |
 | GPU Type | - | None | None, NVIDIA L4, NVIDIA H100 (80GB) |
 | GPU Count | 1-8 | 1 | Number of GPUs |
 

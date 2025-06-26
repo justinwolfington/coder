@@ -9,7 +9,7 @@ When referencing modules from this repository in your Terraform configurations, 
 ```hcl
 module "module_name" {
   source = "git::https://github.com/abridgeai/coder.git//modules/module_path?ref=COMMIT_HASH"
-  
+
   # Module variables
   variable1 = "value1"
   variable2 = "value2"
@@ -20,7 +20,7 @@ module "module_name" {
 
 ```hcl
 module "logger" {
-  source = "git::https://github.com/abridgeai/coder.git//modules/logger?ref=82257456"
+  source = "git::https://github.com/abridgeai/coder.git//modules/logger?ref=be83dd2"
 }
 ```
 

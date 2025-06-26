@@ -27,9 +27,9 @@ PHI-compliant GPU-accelerated Kubernetes workspace for secure ML/AI development 
 | Parameter | Range | Default | Description |
 |-----------|-------|---------|-------------|
 | Repository URL | - | phi-service | GitHub repository to clone |
-| CPU Cores | 4-16 | 4 | CPU cores allocated |
+| CPU Cores | 8-16 | 8 | CPU cores allocated |
 | Memory | 16-1024 GB | 16 GB | Memory allocated |
-| Home Disk | 16-1024 GB | 16 GB | Persistent storage size |
+| Home Disk | 64-1024 GB | 64 GB | Persistent storage size |
 | GPU Type | - | None | None, NVIDIA L4, NVIDIA H100 (80GB) |
 | GPU Count | 1-8 | 1 | Number of GPUs |
 

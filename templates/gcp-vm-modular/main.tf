@@ -1,7 +1,7 @@
 terraform {
   required_providers {
     coder = {
-      source = "coder/coder"
+      source  = "coder/coder"
       version = "2.7.0"
     }
     google = {
@@ -29,22 +29,22 @@ data "coder_workspace_owner" "me" {}
 # SHARED MODULES
 ############################
 module "gpu_resources" {
-  source = "git::https://github.com/abridgeai/coder.git//modules/resources/gpu?ref=b73a5dca"
+  source = "git::https://github.com/abridgeai/coder.git//modules/resources/gpu?ref=be83dd2"
 }
 
 module "git_utilities" {
-  source = "git::https://github.com/abridgeai/coder.git//modules/utilities/git?ref=b73a5dca"
-  start_count = data.coder_workspace.me.start_count
-  agent_id = coder_agent.main.id
-  repo_url = ""
+  source       = "git::https://github.com/abridgeai/coder.git//modules/utilities/git?ref=be83dd2"
+  start_count  = data.coder_workspace.me.start_count
+  agent_id     = coder_agent.main.id
+  repo_url     = ""
   should_clone = false
 }
 
 module "ide_modules" {
-  source = "git::https://github.com/abridgeai/coder.git//modules/utilities/ide?ref=b73a5dca"
+  source      = "git::https://github.com/abridgeai/coder.git//modules/utilities/ide?ref=be83dd2"
   start_count = data.coder_workspace.me.start_count
-  agent_id = coder_agent.main.id
-  user_name = data.coder_workspace_owner.me.name
+  agent_id    = coder_agent.main.id
+  user_name   = data.coder_workspace_owner.me.name
 }
 
 ############################
@@ -208,15 +208,15 @@ locals {
   }] : []
 
   # Run the following command to get a list of supported images
-  # gcloud compute images list \                                                                                                                  
+  # gcloud compute images list \
   #   --project deeplearning-platform-release \
   #   --format="value(NAME)"
 
   dl_images = {
-    "pytorch-latest-gpu" = "projects/deeplearning-platform-release/global/images/family/pytorch-latest-gpu"
-    "tf-ent-latest-gpu-ubuntu-2204-conda"  = "projects/deeplearning-platform-release/global/images/family/tf-ent-latest-gpu-ubuntu-2204-conda"
-    "common-cu124"       = "projects/deeplearning-platform-release/global/images/family/common-cu124"
-    "ubuntu-2204"        = "projects/ubuntu-os-cloud/global/images/family/ubuntu-2204-lts"
+    "pytorch-latest-gpu"                  = "projects/deeplearning-platform-release/global/images/family/pytorch-latest-gpu"
+    "tf-ent-latest-gpu-ubuntu-2204-conda" = "projects/deeplearning-platform-release/global/images/family/tf-ent-latest-gpu-ubuntu-2204-conda"
+    "common-cu124"                        = "projects/deeplearning-platform-release/global/images/family/common-cu124"
+    "ubuntu-2204"                         = "projects/ubuntu-os-cloud/global/images/family/ubuntu-2204-lts"
   }
   image = local.dl_images[data.coder_parameter.dl_image.value]
 
@@ -427,7 +427,7 @@ resource "coder_agent_instance" "main" {
 resource "coder_metadata" "workspace_info" {
   count       = data.coder_workspace.me.start_count
   resource_id = google_compute_instance.workspace[0].id
-  daily_cost = lookup(module.gpu_resources.gpu_cost_per_unit, local.gpu_config.gpu_type, 0) * local.gpu_config.gpu_count
+  daily_cost  = lookup(module.gpu_resources.gpu_cost_per_unit, local.gpu_config.gpu_type, 0) * local.gpu_config.gpu_count
 
   item {
     key   = "Machine Type"

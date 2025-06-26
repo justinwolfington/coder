@@ -55,7 +55,7 @@ jobs:
 
       - name: Set up Terraform
         uses: hashicorp/setup-terraform@v3
-      
+
       - name: Configure Git for private repos
         run: |
           git config --global url."https://${{ secrets.ABRIDGE_GH_BOT}}@github.com/".insteadOf "https://github.com/"
@@ -76,7 +76,7 @@ jobs:
       - name: Initialize Terraform
         working-directory: ./templates
         run: terraform init
-        
+
       - name: Create tfvars file
         working-directory: ./templates
         run: |
@@ -87,7 +87,7 @@ jobs:
           template_name = "${{ github.event.inputs.template_name || '' }}"
           commit_sha = "${{ steps.vars.outputs.sha_short }}"
           EOF
-        
+
       - name: Import existing templates
         working-directory: ./templates
         run: |
@@ -98,8 +98,9 @@ jobs:
           terraform import 'coderd_template.templates["cpu-k8s"]' coder/cpu-k8s || true
           terraform import 'coderd_template.templates["gpu-k8s"]' coder/gpu-k8s || true
           terraform import 'coderd_template.templates["phi-gpu-k8s"]' coder/phi-gpu-k8s || true
-          
-        
+          terraform import 'coderd_template.templates["skypilot-k8s"]' coder/skypilot-k8s || true
+
+
       - name: Validate Terraform configuration
         working-directory: ./templates
         run: terraform validate
@@ -116,10 +117,10 @@ jobs:
         working-directory: ./templates
         if: always()
         run: terraform output -json deployed_templates
-      
+
       - name: Clean up sensitive files
         working-directory: ./templates
         if: always()
         run: |
           rm -f terraform.auto.tfvars
-          rm -f terraform.tfstate* 
+          rm -f terraform.tfstate*

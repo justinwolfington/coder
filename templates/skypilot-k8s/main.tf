@@ -159,6 +159,22 @@ resource "coder_app" "code-server" {
 
 # --- Kubernetes Resources ---
 
+# Reference to existing shared PVCs created by skypilot-api-server
+data "kubernetes_persistent_volume_claim" "data_pvc" {
+  metadata {
+    name      = "data-pvc"
+    namespace = var.namespace
+  }
+}
+
+data "kubernetes_persistent_volume_claim" "shared_home_pvc" {
+  metadata {
+    name      = "home-pvc"
+    namespace = var.namespace
+  }
+}
+
+# Workspace-specific home PVC (keep existing behavior)
 resource "kubernetes_persistent_volume_claim" "home" {
   metadata {
     name        = "coder-${data.coder_workspace.me.id}-home"
@@ -179,7 +195,7 @@ resource "kubernetes_persistent_volume_claim" "home" {
 
 resource "kubernetes_deployment" "main" {
   count            = data.coder_workspace.me.start_count
-  depends_on       = [kubernetes_persistent_volume_claim.home]
+  depends_on       = [kubernetes_persistent_volume_claim.home, data.kubernetes_persistent_volume_claim.data_pvc, data.kubernetes_persistent_volume_claim.shared_home_pvc]
   wait_for_rollout = false
 
   metadata {
@@ -269,12 +285,38 @@ resource "kubernetes_deployment" "main" {
             name       = "home"
             read_only  = false
           }
+
+          volume_mount {
+            mount_path = "/data"
+            name       = "data"
+            read_only  = false
+          }
+
+          volume_mount {
+            mount_path = "/shared/home"
+            name       = "shared-home"
+            read_only  = false
+          }
         }
 
         volume {
           name = "home"
           persistent_volume_claim {
             claim_name = kubernetes_persistent_volume_claim.home.metadata[0].name
+          }
+        }
+
+        volume {
+          name = "data"
+          persistent_volume_claim {
+            claim_name = "data-pvc"
+          }
+        }
+
+        volume {
+          name = "shared-home"
+          persistent_volume_claim {
+            claim_name = "home-pvc"
           }
         }
 
@@ -334,5 +376,13 @@ resource "coder_metadata" "home_pvc_info" {
   item {
     key   = "Namespace"
     value = var.namespace
+  }
+  item {
+    key   = "Shared Home PVC"
+    value = "home-pvc (mounted at /shared/home)"
+  }
+  item {
+    key   = "Shared Data PVC"
+    value = "data-pvc (mounted at /data)"
   }
 }

@@ -1,7 +1,7 @@
 terraform {
   required_providers {
     coder = {
-      source = "coder/coder"
+      source  = "coder/coder"
       version = "2.7.0"
     }
     kubernetes = {
@@ -23,26 +23,26 @@ provider "kubernetes" {
 # SHARED MODULES
 ############################
 module "cpu_resources" {
-  source = "git::https://github.com/abridgeai/coder.git//modules/resources/cpu?ref=b73a5dca"
+  source = "git::https://github.com/abridgeai/coder.git//modules/resources/cpu?ref=be83dd2"
 }
 
 module "git_utilities" {
-  source = "git::https://github.com/abridgeai/coder.git//modules/utilities/git?ref=b73a5dca"
-  start_count = data.coder_workspace.me.start_count
-  agent_id = coder_agent.main.id
-  repo_url = data.coder_parameter.repository_url.value
+  source       = "git::https://github.com/abridgeai/coder.git//modules/utilities/git?ref=be83dd2"
+  start_count  = data.coder_workspace.me.start_count
+  agent_id     = coder_agent.main.id
+  repo_url     = data.coder_parameter.repository_url.value
   should_clone = data.coder_parameter.repository_url.value != ""
 }
 
 module "ide_utilities" {
-  source = "git::https://github.com/abridgeai/coder.git//modules/utilities/ide?ref=b73a5dca"
+  source      = "git::https://github.com/abridgeai/coder.git//modules/utilities/ide?ref=be83dd2"
   start_count = data.coder_workspace.me.start_count
-  agent_id = coder_agent.main.id
-  user_name = data.coder_workspace_owner.me.name
+  agent_id    = coder_agent.main.id
+  user_name   = data.coder_workspace_owner.me.name
 }
 
 module "logger" {
-  source = "git::https://github.com/abridgeai/coder.git//modules/logger?ref=b73a5dca"
+  source = "git::https://github.com/abridgeai/coder.git//modules/logger?ref=be83dd2"
 }
 
 ############################
@@ -106,7 +106,7 @@ locals {
   }
 
   # Startup script for the workspace
-  init_script = templatefile("${path.module}/startup.tftpl", {})
+  init_script   = templatefile("${path.module}/startup.tftpl", {})
   logger_script = module.logger.logger_script
 
   # Metrics for workspace monitoring
@@ -267,7 +267,7 @@ resource "kubernetes_deployment" "main" {
             name  = "CODER_AGENT_TOKEN"
             value = coder_agent.main.token
           }
-          
+
           env {
             name  = "CODER_AGENT_SUBSYSTEM"
             value = "exectrace"

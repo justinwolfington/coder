@@ -1,7 +1,7 @@
 terraform {
   required_providers {
     coder = {
-      source = "coder/coder"
+      source  = "coder/coder"
       version = "2.7.0"
     }
     kubernetes = {
@@ -29,18 +29,18 @@ data "coder_workspace_owner" "me" {}
 # SHARED MODULES
 ############################
 module "cpu_resources" {
-  source = "git::https://github.com/abridgeai/coder.git//modules/resources/cpu?ref=b73a5dca"
+  source = "git::https://github.com/abridgeai/coder.git//modules/resources/cpu?ref=be83dd2"
 }
 
 module "gpu_resources" {
-  source = "git::https://github.com/abridgeai/coder.git//modules/resources/gpu?ref=b73a5dca"
+  source = "git::https://github.com/abridgeai/coder.git//modules/resources/gpu?ref=be83dd2"
 }
 
 module "git_utilities" {
-  source = "git::https://github.com/abridgeai/coder.git//modules/utilities/git?ref=b73a5dca"
-  start_count = data.coder_workspace.me.start_count
-  agent_id = coder_agent.main.id
-  repo_url = data.coder_parameter.repository_url.value
+  source       = "git::https://github.com/abridgeai/coder.git//modules/utilities/git?ref=be83dd2"
+  start_count  = data.coder_workspace.me.start_count
+  agent_id     = coder_agent.main.id
+  repo_url     = data.coder_parameter.repository_url.value
   should_clone = data.coder_parameter.repository_url.value != ""
 }
 

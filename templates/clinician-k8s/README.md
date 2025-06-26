@@ -25,9 +25,9 @@ CPU-based Kubernetes development workspace with integrated Arize Phoenix tracing
 | Parameter | Range | Default | Description |
 |-----------|-------|---------|-------------|
 | Repository URL | - | completion-service | GitHub repository to clone |
-| CPU Cores | 4-16 | 4 | CPU cores allocated |
-| Memory | 8-32 GB | 8 GB | Memory allocated |
-| Home Disk | 16-1024 GB | 16 GB | Persistent storage size |
+| CPU Cores | 8-16 | 8 | CPU cores allocated |
+| Memory | 16-32 GB | 16 GB | Memory allocated |
+| Home Disk | 64-1024 GB | 64 GB | Persistent storage size |
 
 ## Applications
 
@@ -43,7 +43,7 @@ CPU-based Kubernetes development workspace with integrated Arize Phoenix tracing
 
 **Main Container:**
 - Development environment with code-server
-- User-defined resources (4-16 CPU, 8-32GB RAM)
+- User-defined resources (8-16 CPU, 16-32GB RAM)
 
 **Phoenix Sidecar:**
 - Tracing and monitoring (500m CPU, 512Mi RAM)

@@ -4,15 +4,15 @@ locals {
   # - failure_ttl_ms: How long to keep failed workspaces before cleanup
   # - time_til_dormant_ms: Time before marking workspace as dormant
   # - default_ttl_ms: Default time-to-live for workspaces
-  
+
   # Standard timing configuration for all templates
   standard_timings = {
-    activity_bump_ms    = 86400000   # 1 day
-    default_ttl_ms      = 172800000  # 2 days
-    time_til_dormant_ms = 604800000  # 7 days
-    failure_ttl_ms      = 7200000    # 2 hours
+    activity_bump_ms    = 86400000  # 1 day
+    default_ttl_ms      = 172800000 # 2 days
+    time_til_dormant_ms = 604800000 # 7 days
+    failure_ttl_ms      = 7200000   # 2 hours
   }
-  
+
   templates = {
     "k8s-completion-service" = merge({
       display_name = "Kubernetes Completion Service with Phoenix"
@@ -53,6 +53,14 @@ locals {
       directory    = "./phi-gpu-k8s"
       environments = ["development", "production"]
     }, local.standard_timings)
+
+    "skypilot-k8s" = merge({
+      display_name = "SkyPilot K8s"
+      description  = "Kubernetes development workspace with SkyPilot integration."
+      icon         = "/icon/pytorch.svg"
+      directory    = "./skypilot-k8s"
+      environments = ["development", "staging", "production"]
+    }, local.standard_timings)
   }
 
   # Filter templates based on target environment
@@ -74,7 +82,7 @@ locals {
 variable "environment" {
   description = "Target environment (development, staging, production)"
   type        = string
-  
+
   validation {
     condition     = contains(["development", "staging", "production"], var.environment)
     error_message = "Environment must be one of: development, staging, production"
@@ -101,4 +109,4 @@ variable "coder_token" {
   description = "Coder session token"
   type        = string
   sensitive   = true
-} 
+}
