@@ -55,13 +55,13 @@ The workspace provides access to multiple storage volumes for different use case
    - **Purpose**: Private workspace files and configurations
    - **Persistence**: Unique per workspace, isolated from other workspaces
 
-2. **Shared Data Volume** (`/data`)
+2. **Shared Data Volume** (`/mnt/data`)
    - **Type**: Shared PVC (`data-pvc`)
    - **Access Mode**: ReadWriteMany
    - **Purpose**: Common datasets, models, and shared resources
    - **Persistence**: Shared across all workspaces
 
-3. **Shared Home Volume** (`/shared/home`)
+3. **Shared Home Volume** (`/mnt/home`)
    - **Type**: Shared PVC (`home-pvc`)
    - **Access Mode**: ReadWriteMany
    - **Purpose**: Shared home directory resources and common configurations
@@ -77,8 +77,8 @@ The shared PVCs are created and managed by the [skypilot-api-server](https://git
 ### Storage Use Cases
 
 - **Private Development**: Use `/home/vscode` for personal workspace files
-- **Shared Datasets**: Access common data from `/data`
-- **Shared Resources**: Access shared tools and configurations from `/shared/home`
+- **Shared Datasets**: Access common data from `/mnt/data`
+- **Shared Resources**: Access shared tools and configurations from `/mnt/home`
 - **Collaboration**: Share files with other workspaces via shared volumes
 
 ## Parameters
@@ -114,8 +114,8 @@ Available SkyPilot commands:
 
 **Storage:**
 - Workspace-specific persistent home directory (`/home/vscode`)
-- Shared data volume (`/data`) for common datasets and resources
-- Shared home volume (`/shared/home`) for shared configurations
+- Shared data volume (`/mnt/data`) for common datasets and resources
+- Shared home volume (`/mnt/home`) for shared configurations
 - Configurable workspace disk size
 
 ## Use Cases

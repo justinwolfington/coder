@@ -95,7 +95,7 @@ jobs:
         if: steps.module-version.outputs.update_modules == 'true'
         run: |
           echo "Updating all module references to version: ${{ steps.module-version.outputs.module_version }}"
-          find templates/ -name "*.tf" -exec sed -i 's|?ref=[^"]*|?ref=${{ steps.module-version.outputs.module_version }}|g' {} \;
+          find templates/ -name "*.tf" -exec sed -i 's|git::https://github.com/abridgeai/coder.git//modules/\([^?]*\)?ref=[^"]*|git::https://github.com/abridgeai/coder.git//modules/\1?ref=${{ steps.module-version.outputs.module_version }}|g' {} \;
 
       - name: Initialize Terraform
         working-directory: ./templates

@@ -58,7 +58,7 @@ data "coder_parameter" "repository_url" {
   name         = "repository_url"
   display_name = "Repository URL"
   description  = "GitHub repository URL (leave empty for no repository)"
-  default      = "https://github.com/abridgeai/completion-service"
+  default      = "https://github.com/abridgeai/ml-training-utils"
   mutable      = true
   order        = 1
   type         = "string"
@@ -287,13 +287,13 @@ resource "kubernetes_deployment" "main" {
           }
 
           volume_mount {
-            mount_path = "/data"
+            mount_path = "/mnt/data"
             name       = "data"
             read_only  = false
           }
 
           volume_mount {
-            mount_path = "/shared/home"
+            mount_path = "/mnt/home"
             name       = "shared-home"
             read_only  = false
           }
@@ -379,10 +379,10 @@ resource "coder_metadata" "home_pvc_info" {
   }
   item {
     key   = "Shared Home PVC"
-    value = "home-pvc (mounted at /shared/home)"
+    value = "home-pvc (mounted at /mnt/home)"
   }
   item {
     key   = "Shared Data PVC"
-    value = "data-pvc (mounted at /data)"
+    value = "data-pvc (mounted at /mnt/data)"
   }
 }

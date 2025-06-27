@@ -13,8 +13,8 @@ fi
 
 echo "Updating all module references to: $VERSION"
 
-# Update all .tf files that have module references
-find . -name "*.tf" -exec sed -i '' "s|?ref=[^\"]*|?ref=$VERSION|g" {} \;
+# Update all .tf files that have abridgeai/coder.git module references
+find . -name "*.tf" -exec sed -i '' "s|git::https://github.com/abridgeai/coder.git//modules/\([^?]*\)?ref=[^\"]*|git::https://github.com/abridgeai/coder.git//modules/\1?ref=$VERSION|g" {} \;
 
 echo "Done. Updated all module references to $VERSION"
 echo ""
