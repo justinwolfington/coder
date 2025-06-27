@@ -34,6 +34,10 @@ on:
           - development
           - staging
           - production
+      module_version:
+        description: 'Module version to use (optional, uses environment default if empty)'
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -72,6 +76,26 @@ jobs:
           SHA="${{ github.event_name == 'workflow_dispatch' && github.sha || github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.event.workflow_run.head_sha }}"
           [[ -z "$SHA" ]] && SHA=$(git rev-parse HEAD)
           echo "sha_short=${SHA:0:7}" >> $GITHUB_OUTPUT
+
+      - name: Check if module version provided
+        id: module-version
+        run: |
+          PROVIDED_VERSION="${{ github.event.inputs.module_version }}"
+
+          if [ -n "$PROVIDED_VERSION" ]; then
+            echo "update_modules=true" >> $GITHUB_OUTPUT
+            echo "module_version=$PROVIDED_VERSION" >> $GITHUB_OUTPUT
+            echo "Will update module references to: $PROVIDED_VERSION"
+          else
+            echo "update_modules=false" >> $GITHUB_OUTPUT
+            echo "No module version provided - templates will use existing references"
+          fi
+
+      - name: Update module references in templates
+        if: steps.module-version.outputs.update_modules == 'true'
+        run: |
+          echo "Updating all module references to version: ${{ steps.module-version.outputs.module_version }}"
+          find templates/ -name "*.tf" -exec sed -i 's|?ref=[^"]*|?ref=${{ steps.module-version.outputs.module_version }}|g' {} \;
 
       - name: Initialize Terraform
         working-directory: ./templates

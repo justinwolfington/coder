@@ -15,7 +15,8 @@ coder/
 ├── docker-compose.yaml           # Local development setup
 ├── charts/                       # Helm chart for Coder deployment
 ├── scripts/                      # Utility scripts for setup and management
-│   └── create_coder_tokens.sh    # Script to create machine user tokens
+│   ├── create_coder_tokens.sh    # Script to create machine user tokens
+│   └── update-to-version.sh      # Script to update module references to version tags
 ├── modules/                      # Shared modules for Coder templates
 │   ├── resources/                # Resource parameter modules
 │   │   ├── cpu/                  # CPU resource parameters and costs
@@ -118,6 +119,23 @@ Use the provided script to create machine user tokens:
 ``` bash
 ./scripts/create_coder_tokens.sh https://coder.abridge.coffee
 ```
+
+## Module Version Management
+
+Templates use Git tags instead of commit hashes to prevent orphaned references:
+
+```bash
+# Update all templates to a version
+./scripts/update-to-version.sh v1.1.0
+
+# Or use GitHub Actions: "Publish Coder Templates" → enter module_version
+```
+
+**Workflow:**
+
+1. Create tag: Actions → "Create Version Tag"
+2. Deploy: Actions → "Publish Coder Templates" (optionally specify `module_version`)
+3. Different environments can use different versions
 
 ## Prerequisites
 

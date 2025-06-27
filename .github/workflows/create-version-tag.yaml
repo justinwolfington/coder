@@ -1,0 +1,52 @@
+name: Create Version Tag
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag to create (e.g., v1.0.0)'
+        required: true
+        type: string
+
+jobs:
+  create-tag:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Create and push tag
+        id: create-tag
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+
+          VERSION="${{ github.event.inputs.version }}"
+
+          # Check if tag already exists on remote
+          if git ls-remote --tags origin | grep -q "refs/tags/${VERSION}$"; then
+            echo "Tag $VERSION already exists. Skipping creation."
+            echo "tag_created=false" >> $GITHUB_OUTPUT
+          else
+            # Create and push the tag
+            git tag $VERSION
+            git push origin $VERSION
+            echo "Created and pushed tag: $VERSION"
+            echo "tag_created=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create GitHub Release
+        if: steps.create-tag.outputs.tag_created == 'true'
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.event.inputs.version }}
+          release_name: ${{ github.event.inputs.version }}
+          body: |
+            ## Module Version ${{ github.event.inputs.version }}
+
+            This tag provides a stable reference for Terraform modules.
+            Use this tag in your module references: `?ref=${{ github.event.inputs.version }}`
+          draft: false
+          prerelease: false

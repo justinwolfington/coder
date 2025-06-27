@@ -1,0 +1,24 @@
+#!/bin/bash
+
+# Simple script to update module references to a version tag
+# Usage: ./scripts/update-to-version.sh v1.0.0
+
+VERSION="$1"
+
+if [ -z "$VERSION" ]; then
+    echo "Usage: $0 <version>"
+    echo "Example: $0 v1.0.0"
+    exit 1
+fi
+
+echo "Updating all module references to: $VERSION"
+
+# Update all .tf files that have module references
+find . -name "*.tf" -exec sed -i '' "s|?ref=[^\"]*|?ref=$VERSION|g" {} \;
+
+echo "✅ Done! All module references updated to $VERSION"
+echo ""
+echo "Next steps:"
+echo "1. Review changes: git diff"
+echo "2. Commit: git add . && git commit -m 'Update module references to $VERSION'"
+echo "3. Create tag: git tag $VERSION && git push origin $VERSION"
