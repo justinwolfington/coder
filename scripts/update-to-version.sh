@@ -16,9 +16,9 @@ echo "Updating all module references to: $VERSION"
 # Update all .tf files that have module references
 find . -name "*.tf" -exec sed -i '' "s|?ref=[^\"]*|?ref=$VERSION|g" {} \;
 
-echo "✅ Done! All module references updated to $VERSION"
+echo "Done. Updated all module references to $VERSION"
 echo ""
-echo "Next steps:"
-echo "1. Review changes: git diff"
-echo "2. Commit: git add . && git commit -m 'Update module references to $VERSION'"
-echo "3. Create tag: git tag $VERSION && git push origin $VERSION"
+echo "Don't forget to:"
+echo "- Check what changed: git diff"
+echo "- Commit: git add . && git commit -m 'Update module references to $VERSION'"
+echo "- Tag it: git tag $VERSION && git push origin $VERSION"
