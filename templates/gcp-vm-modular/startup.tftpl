@@ -6,6 +6,9 @@ echo "Initializing environment for ${username}..."
 # Harden OS: Update and upgrade
 export DEBIAN_FRONTEND=noninteractive
 
+echo "Checking dpkg state..."
+dpkg --configure -a || true
+
 # Update and install packages (with built-in retry via apt)
 echo "Updating and installing packages..."
 apt-get update -y
