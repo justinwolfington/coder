@@ -7,10 +7,11 @@ locals {
 
   # Standard timing configuration for all templates
   standard_timings = {
-    activity_bump_ms    = 86400000  # 1 day
-    default_ttl_ms      = 172800000 # 2 days
-    time_til_dormant_ms = 604800000 # 7 days
-    failure_ttl_ms      = 7200000   # 2 hours
+    # Disabled standard_timings to prevent automatic workspace deletion for now.
+    #   activity_bump_ms    = 86400000  # 1 day
+    #   default_ttl_ms      = 172800000 # 2 days
+    #   time_til_dormant_ms = 604800000 # 7 days
+    #   failure_ttl_ms      = 7200000   # 2 hours
   }
 
   templates = {

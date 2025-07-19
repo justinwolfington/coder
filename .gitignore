@@ -3,6 +3,8 @@
 **/.terraform/
 **/.terraform.lock.hcl
 **/.coder/
+charts/charts/
+
 
 # Test files
 templates/*.tfvars

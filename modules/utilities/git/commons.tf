@@ -1,7 +1,7 @@
 module "git-clone" {
   count    = var.start_count > 0 && var.should_clone ? 1 : 0
   source   = "registry.coder.com/coder/git-clone/coder"
-  version  = "1.0.18"
+  version  = "1.1.0"
   agent_id = var.agent_id
   url      = var.repo_url
 }
