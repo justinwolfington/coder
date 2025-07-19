@@ -1,11 +1,11 @@
 output "instance_name" {
   description = "Name of the created GCP compute instance"
-  value       = data.coder_workspace.me.start_count > 0 ? google_compute_instance.workspace.name : ""
+  value       = data.coder_workspace.me.start_count > 0 ? google_compute_instance.workspace[0].name : ""
 }
 
 output "internal_ip" {
   description = "Internal IP address of the compute instance"
-  value       = data.coder_workspace.me.start_count > 0 ? google_compute_instance.workspace.network_interface[0].network_ip : ""
+  value       = data.coder_workspace.me.start_count > 0 ? google_compute_instance.workspace[0].network_interface[0].network_ip : ""
 }
 
 output "machine_type" {

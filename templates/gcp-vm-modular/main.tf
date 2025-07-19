@@ -309,13 +309,25 @@ module "code-server" {
 ############################
 # INFRASTRUCTURE RESOURCES
 ############################
+
+resource "google_compute_disk" "vm_boot_disk" {
+  name         = "coder-${lower(data.coder_workspace_owner.me.name)}-${lower(data.coder_workspace.me.name)}-boot-disk"
+  type         = local.gpu_config.disk_type
+  zone         = var.zone
+  size         = data.coder_parameter.disk_size.value
+  image        = local.image
+  labels = {
+    "coder-workspace"   = data.coder_workspace.me.id
+    "coder_replaceable" = "yes"
+    "workspace-type"    = local.gpu_config.gpu_count > 0 ? "gpu" : "cpu"
+  }
+}
+
 resource "google_compute_instance" "workspace" {
+  count        = data.coder_workspace.me.start_count
   name         = "coder-${lower(data.coder_workspace_owner.me.name)}-${lower(data.coder_workspace.me.name)}"
   machine_type = local.gpu_config.machine_type
   zone         = var.zone
-
-  # this does not delete the instance when coder workspace is stopped
-  desired_status = data.coder_workspace.me.start_count == 1 ? "RUNNING" : "TERMINATED"
 
   network_interface {
     network    = "projects/${local.env_config.project_id}/global/networks/${local.env_config.network}"
@@ -324,11 +336,8 @@ resource "google_compute_instance" "workspace" {
   }
 
   boot_disk {
-    initialize_params {
-      image = local.image
-      size  = data.coder_parameter.disk_size.value
-      type  = local.gpu_config.disk_type
-    }
+    source = google_compute_disk.vm_boot_disk.self_link
+    auto_delete = false
   }
 
   dynamic "scratch_disk" {
@@ -420,7 +429,7 @@ resource "google_compute_instance" "workspace" {
 resource "coder_agent_instance" "main" {
   count       = data.coder_workspace.me.start_count
   agent_id    = coder_agent.main.id
-  instance_id = google_compute_instance.workspace.instance_id
+  instance_id = google_compute_instance.workspace[0].instance_id
 }
 
 ############################
@@ -428,7 +437,7 @@ resource "coder_agent_instance" "main" {
 ############################
 resource "coder_metadata" "workspace_info" {
   count       = data.coder_workspace.me.start_count
-  resource_id = google_compute_instance.workspace.id
+  resource_id = google_compute_instance.workspace[0].id
   daily_cost  = lookup(module.gpu_resources.gpu_cost_per_unit, local.gpu_config.gpu_type, 0) * local.gpu_config.gpu_count
 
   item {
@@ -473,6 +482,6 @@ resource "coder_metadata" "workspace_info" {
 
   item {
     key   = "Internal IP"
-    value = google_compute_instance.workspace.network_interface[0].network_ip
+    value = google_compute_instance.workspace[0].network_interface[0].network_ip
   }
 }
