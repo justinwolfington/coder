@@ -148,13 +148,13 @@ locals {
     }
     "staging" = {
       project_id            = "abridge-client-staging"
-      service_account_email = "146004356782-compute@abridge-client-staging.iam.gserviceaccount.com"
+      service_account_email = "959950361719-compute@developer.gserviceaccount.com"
       network               = "staging-vpc"
       subnetwork            = "staging-ml"
     }
     "production" = {
       project_id            = "abridge-client-prod"
-      service_account_email = "146004356782-compute@abridge-client-prod.iam.gserviceaccount.com"
+      service_account_email = "146004356782-compute@developer.gserviceaccount.com"
       network               = "production-vpc"
       subnetwork            = "production-ml"
     }
