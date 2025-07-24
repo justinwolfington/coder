@@ -81,9 +81,9 @@ coder:
 
     # mount the git secrets to enable coder to pull modules from coder repo
     # the following secrets have read only access to the coder repo
-    volumes: 
+    volumes:
       - name: git-secrets
-        secret: 
+        secret:
           secretName: coder-github-app
           items:
             - key: .gitconfig
