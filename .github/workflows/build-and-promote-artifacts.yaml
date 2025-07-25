@@ -43,6 +43,7 @@ jobs:
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
+
       - name: Checkout code
         uses: actions/checkout@v4
         with:
@@ -55,6 +56,8 @@ jobs:
         uses: tj-actions/changed-files@v46
         with:
           files: docker/**
+          # When manually triggered, compare against main branch
+          base_sha: ${{ github.event_name == 'workflow_dispatch' && 'main' || '' }}
 
       - name: Set matrix for changed images
         id: set-matrix

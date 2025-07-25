@@ -104,7 +104,7 @@ locals {
   home_dir = "/root"
 
   # Image and environment configuration
-  base_image_repo = "us-central1-docker.pkg.dev/abridge-artifact-registry/coder/gpu"
+  base_image_repo = "us-central1-docker.pkg.dev/abridge-artifact-registry/coder/phi"
   base_image_tag  = "latest"
   base_image      = "${local.base_image_repo}:${local.base_image_tag}"
 
@@ -273,10 +273,10 @@ resource "kubernetes_deployment" "main" {
           command           = ["sh", "-c", coder_agent.main.init_script]
 
           security_context {
-            # Run as root
+            # Enable read-only filesystem to prevent tool installation
             run_as_user                = 0
             allow_privilege_escalation = true
-            read_only_root_filesystem  = false
+            read_only_root_filesystem  = true
           }
 
           env {
@@ -317,6 +317,12 @@ resource "kubernetes_deployment" "main" {
             name       = "home"
             read_only  = false
           }
+
+          # mount tmp volume explicitly so that /tmp is writable
+          volume_mount {
+            mount_path = "/tmp"
+            name       = "tmp-volume"
+          }
         }
 
         volume {
@@ -324,6 +330,11 @@ resource "kubernetes_deployment" "main" {
           persistent_volume_claim {
             claim_name = kubernetes_persistent_volume_claim.home.metadata[0].name
           }
+        }
+        
+        volume {
+          name = "tmp-volume"
+          empty_dir {}
         }
       }
     }
