@@ -1,0 +1,156 @@
+name: Test Coder Templates
+
+on:
+  # Run in merge queue
+  # Before merging a PR, test all templates in dev environment
+  merge_group:
+    types: [checks_requested]
+
+  # Run on push to specific test branch and main
+  push:
+    branches:
+      - main
+    paths:
+      - "templates/**"
+      - "tests/test_templates.sh"
+      - "tests/templates/**"
+      - ".github/workflows/test-coder-templates.yaml"
+
+  # Allow manual trigger
+  workflow_dispatch:
+    inputs:
+      template_name:
+        description: 'Specific template name to test (optional, tests all if empty)'
+        required: false
+        type: string
+      environment:
+        description: 'Environment to test against (development, staging, production)'
+        required: true
+        default: 'development'
+        type: choice
+        options:
+          - development
+          - staging
+          - production
+
+permissions:
+  contents: read
+  actions: read
+  pull-requests: write  # For PR comments
+  issues: write  # For PR comments
+
+jobs:
+  # Determine which templates to test based on changed files
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.matrix.outputs.result }}
+      should_test: ${{ steps.matrix.outputs.should_test }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Get changed files
+        id: changed
+        uses: tj-actions/changed-files@v46
+        with:
+          files: |
+            templates/**
+            modules/**
+            tests/**
+            .github/workflows/test-coder-templates.yaml
+
+      - name: Build matrix
+        id: matrix
+        run: |
+          # Determine which templates to test
+          if [[ -n "${{ inputs.template_name }}" ]]; then
+            templates="${{ inputs.template_name }}"
+          elif [[ "${{ github.ref_name }}" == "main" ]] || \
+               [[ "${{ github.ref_name }}" == "shubh/add-template-tests" ]] || \
+               [[ "${{ github.event_name }}" == "workflow_dispatch" ]] || \
+               [[ "${{ steps.changed.outputs.any_changed }}" == "true" && "${{ contains(steps.changed.outputs.all_changed_files, 'modules/') || contains(steps.changed.outputs.all_changed_files, 'tests/') || contains(steps.changed.outputs.all_changed_files, '.github/') }}" == "true" ]]; then
+            # Test all templates
+            templates=$(ls tests/templates/*.json | xargs -n1 basename -s .json | tr '\n' ' ')
+          else
+            # Test only changed templates
+            templates=""
+            for file in ${{ steps.changed.outputs.all_changed_files }}; do
+              if [[ $file == templates/* ]]; then
+                template=$(echo $file | cut -d'/' -f2)
+                [[ -f "tests/templates/${template}.json" ]] && templates="$templates $template"
+              fi
+            done
+          fi
+
+          # Build JSON matrix
+          matrix="["
+          for template in $templates; do
+            [[ ! -f "tests/templates/${template}.json" ]] && continue
+            for scenario in $(jq -r 'keys[]' "tests/templates/${template}.json"); do
+              [[ "$matrix" != "[" ]] && matrix+=","
+              matrix+="{\"template\":\"$template\",\"scenario\":\"$scenario\"}"
+            done
+          done
+          matrix+="]"
+
+          # Output results
+          if [[ "$matrix" == "[]" ]]; then
+            echo "should_test=false" >> $GITHUB_OUTPUT
+            echo "result=[]" >> $GITHUB_OUTPUT
+          else
+            echo "should_test=true" >> $GITHUB_OUTPUT
+            echo "result=$matrix" >> $GITHUB_OUTPUT
+            echo "Testing: $templates"
+          fi
+
+  test-templates:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.should_test == 'true'
+    runs-on: abridge-runner-${{ inputs.environment || 'development' }}
+    environment: ${{ inputs.environment || 'development' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.detect-changes.outputs.matrix) }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Coder CLI
+        uses: coder/setup-action@v1
+        with:
+          access_url: ${{ vars.CODER_ACCESS_URL }}
+          coder_session_token: ${{ secrets.CODER_SESSION_TOKEN }}
+
+      - name: Run test
+        env:
+          CODER_SESSION_TOKEN: ${{ secrets.CODER_SESSION_TOKEN }}
+          CODER_ACCESS_URL: ${{ vars.CODER_ACCESS_URL }}
+        run: |
+          chmod +x ./tests/test_templates.sh
+          ./tests/test_templates.sh "tests/templates/${{ matrix.template }}.json" "${{ matrix.scenario }}"
+
+  summary:
+    needs: test-templates
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate test summary
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: jobs } = await github.rest.actions.listJobsForWorkflowRun({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: context.runId,
+            });
+
+            const tests = jobs.jobs.filter(job => job.name.startsWith('test-templates'));
+            const passed = tests.filter(job => job.conclusion === 'success').length;
+            const failed = tests.filter(job => job.conclusion === 'failure');
+
+            console.log(`${passed}/${tests.length} tests passed ${failed.length ? '❌' : '✅'}`);
+            await core.summary.addRaw(`## Tests: ${passed}/${tests.length} passed ${failed.length ? '❌' : '✅'}`).write();
+
+            if (failed.length) core.setFailed(`${failed.length} tests failed`);

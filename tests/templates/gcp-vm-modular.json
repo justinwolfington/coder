@@ -1,0 +1,26 @@
+{
+    "vm-cpu": {
+        "template_name": "gcp-vm-modular",
+        "home_dir": "/home",
+        "repository_url": "",
+        "repo_clone_path": "",
+        "test_code_server": true,
+        "extra_parameters": "gpu_type: \"none\"\ndisk_size: 128\njetbrains_ide: PY\ndl_image: \"pytorch-latest-gpu\"\nenvironment: \"development\""
+    },
+    "vm-l4": {
+        "template_name": "gcp-vm-modular",
+        "home_dir": "/home",
+        "repository_url": "",
+        "repo_clone_path": "",
+        "test_code_server": true,
+        "extra_parameters": "gpu_type: \"nvidia-l4-2x\"\ndisk_size: 128\njetbrains_ide: PY\ndl_image: \"pytorch-latest-gpu\"\nenvironment: \"development\""
+    },
+    "vm-h100": {
+        "template_name": "gcp-vm-modular",
+        "home_dir": "/home",
+        "repository_url": "",
+        "repo_clone_path": "",
+        "test_code_server": true,
+        "extra_parameters": "gpu_type: \"nvidia-h100-80gb\"\ndisk_size: 128\njetbrains_ide: PY\ndl_image: \"pytorch-latest-gpu\"\nenvironment: \"development\""
+    }
+}

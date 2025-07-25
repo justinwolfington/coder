@@ -1,0 +1,18 @@
+{
+    "gpu-k8s-l4": {
+        "template_name": "gpu-k8s",
+        "home_dir": "/root",
+        "repository_url": "https://github.com/abridgeai/completion-service",
+        "repo_clone_path": "/root",
+        "test_code_server": true,
+        "extra_parameters": "gpu_accelerator: \"nvidia-l4\"\ngpu_count: 1\ncpu: 8\nmemory: 16\nhome_disk_size: 64\njetbrains_ide: PY"
+    },
+    "gpu-k8s-h100": {
+        "template_name": "gpu-k8s",
+        "home_dir": "/root",
+        "repository_url": "https://github.com/abridgeai/completion-service",
+        "repo_clone_path": "/root",
+        "test_code_server": true,
+        "extra_parameters": "gpu_accelerator: \"nvidia-h100-80gb\"\ngpu_count: 1\ncpu: 8\nmemory: 16\nhome_disk_size: 64\njetbrains_ide: PY"
+    }
+}
