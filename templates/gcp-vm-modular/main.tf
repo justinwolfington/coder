@@ -77,24 +77,20 @@ data "coder_parameter" "dl_image" {
   display_name = "Deep Learning Image"
   description  = "Select deep learning platform image"
   type         = "string"
-  default      = "pytorch-latest-gpu"
+  default      = "pytorch-2-7-cu128-ubuntu-2204-nvidia-570-v20250728"
   mutable      = true
 
   option {
-    name  = "PyTorch Latest GPU"
-    value = "pytorch-latest-gpu"
+    name  = "PyTorch 2.7 + CUDA 12.8 (Ubuntu 22.04)"
+    value = "pytorch-2-7-cu128-ubuntu-2204-nvidia-570-v20250728"
   }
   option {
-    name  = "TensorFlow Latest GPU"
-    value = "tf-ent-latest-gpu-ubuntu-2204-conda"
+    name  = "Multi-Framework + CUDA 12.8 (Ubuntu 22.04)"
+    value = "common-cu128-ubuntu-2204-nvidia-570-v20250728"
   }
   option {
-    name  = "Common Framework GPU (CUDA 12.4)"
-    value = "common-cu124"
-  }
-  option {
-    name  = "Ubuntu 22.04 LTS"
-    value = "ubuntu-2204"
+    name  = "Ubuntu 24.04 Noble (Clean Base)"
+    value = "ubuntu-2404-noble-amd64-v20250725"
   }
 }
 
@@ -196,7 +192,7 @@ locals {
 
   reservation_mappings = {
     "none"             = ""
-    "nvidia-l4-2x"     = "" #"projects/abridge-client-prod/reservations/shared-g2-standard-24-usc1-a-l4-4"
+    "nvidia-l4-2x"     = ""
     "nvidia-h100-80gb" = "projects/abridge-client-prod/reservations/shared-a3-highgpu-8g-usc1-a-h100"
   }
 
@@ -207,16 +203,16 @@ locals {
     count = local.gpu_config.gpu_count
   }] : []
 
-  # Run the following command to get a list of supported images
-  # gcloud compute images list \
-  #   --project deeplearning-platform-release \
-  #   --format="value(NAME)"
+  # Run the following commands to get a list of supported images:
+  # Deep Learning images:
+  # gcloud compute images list --project deeplearning-platform-release --format="value(NAME)" --no-standard-images
+  # Ubuntu images:
+  # gcloud compute images list --project ubuntu-os-cloud --format="value(NAME)" --filter="name~ubuntu-2404"
 
   dl_images = {
-    "pytorch-latest-gpu"                  = "projects/deeplearning-platform-release/global/images/family/pytorch-latest-gpu"
-    "tf-ent-latest-gpu-ubuntu-2204-conda" = "projects/deeplearning-platform-release/global/images/family/tf-ent-latest-gpu-ubuntu-2204-conda"
-    "common-cu124"                        = "projects/deeplearning-platform-release/global/images/family/common-cu124"
-    "ubuntu-2204"                         = "projects/ubuntu-os-cloud/global/images/family/ubuntu-2204-lts"
+    "pytorch-2-7-cu128-ubuntu-2204-nvidia-570-v20250728" = "projects/deeplearning-platform-release/global/images/pytorch-2-7-cu128-ubuntu-2204-nvidia-570-v20250728"
+    "common-cu128-ubuntu-2204-nvidia-570-v20250728"      = "projects/deeplearning-platform-release/global/images/common-cu128-ubuntu-2204-nvidia-570-v20250728"
+    "ubuntu-2404-noble-amd64-v20250725"                  = "projects/ubuntu-os-cloud/global/images/ubuntu-2404-noble-amd64-v20250725"
   }
   image = local.dl_images[data.coder_parameter.dl_image.value]
 
@@ -311,11 +307,11 @@ module "code-server" {
 ############################
 
 resource "google_compute_disk" "vm_boot_disk" {
-  name         = "coder-${lower(data.coder_workspace_owner.me.name)}-${lower(data.coder_workspace.me.name)}-boot-disk"
-  type         = local.gpu_config.disk_type
-  zone         = var.zone
-  size         = data.coder_parameter.disk_size.value
-  image        = local.image
+  name  = "coder-${lower(data.coder_workspace_owner.me.name)}-${lower(data.coder_workspace.me.name)}-boot-disk"
+  type  = local.gpu_config.disk_type
+  zone  = var.zone
+  size  = data.coder_parameter.disk_size.value
+  image = local.image
   labels = {
     "coder-workspace"   = data.coder_workspace.me.id
     "coder_replaceable" = "yes"
@@ -336,7 +332,7 @@ resource "google_compute_instance" "workspace" {
   }
 
   boot_disk {
-    source = google_compute_disk.vm_boot_disk.self_link
+    source      = google_compute_disk.vm_boot_disk.self_link
     auto_delete = false
   }
 
