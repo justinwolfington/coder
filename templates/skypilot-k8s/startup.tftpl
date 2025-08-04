@@ -22,7 +22,7 @@ $CODE_SERVER_DIR/bin/code-server --install-extension ms-toolsai.jupyter
 
 # Install SkyPilot
 echo "Installing SkyPilot..."
-pip install -U "skypilot-nightly[kubernetes,gcp]==1.0.0.dev20250708"
+pip install -U "skypilot[kubernetes,gcp]==0.10.0"
 
 # Start code-server
 $CODE_SERVER_DIR/bin/code-server --auth none --port 13337 >/tmp/code-server.log 2>&1 &
