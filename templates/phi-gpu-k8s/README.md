@@ -59,6 +59,8 @@ PHI-compliant GPU-accelerated Kubernetes workspace for secure ML/AI development 
 - **Network Policies**: Dedicated PHI network isolation
 - **Labels**: `coder-phi-workspace` for proper network segmentation
 - **Annotations**: PHI-enabled workspace identification
+- **File Transfer Blocking**: `CODER_AGENT_BLOCK_FILE_TRANSFER=true` blocks scp, rsync, ftp, and nc commands via SSH
+- **Read-Only Root Filesystem**: Prevents installation of additional tools that could bypass security
 
 ## Prerequisites
 

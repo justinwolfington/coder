@@ -295,6 +295,12 @@ resource "kubernetes_deployment" "main" {
             value = "enabled"
           }
 
+          # Block file transfer tools like scp, rsync, ftp, nc
+          env {
+            name  = "CODER_AGENT_BLOCK_FILE_TRANSFER"
+            value = "true"
+          }
+
           resources {
             requests = merge(
               {
