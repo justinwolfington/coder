@@ -24,7 +24,7 @@ Lightweight CPU-based Kubernetes development workspace optimized for performance
 
 | Parameter | Range | Default | Description |
 |-----------|-------|---------|-------------|
-| Repository URL | - | completion-service | GitHub repository to clone |
+| Repository URL | - | bilrost | GitHub repository to clone |
 | CPU Cores | 8-16 | 8 | CPU cores allocated |
 | Memory | 16-32 GB | 16 GB | Memory allocated |
 | Home Disk | 64-1024 GB | 64 GB | Persistent storage size |

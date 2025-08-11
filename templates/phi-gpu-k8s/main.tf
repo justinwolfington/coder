@@ -52,7 +52,7 @@ data "coder_parameter" "repository_url" {
   name         = "repository_url"
   display_name = "Repository URL"
   description  = "GitHub repository URL (leave empty for no repository)"
-  default      = "https://github.com/abridgeai/completion-service"
+  default      = "https://github.com/abridgeai/bilrost"
   mutable      = true
   order        = 1
   type         = "string"
