@@ -5,7 +5,7 @@ type: application
 version: 0.1.0
 dependencies:
   - name: coder
-    version: 2.23.4 # Specify the version you want to use
+    version: 2.24.3
     repository: https://helm.coder.com/v2
   - name: coder-logstream-kube
     version: v0.0.11

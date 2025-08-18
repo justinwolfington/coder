@@ -1,9 +1,9 @@
 dependencies:
 - name: coder
   repository: https://helm.coder.com/v2
-  version: 2.23.4
+  version: 2.24.3
 - name: coder-logstream-kube
   repository: https://helm.coder.com/logstream-kube
   version: v0.0.11
-digest: sha256:c0242fc2b29fb245cf88be6297d056a900777d58ff071c502033276b8eb36ad6
-generated: "2025-07-24T16:26:56.243776-04:00"
+digest: sha256:10e0559a9c8aa6a0052181fdc865425db198ad45b37b111c75a7b411bae3afd2
+generated: "2025-08-18T09:51:08.274526-07:00"
