@@ -26,23 +26,25 @@ provider "kubernetes" {
 data "coder_workspace" "me" {}
 data "coder_workspace_owner" "me" {}
 
+
 ############################
 # SHARED MODULES
 ############################
 module "cpu_resources" {
-  source = "git::https://github.com/abridgeai/coder.git//modules/resources/cpu?ref=v1.2.0"
+  source = "git::https://github.com/abridgeai/coder.git//modules/resources/cpu?ref=v1.3.2"
 }
 
 module "gpu_resources" {
-  source = "git::https://github.com/abridgeai/coder.git//modules/resources/gpu?ref=v1.2.0"
+  source = "git::https://github.com/abridgeai/coder.git//modules/resources/gpu?ref=v1.3.2"
 }
 
 module "git_utilities" {
-  source       = "git::https://github.com/abridgeai/coder.git//modules/utilities/git?ref=v1.2.0"
+  source       = "git::https://github.com/abridgeai/coder.git//modules/utilities/git?ref=v1.3.2"
   start_count  = data.coder_workspace.me.start_count
   agent_id     = coder_agent.main.id
   repo_url     = data.coder_parameter.repository_url.value
   should_clone = data.coder_parameter.repository_url.value != ""
+  
 }
 
 ############################
@@ -135,7 +137,10 @@ locals {
   }
 
   # Startup script for the workspace
-  init_script = templatefile("${path.module}/startup.tftpl", {})
+  init_script = templatefile("${path.module}/startup.tftpl", {
+    should_clone = local.should_clone
+    repo_url     = local.repo_url
+  })
 
   # Metrics for workspace monitoring
   metrics = {
@@ -293,6 +298,12 @@ resource "kubernetes_deployment" "main" {
           env {
             name  = "PHI_COMPLIANCE_MODE"
             value = "enabled"
+          }
+
+          # Pass GitHub token to container so startup checks and git operations can use it
+          env {
+            name  = "GITHUB_TOKEN"
+            value = module.git_utilities.github_token
           }
 
           # Block file transfer tools like scp, rsync, ftp, nc

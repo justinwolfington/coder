@@ -1,6 +1,13 @@
 #!/bin/bash
 set -e
 
+# If a repo is requested, ensure GitHub auth is present; fail fast with guidance
+if [ "${should_clone}" = "true" ] && [ -z "$${GITHUB_TOKEN}" ]; then
+  echo "GitHub authentication is required to clone ${repo_url} but was not found."
+  echo "Please authenticate with GitHub in Coder (Account → External Authentication), then retry."
+  exit 1
+fi
+
 # PHI Workspace Initialization
 echo "Initializing PHI-compliant workspace..."
 
