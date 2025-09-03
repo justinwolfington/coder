@@ -1,0 +1,64 @@
+{{- if and .Values.phiIstio .Values.phiIstio.enabled }}
+---
+# ServiceEntry for allowed external hosts
+apiVersion: networking.istio.io/v1beta1
+kind: ServiceEntry
+metadata:
+  name: phi-allowed-external
+  namespace: {{ .Release.Namespace }}
+spec:
+  exportTo:
+    - "."
+  hosts:
+  {{- range .Values.phiIstio.allowedHosts }}
+    - {{ . | quote }}
+  {{- end }}
+  ports:
+    - number: 443
+      name: tls
+      protocol: TLS
+  resolution: DNS
+  location: MESH_EXTERNAL
+---
+# Sidecar to restrict egress for PHI workspaces
+apiVersion: networking.istio.io/v1beta1
+kind: Sidecar
+metadata:
+  name: phi-restrict-egress
+  namespace: {{ .Release.Namespace }}
+spec:
+  workloadSelector:
+    labels:
+      app.kubernetes.io/name: coder-phi-workspace
+  outboundTrafficPolicy:
+    mode: REGISTRY_ONLY
+  egress:
+    - port:
+        number: 443
+        protocol: TLS
+        name: tls
+      hosts:
+      {{- range .Values.phiIstio.allowedHosts }}
+        - ./{{ . }}
+      {{- end }}
+    - hosts:
+        - ./*
+        - kube-system/*
+
+{{- range .Values.phiIstio.allowedHosts }}
+---
+# DestinationRule for {{ . }}
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: phi-dr-{{ . | replace "." "-" }}
+  namespace: {{ $.Release.Namespace }}
+spec:
+  host: {{ . | quote }}
+  exportTo:
+    - "."
+  trafficPolicy:
+    tls:
+      mode: DISABLE
+{{- end }}
+{{- end }}

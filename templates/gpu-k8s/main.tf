@@ -258,7 +258,9 @@ resource "kubernetes_deployment" "main" {
     template {
       metadata {
         labels      = local.labels
-        annotations = local.annotations
+        annotations = merge(local.annotations, {
+          "sidecar.istio.io/inject" = "false"
+        })
       }
       spec {
         node_selector = data.coder_parameter.gpu_accelerator.value != "" ? local.gpu_node_selector : null

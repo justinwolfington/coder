@@ -105,6 +105,10 @@ coder:
       # coder.service.type -- Set to ClusterIP when using Ingress.
       type: ClusterIP
 
+    # Pod annotations to disable Istio injection for Coder server
+    podAnnotations:
+      sidecar.istio.io/inject: "false"
+
     # Staging-specific service account
     serviceAccount:
       annotations:
@@ -173,8 +177,39 @@ networkPolicy:
               - 172.48.0.0/22
               - 10.6.0.0/16
 
-# PHI-specific network policy configuration
-# Complete network isolation for PHI compliance
-networkPolicyPhi:
+
+# Enable PHI Istio egress controls in development
+phiIstio:
   enabled: true
-  # No allowed services or egress rules for maximum security
+  allowedHosts:
+    # Coder server - workspace agents need to connect to this
+    - coder.abridge.coffee
+    # Package repositories
+    - us-central1-python.pkg.dev
+    - pypi.org
+    - files.pythonhosted.org
+    # Google OAuth (for gcloud auth login)
+    - accounts.google.com
+    - oauth2.googleapis.com
+    # google storage and other google services
+    - storage.googleapis.com
+    - storage.cloud.google.com
+    - metadata.google.internal
+    - identitytoolkit.googleapis.com
+    - iamcredentials.googleapis.com
+    - googleapis.com
+    - firestore.googleapis.com
+    - bigquery.googleapis.com
+    - cloudresourcemanager.googleapis.com
+    - dl.google.com
+    # Istio/ASM mesh services
+    - meshca.googleapis.com
+    - meshconfig.googleapis.com
+    # GitHub access
+    - github.com
+    - api.github.com
+    - raw.githubusercontent.com
+    - githubusercontent.com
+    - release-assets.githubusercontent.com
+    # internal services
+    - skypilot.abridge.cafe

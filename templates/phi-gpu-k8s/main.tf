@@ -259,7 +259,12 @@ resource "kubernetes_deployment" "main" {
     template {
       metadata {
         labels      = local.labels
-        annotations = local.annotations
+        annotations = merge(local.annotations, {
+          "sidecar.istio.io/inject" = "true"
+          "proxy.istio.io/config" = jsonencode({
+            holdApplicationUntilProxyStarts = true
+          })
+        })
       }
       spec {
         node_selector = data.coder_parameter.gpu_accelerator.value != "" ? local.gpu_node_selector : null

@@ -41,3 +41,23 @@ RUN curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cl
 RUN mkdir -p /usr/local/etc/uv && \
     uv tool install keyring --with keyrings.google-artifactregistry-auth && \
     uv tool list > /usr/local/etc/uv/tools_installed
+
+# Install code-server and VS Code extensions
+ENV CODE_SERVER_VERSION=4.103.1
+RUN mkdir -p /opt/code-server && \
+    curl -fsSL https://github.com/coder/code-server/releases/download/v${CODE_SERVER_VERSION}/code-server-${CODE_SERVER_VERSION}-linux-amd64.tar.gz | \
+    tar -xz -C /opt/code-server --strip-components=1 && \
+    ln -s /opt/code-server/bin/code-server /usr/local/bin/code-server
+
+# Pre-install VS Code extensions
+RUN mkdir -p /opt/code-server-extensions && \
+    code-server --extensions-dir /opt/code-server-extensions \
+        --install-extension ms-python.python && \
+    code-server --extensions-dir /opt/code-server-extensions \
+        --install-extension ms-toolsai.jupyter && \
+    code-server --extensions-dir /opt/code-server-extensions \
+        --install-extension ms-vscode.vscode-typescript-next
+
+# Create writable directories for code-server runtime
+RUN mkdir -p /tmp/code-server-data /tmp/code-server-config && \
+    chmod 777 /tmp/code-server-data /tmp/code-server-config

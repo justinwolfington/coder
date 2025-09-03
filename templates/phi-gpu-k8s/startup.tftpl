@@ -11,24 +11,20 @@ fi
 # PHI Workspace Initialization
 echo "Initializing PHI-compliant workspace..."
 
-# Install and start code-server
-export CODE_SERVER_DIR="/tmp/code-server"
-
-if [ ! -f "$CODE_SERVER_DIR/bin/code-server" ]; then
-  mkdir -p "$CODE_SERVER_DIR"
-  curl -fsSL https://code-server.dev/install.sh | sh -s -- --method=standalone --prefix="$CODE_SERVER_DIR" || exit 1
-fi
-
-# Install VS Code extensions for PHI development
-$CODE_SERVER_DIR/bin/code-server --install-extension ms-python.python
-$CODE_SERVER_DIR/bin/code-server --install-extension ms-toolsai.jupyter
-$CODE_SERVER_DIR/bin/code-server --install-extension ms-vscode.vscode-typescript-next
-
 # PHI-specific environment setup
 echo "Setting up PHI compliance environment..."
 export PHI_WORKSPACE=true
 export PHI_COMPLIANCE_MODE=enabled
 
-$CODE_SERVER_DIR/bin/code-server --auth none --port 13337 >/tmp/code-server.log 2>&1 &
+# Start code-server with pre-installed extensions
+# Use writable directories in /tmp since the filesystem is read-only
+# With egress locked down, code server will not support installing new extensions
+code-server \
+  --auth none \
+  --port 13337 \
+  --user-data-dir /tmp/code-server-data \
+  --config /tmp/code-server-config/config.yaml \
+  --extensions-dir /opt/code-server-extensions \
+  >/tmp/code-server.log 2>&1 &
 
 echo "PHI workspace ready!"

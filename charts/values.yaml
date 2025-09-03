@@ -5,3 +5,9 @@
 coder-logstream-kube:
   enabled: false  # Disabled by default, enable per environment
   # Configuration will be overridden in environment-specific values files
+
+# Istio egress controls for PHI workspaces
+phiIstio:
+  enabled: false
+  # List of allowed external HTTPS hosts for PHI pods
+  allowedHosts: []

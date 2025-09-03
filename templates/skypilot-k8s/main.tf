@@ -220,7 +220,9 @@ resource "kubernetes_deployment" "main" {
     template {
       metadata {
         labels      = local.labels
-        annotations = local.annotations
+        annotations = merge(local.annotations, {
+          "sidecar.istio.io/inject" = "false"
+        })
       }
       spec {
         security_context {
