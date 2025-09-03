@@ -215,8 +215,6 @@ phiIstio:
     - raw.githubusercontent.com
     - githubusercontent.com
     - release-assets.githubusercontent.com
-    # internal services
-    - skypilot.abridge.services
 
 
 # Enable Kubernetes event streaming for production environment

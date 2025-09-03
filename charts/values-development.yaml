@@ -211,8 +211,6 @@ phiIstio:
     - raw.githubusercontent.com
     - githubusercontent.com
     - release-assets.githubusercontent.com
-    # internal services
-    - skypilot.abridge.coffee
 
 # Enable Kubernetes event streaming for development environment
 coder-logstream-kube:
