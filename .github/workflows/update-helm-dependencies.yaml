@@ -1,0 +1,35 @@
+name: Update Helm Dependencies
+
+on:
+  schedule:
+    # Run monthly on the 1st at 09:00 UTC
+    - cron: '0 9 1 * *'
+  workflow_dispatch: # Allow manual triggering
+
+jobs:
+  update-helm-deps:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v4
+
+      - name: Update Helm dependencies
+        run: |
+          cd charts
+          helm dependency update
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v5
+        with:
+          commit-message: "helm: update chart dependencies"
+          title: "Update Helm chart dependencies"
+          body: |
+            Automated update of Helm chart dependencies.
+            Please review and merge if appropriate.
+          branch: "helm-dependency-updates"
+          labels: |
+            dependencies
+            helm
