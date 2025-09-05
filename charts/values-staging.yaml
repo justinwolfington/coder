@@ -183,7 +183,7 @@ phiIstio:
   enabled: true
   allowedHosts:
     # Coder server - workspace agents need to connect to this
-    - coder.abridge.coffee
+    - coder.abridge.cafe
     # Package repositories
     - us-central1-python.pkg.dev
     - pypi.org
