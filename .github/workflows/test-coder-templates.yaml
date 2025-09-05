@@ -1,6 +1,8 @@
 name: Test Coder Templates
 
 on:
+  pull_request:
+
   # Run in merge queue
   # Before merging a PR, test all templates in dev environment
   merge_group:
@@ -108,7 +110,7 @@ jobs:
 
   test-templates:
     needs: detect-changes
-    if: needs.detect-changes.outputs.should_test == 'true'
+    if: github.event_name != 'pull_request' && needs.detect-changes.outputs.should_test == 'true'
     runs-on: abridge-runner-${{ inputs.environment || 'development' }}
     environment: ${{ inputs.environment || 'development' }}
     strategy:
