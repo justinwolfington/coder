@@ -163,7 +163,7 @@ jobs:
           access_token_lifetime: "600s"
 
       - name: Setup gcloud CLI
-        uses: google-github-actions/setup-gcloud@v2
+        uses: google-github-actions/setup-gcloud@v3
 
       - name: Promote images
         run: |
