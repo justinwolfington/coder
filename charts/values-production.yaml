@@ -216,12 +216,13 @@ phiIstio:
     - githubusercontent.com
     - release-assets.githubusercontent.com
     # internal services
-    - deid.abridge.services
-    - encounter-processor-api.abridge.services
     - abridge.wandb.io
     # external services for datagen/annotation
     - api.openai.com
     - api.centaurlabs.com
+  allowedHttpHosts:
+    - deid.abridge.services
+    - encounter-processor-api.abridge.services
 
 
 # Enable Kubernetes event streaming for production environment

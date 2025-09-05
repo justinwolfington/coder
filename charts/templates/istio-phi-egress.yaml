@@ -1,4 +1,5 @@
 {{- if and .Values.phiIstio .Values.phiIstio.enabled }}
+{{- $allHosts := concat ( .Values.phiIstio.allowedHosts | default list ) ( .Values.phiIstio.allowedHttpHosts | default list ) -}}
 ---
 # ServiceEntry for allowed external hosts
 apiVersion: networking.istio.io/v1beta1
@@ -10,13 +11,16 @@ spec:
   exportTo:
     - "."
   hosts:
-  {{- range .Values.phiIstio.allowedHosts }}
+  {{- range $allHosts }}
     - {{ . | quote }}
   {{- end }}
   ports:
     - number: 443
       name: tls
       protocol: TLS
+    - number: 80
+      name: http
+      protocol: HTTP
   resolution: DNS
   location: MESH_EXTERNAL
 ---
@@ -41,11 +45,19 @@ spec:
       {{- range .Values.phiIstio.allowedHosts }}
         - ./{{ . }}
       {{- end }}
+    - port:
+        number: 80
+        protocol: HTTP
+        name: http
+      hosts:
+      {{- range .Values.phiIstio.allowedHttpHosts }}
+        - ./{{ . }}
+      {{- end }}
     - hosts:
         - ./*
         - kube-system/*
 
-{{- range .Values.phiIstio.allowedHosts }}
+{{- range $allHosts }}
 ---
 # DestinationRule for {{ . }}
 apiVersion: networking.istio.io/v1beta1

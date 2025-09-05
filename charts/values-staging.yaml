@@ -212,9 +212,10 @@ phiIstio:
     - githubusercontent.com
     - release-assets.githubusercontent.com
     # internal services
-    - deid.abridge.cafe
-    - encounter-processor-api.abridge.cafe
     - abridge.wandb.io
     # external services for datagen/annotation
     - api.openai.com
     - api.centaurlabs.com
+  allowedHttpHosts:
+    - deid.abridge.cafe
+    - encounter-processor-api.abridge.cafe
