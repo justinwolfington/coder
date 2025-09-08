@@ -192,6 +192,7 @@ phiIstio:
     - us-central1-python.pkg.dev
     - pypi.org
     - files.pythonhosted.org
+    - download.pytorch.org
     # Google OAuth (for gcloud auth login)
     - accounts.google.com
     - oauth2.googleapis.com
