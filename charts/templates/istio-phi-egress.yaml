@@ -1,5 +1,8 @@
 {{- if and .Values.phiIstio .Values.phiIstio.enabled }}
-{{- $allHosts := concat ( .Values.phiIstio.allowedHosts | default list ) ( .Values.phiIstio.allowedHttpHosts | default list ) -}}
+{{- $commonHosts := .Values.phiIstio.commonAllowedHosts | default (list) -}}
+{{- $allowedHosts := uniq (concat $commonHosts ( .Values.phiIstio.allowedHosts | default (list) )) -}}
+{{- $allowedHttpHosts := uniq ( .Values.phiIstio.allowedHttpHosts | default (list) ) -}}
+{{- $allHosts := uniq (concat $allowedHosts $allowedHttpHosts) -}}
 ---
 # ServiceEntry for allowed external hosts
 apiVersion: networking.istio.io/v1beta1
@@ -42,7 +45,7 @@ spec:
         protocol: TLS
         name: tls
       hosts:
-      {{- range .Values.phiIstio.allowedHosts }}
+      {{- range $allowedHosts }}
         - ./{{ . }}
       {{- end }}
     - port:
@@ -50,7 +53,7 @@ spec:
         protocol: HTTP
         name: http
       hosts:
-      {{- range .Values.phiIstio.allowedHttpHosts }}
+      {{- range $allowedHttpHosts }}
         - ./{{ . }}
       {{- end }}
     - hosts:
