@@ -193,6 +193,8 @@ phiIstio:
     - pypi.org
     - files.pythonhosted.org
     - download.pytorch.org
+    - nodejs.org
+    - ai2-s2-scispacy.s3-us-west-2.amazonaws.com
     # Google OAuth (for gcloud auth login)
     - accounts.google.com
     - oauth2.googleapis.com
