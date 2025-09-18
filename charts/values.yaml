@@ -18,6 +18,7 @@ phiIstio:
     - download.pytorch.org
     - nodejs.org
     - ai2-s2-scispacy.s3-us-west-2.amazonaws.com
+    - cdn.jsdelivr.net
     - jsdelivr.com
     - unpkg.com
     # Google OAuth (for gcloud auth login)
