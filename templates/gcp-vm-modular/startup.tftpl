@@ -11,9 +11,19 @@ dpkg --configure -a || true
 
 # Update and install packages (with built-in retry via apt)
 echo "Updating and installing packages..."
+
+# do not upgrade nvidia packages
+# updating nvidia packages makes the system go out of sync with the ones installed by the image
+pkgs=$(dpkg-query -W -f='$${binary:Package}\n' | grep -E '^(nvidia-|libnvidia-|fabricmanager-)')
+if [ -n "$pkgs" ]; then
+    apt-mark hold $pkgs
+fi
+
 apt-get update -y
 apt-get upgrade -y --fix-missing || apt-get upgrade -y --fix-missing  # Simple retry
 apt-get install -y --fix-missing curl wget git vim htop unzip jq sudo build-essential
+
+apt-mark unhold $pkgs
 
 # User setup with sudo and docker
 if ! id "${username}" &>/dev/null; then
