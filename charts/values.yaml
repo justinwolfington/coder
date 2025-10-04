@@ -33,6 +33,7 @@ phiIstio:
     - googleapis.com
     - firestore.googleapis.com
     - bigquery.googleapis.com
+    - bigquerystorage.googleapis.com
     - cloudresourcemanager.googleapis.com
     - dl.google.com
     # Istio/ASM mesh services
