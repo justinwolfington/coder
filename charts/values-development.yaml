@@ -147,37 +147,6 @@ coder:
             # CPU scales with database I/O
             cpu: 100m
 
-# Development-specific network policy configuration
-networkPolicy:
-  allowedServices:
-    - name: elms
-      port: 80
-      namespace: elms
-      selector:
-        app.kubernetes.io/name: elms
-        app.kubernetes.io/instance: elms
-
-    - name: eyes
-      port: 8000
-      namespace: eyes-v1
-      selector:
-        app.kubernetes.io/name: eyes-new
-        app.kubernetes.io/instance: eyes-v1
-
-  # Additional egress rules for general internet access
-  additionalEgressRules:
-    - ports:
-        - port: 80
-          protocol: TCP
-      to:
-        - ipBlock:
-            cidr: 0.0.0.0/0
-            except:
-              - 172.32.0.0/12
-              - 172.48.0.0/22
-              - 10.6.0.0/16
-
-
 # Enable PHI Istio egress controls in development
 phiIstio:
   enabled: true
