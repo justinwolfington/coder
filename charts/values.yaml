@@ -1,6 +1,5 @@
-# Based on: https://github.com/coder/coder/blob/v2.25.1/helm/coder/values.yaml
+# Based on: https://github.com/coder/coder/blob/v2.26.3/helm/coder/values.yaml
 ---
-
 # Coder logstream configuration for Kubernetes event streaming
 coder-logstream-kube:
   enabled: false  # Disabled by default, enable per environment
