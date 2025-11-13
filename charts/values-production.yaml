@@ -121,7 +121,7 @@ coder:
       - name: cloud-sql-proxy
         restartPolicy: Always
         # It is recommended to use the latest version of the Cloud SQL Auth Proxy!
-        image: gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.14.1
+        image: gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.19.0
         args:
           # Connect over private IP in VPC-native GKE cluster
           - --private-ip
@@ -181,7 +181,6 @@ networkPolicy:
               - 172.48.0.0/22
               - 10.6.0.0/16
 
-
 # Enable PHI Istio egress controls in production
 phiIstio:
   enabled: true
@@ -192,8 +191,7 @@ phiIstio:
     - deid.abridge.services
     - encounter-processor-api.abridge.services
 
-
 # Enable Kubernetes event streaming for production environment
 coder-logstream-kube:
   enabled: true
-  url: https://coder.abridge.services  # Must match CODER_ACCESS_URL above
+  url: https://coder.abridge.services # Must match CODER_ACCESS_URL above
