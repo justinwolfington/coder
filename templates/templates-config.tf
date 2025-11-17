@@ -2,17 +2,17 @@ locals {
   # Template timing parameters (all in milliseconds):
   # - activity_bump_ms: How much to extend workspace deadline when activity detected
   # - failure_ttl_ms: How long to keep failed workspaces before cleanup
-  # - time_til_dormant_ms: Time before marking workspace as dormant
   # - default_ttl_ms: Default time-to-live for workspaces
 
-  # Standard timing configuration for all templates
-  standard_timings = {
-    # Disabled standard_timings to prevent automatic workspace deletion for now.
-    #   activity_bump_ms    = 86400000  # 1 day
-    #   default_ttl_ms      = 172800000 # 2 days
-    #   time_til_dormant_ms = 604800000 # 7 days
-    #   failure_ttl_ms      = 7200000   # 2 hours
+  # GPU-specific timing configuration to prevent abuse while allowing productive work
+  gpu_timings = {
+    activity_bump_ms = 86400000  # 1 day (extend workspace when active)
+    default_ttl_ms   = 172800000 # 2 days (auto-stop)
+    failure_ttl_ms   = 7200000   # 2 hours (cleanup failed workspaces)
   }
+
+  # Standard timing configuration for non-GPU templates (disabled)
+  standard_timings = {}
 
   templates = {
     "k8s-completion-service" = merge({
@@ -37,7 +37,7 @@ locals {
       icon         = "/emojis/1f35f.png"
       directory    = "./gpu-k8s"
       environments = ["development", "staging", "production"]
-    }, local.standard_timings)
+    }, local.gpu_timings)
 
     "gcp-vm-modular" = merge({
       display_name = "GCP VM Workspace with Docker"
@@ -45,7 +45,7 @@ locals {
       icon         = "/icon/gcp.png"
       directory    = "./gcp-vm-modular"
       environments = ["development", "staging"]
-    }, local.standard_timings)
+    }, local.gpu_timings)
 
     "phi-gpu-k8s" = merge({
       display_name = "Kubernetes PHI Workspace"
@@ -53,7 +53,7 @@ locals {
       icon         = "/emojis/1f510.png"
       directory    = "./phi-gpu-k8s"
       environments = ["development", "production"]
-    }, local.standard_timings)
+    }, local.gpu_timings)
 
     "skypilot-k8s" = merge({
       display_name = "SkyPilot K8s"
@@ -72,11 +72,11 @@ locals {
   }
 
   # Support filtering by specific template name
-  filtered_templates = var.template_name != "" ? {
+  filtered_templates = {
     for name, config in local.active_templates :
     name => config
-    if name == var.template_name
-  } : local.active_templates
+    if var.template_name == "" || name == var.template_name
+  }
 }
 
 # Variables for runtime configuration
