@@ -24,11 +24,11 @@ provider "kubernetes" {
 # SHARED MODULES
 ############################
 module "cpu_resources" {
-  source = "git::https://github.com/abridgeai/coder.git//modules/resources/cpu?ref=v1.3.2"
+  source = "git::https://github.com/abridgeai/coder.git//modules/resources/cpu?ref=v1.4.0"
 }
 
 module "git_utilities" {
-  source       = "git::https://github.com/abridgeai/coder.git//modules/utilities/git?ref=v1.3.2"
+  source       = "git::https://github.com/abridgeai/coder.git//modules/utilities/git?ref=v1.4.0"
   start_count  = data.coder_workspace.me.start_count
   agent_id     = coder_agent.main.id
   repo_url     = data.coder_parameter.repository_url.value
@@ -36,14 +36,14 @@ module "git_utilities" {
 }
 
 module "ide_utilities" {
-  source      = "git::https://github.com/abridgeai/coder.git//modules/utilities/ide?ref=v1.3.2"
+  source      = "git::https://github.com/abridgeai/coder.git//modules/utilities/ide?ref=v1.4.0"
   start_count = data.coder_workspace.me.start_count
   agent_id    = coder_agent.main.id
   user_name   = data.coder_workspace_owner.me.name
 }
 
 module "logger" {
-  source = "git::https://github.com/abridgeai/coder.git//modules/logger?ref=v1.3.2"
+  source = "git::https://github.com/abridgeai/coder.git//modules/logger?ref=v1.4.0"
 }
 
 ############################

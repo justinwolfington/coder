@@ -79,6 +79,9 @@ coder:
       - name: CODER_LOG_FILTER
         value: ".*coderd: audit_log.*"
 
+      - name: TF_VAR_environment
+        value: development
+
     # mount the git secrets to enable coder to pull modules from coder repo
     # the following secrets have read only access to the coder repo
     volumes:

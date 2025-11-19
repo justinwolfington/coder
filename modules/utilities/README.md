@@ -16,6 +16,9 @@ Centralizes frequently used utility modules to avoid duplication across template
 - `cursor` - Cursor IDE
 - `jetbrains_gateway` - JetBrains Gateway with PyCharm
 
+### Storage Utilities (gcs-bucket/)
+- `gcs-bucket` - Mount GCS buckets with conditional access control
+
 ## Usage Example
 
 ```hcl
@@ -32,5 +35,15 @@ module "ide_utils" {
   start_count = 1
   agent_id    = coder_agent.main.id
   user_name   = data.coder_workspace.me.owner
+}
+
+module "gcs_bucket" {
+  source                  = "git::ref//modules/utilities/gcs-bucket"
+  environment             = var.environment
+  workspace_owner_groups  = data.coder_workspace_owner.me.groups
+  required_group          = "DATA_ACCESS"
+  bucket_name             = "my-data-bucket"
+  mount_path              = "/data"
+  mount_options           = "implicit-dirs"
 }
 ```

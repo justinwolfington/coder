@@ -31,20 +31,34 @@ data "coder_workspace_owner" "me" {}
 # SHARED MODULES
 ############################
 module "cpu_resources" {
-  source = "git::https://github.com/abridgeai/coder.git//modules/resources/cpu?ref=v1.3.2"
+  source = "git::https://github.com/abridgeai/coder.git//modules/resources/cpu?ref=v1.4.0"
 }
 
 module "gpu_resources" {
-  source = "git::https://github.com/abridgeai/coder.git//modules/resources/gpu?ref=v1.3.2"
+  source = "git::https://github.com/abridgeai/coder.git//modules/resources/gpu?ref=v1.4.0"
 }
 
 module "git_utilities" {
-  source       = "git::https://github.com/abridgeai/coder.git//modules/utilities/git?ref=v1.3.2"
+  source       = "git::https://github.com/abridgeai/coder.git//modules/utilities/git?ref=v1.4.0"
   start_count  = data.coder_workspace.me.start_count
   agent_id     = coder_agent.main.id
   repo_url     = data.coder_parameter.repository_url.value
   should_clone = data.coder_parameter.repository_url.value != ""
-  
+
+}
+
+module "utd_bucket" {
+  source                  = "git::https://github.com/abridgeai/coder.git//modules/utilities/gcs-bucket?ref=v1.4.0"
+  environment             = var.environment
+  workspace_owner_groups  = data.coder_workspace_owner.me.groups
+  required_group          = "UTDACCESS"
+  bucket_name             = "abridge-client-prod-wk-secure-bucket"
+  mount_path              = "/utddata"
+  mount_options           = "implicit-dirs,only-dir=decrypt"
+  parameter_name          = "utd_bucket_access"
+  display_name            = "UTD Bucket Mount"
+  description             = "Enable to mount the UTD secure bucket at /utddata"
+  parameter_order         = 10
 }
 
 ############################
@@ -104,6 +118,9 @@ data "coder_parameter" "gpu_count" {
 locals {
   # Directory configuration
   home_dir = "/root"
+
+  # UTD bucket access configuration
+  utd_bucket_enabled = module.utd_bucket.bucket_enabled
 
   # Image and environment configuration
   base_image_repo = "us-central1-docker.pkg.dev/abridge-artifact-registry/coder/phi"
@@ -260,14 +277,17 @@ resource "kubernetes_deployment" "main" {
       metadata {
         labels      = local.labels
         annotations = merge(local.annotations, {
-          "sidecar.istio.io/inject" = "true"
+          "sidecar.istio.io/inject"                          = "true"
+          "gke-gcsfuse/volumes"                              = module.utd_bucket.gcsfuse_annotation
+          "traffic.sidecar.istio.io/excludeOutboundIPRanges" = module.utd_bucket.istio_ip_exclusion
           "proxy.istio.io/config" = jsonencode({
             holdApplicationUntilProxyStarts = true
           })
         })
       }
       spec {
-        node_selector = data.coder_parameter.gpu_accelerator.value != "" ? local.gpu_node_selector : null
+        service_account_name = local.utd_bucket_enabled ? "coder" : null
+        node_selector        = data.coder_parameter.gpu_accelerator.value != "" ? local.gpu_node_selector : null
 
         security_context {
           # Run as root for unrestricted access
@@ -345,6 +365,16 @@ resource "kubernetes_deployment" "main" {
             mount_path = "/tmp"
             name       = "tmp-volume"
           }
+
+          # Conditionally mount UTD bucket for authorized users
+          dynamic "volume_mount" {
+            for_each = module.utd_bucket.volume_mount != null ? [module.utd_bucket.volume_mount] : []
+            content {
+              mount_path = volume_mount.value.mount_path
+              name       = volume_mount.value.name
+              read_only  = volume_mount.value.read_only
+            }
+          }
         }
 
         volume {
@@ -357,6 +387,18 @@ resource "kubernetes_deployment" "main" {
         volume {
           name = "tmp-volume"
           empty_dir {}
+        }
+
+        # Conditionally add UTD bucket volume for authorized users
+        dynamic "volume" {
+          for_each = module.utd_bucket.volume != null ? [module.utd_bucket.volume] : []
+          content {
+            name = volume.value.name
+            csi {
+              driver            = volume.value.csi.driver
+              volume_attributes = volume.value.csi.volume_attributes
+            }
+          }
         }
       }
     }
@@ -396,6 +438,10 @@ resource "coder_metadata" "workspace_info" {
   item {
     key   = "Workspace Type"
     value = "PHI Compliant"
+  }
+  item {
+    key   = "UTD Bucket Access"
+    value = local.utd_bucket_enabled ? "Enabled (/utddata)" : "Disabled"
   }
 }
 
