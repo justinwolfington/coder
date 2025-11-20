@@ -1,4 +1,4 @@
-# Custom Arize Phoenix Dockerfile based on official image
+# Custom Arize Phoenix Dockerfile based on official image - 20/11/2025
 FROM arizephoenix/phoenix:latest
 
 # Set all environment variables needed for our deployment
