@@ -38,5 +38,14 @@ spec:
           protocol: TCP
         - port: 53
           protocol: UDP
+    # Allow access to GCE/GKE metadata servers for GCS FUSE authentication
+    - ports:
+        - port: 80
+          protocol: TCP
+      to:
+        - ipBlock:
+            cidr: 169.254.169.254/32
+        - ipBlock:
+            cidr: 100.100.100.100/32
 {{- end }}
 {{- end }}

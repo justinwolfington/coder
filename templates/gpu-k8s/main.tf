@@ -276,9 +276,12 @@ resource "kubernetes_deployment" "main" {
       metadata {
         labels      = local.labels
         annotations = merge(local.annotations, {
-          "sidecar.istio.io/inject"                          = "false"
+          "sidecar.istio.io/inject"                          = "true"
           "gke-gcsfuse/volumes"                              = module.utd_bucket.gcsfuse_annotation
           "traffic.sidecar.istio.io/excludeOutboundIPRanges" = module.utd_bucket.istio_ip_exclusion
+          "proxy.istio.io/config" = jsonencode({
+            holdApplicationUntilProxyStarts = true
+          })
         })
       }
       spec {
