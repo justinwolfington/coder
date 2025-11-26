@@ -56,6 +56,20 @@ module "logger" {
   source = "git::https://github.com/abridgeai/coder.git//modules/logger?ref=v1.4.0"
 }
 
+module "utd_bucket" {
+  source                  = "git::https://github.com/abridgeai/coder.git//modules/utilities/gcs-bucket?ref=v1.4.0"
+  environment             = var.environment
+  workspace_owner_groups  = data.coder_workspace_owner.me.groups
+  required_group          = "UTDACCESS"
+  bucket_name             = "abridge-client-prod-wk-secure-bucket"
+  mount_path              = "/utddata"
+  mount_options           = "implicit-dirs,only-dir=decrypt"
+  parameter_name          = "utd_bucket_access"
+  display_name            = "UTD Bucket Mount"
+  description             = "Enable to mount the UTD secure bucket at /utddata"
+  parameter_order         = 10
+}
+
 ############################
 # PARAMETERS
 ############################
@@ -113,6 +127,9 @@ data "coder_parameter" "gpu_count" {
 locals {
   # Directory configuration
   home_dir = "/root"
+
+  # UTD bucket access configuration
+  utd_bucket_enabled = module.utd_bucket.bucket_enabled
 
   # Image and environment configuration
   base_image_repo = "us-central1-docker.pkg.dev/abridge-artifact-registry/coder/gpu"
@@ -259,11 +276,14 @@ resource "kubernetes_deployment" "main" {
       metadata {
         labels      = local.labels
         annotations = merge(local.annotations, {
-          "sidecar.istio.io/inject" = "false"
+          "sidecar.istio.io/inject"                          = "false"
+          "gke-gcsfuse/volumes"                              = module.utd_bucket.gcsfuse_annotation
+          "traffic.sidecar.istio.io/excludeOutboundIPRanges" = module.utd_bucket.istio_ip_exclusion
         })
       }
       spec {
-        node_selector = data.coder_parameter.gpu_accelerator.value != "" ? local.gpu_node_selector : null
+        service_account_name = local.utd_bucket_enabled ? "coder" : null
+        node_selector        = data.coder_parameter.gpu_accelerator.value != "" ? local.gpu_node_selector : null
 
         security_context {
           # Run as root for unrestricted access
@@ -347,12 +367,34 @@ resource "kubernetes_deployment" "main" {
             name       = "home"
             read_only  = false
           }
+
+          # Conditionally mount UTD bucket for authorized users
+          dynamic "volume_mount" {
+            for_each = module.utd_bucket.volume_mount != null ? [module.utd_bucket.volume_mount] : []
+            content {
+              mount_path = volume_mount.value.mount_path
+              name       = volume_mount.value.name
+              read_only  = volume_mount.value.read_only
+            }
+          }
         }
 
         volume {
           name = "home"
           persistent_volume_claim {
             claim_name = kubernetes_persistent_volume_claim.home.metadata[0].name
+          }
+        }
+
+        # Conditionally add UTD bucket volume for authorized users
+        dynamic "volume" {
+          for_each = module.utd_bucket.volume != null ? [module.utd_bucket.volume] : []
+          content {
+            name = volume.value.name
+            csi {
+              driver            = volume.value.csi.driver
+              volume_attributes = volume.value.csi.volume_attributes
+            }
           }
         }
       }
@@ -389,6 +431,10 @@ resource "coder_metadata" "workspace_info" {
   item {
     key   = "GPU Count"
     value = data.coder_parameter.gpu_accelerator.value != "" ? data.coder_parameter.gpu_count.value : "N/A"
+  }
+  item {
+    key   = "UTD Bucket Access"
+    value = local.utd_bucket_enabled ? "Enabled (/utddata)" : "Disabled"
   }
 }
 
