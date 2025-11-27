@@ -14,3 +14,12 @@ module "jetbrains_gateway" {
   jetbrains_ides = ["PY"]
   default        = "PY"
 }
+
+module "claude-code" {
+  count             = var.start_count > 0 && var.anthropic_api_key != "" ? 1 : 0
+  source            = "registry.coder.com/coder/claude-code/coder"
+  version           = "4.2.3"
+  agent_id          = var.agent_id
+  workdir           = var.workdir
+  anthropic_api_key = var.anthropic_api_key
+}

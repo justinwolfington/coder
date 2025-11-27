@@ -42,10 +42,12 @@ module "git_utilities" {
 }
 
 module "ide_modules" {
-  source      = "git::https://github.com/abridgeai/coder.git//modules/utilities/ide?ref=v1.4.0"
-  start_count = data.coder_workspace.me.start_count
-  agent_id    = coder_agent.main.id
-  user_name   = data.coder_workspace_owner.me.name
+  source             = "git::https://github.com/abridgeai/coder.git//modules/utilities/ide?ref=v1.4.0"
+  start_count        = data.coder_workspace.me.start_count
+  agent_id           = coder_agent.main.id
+  user_name          = data.coder_workspace_owner.me.name
+  workdir            = local.repo_dir
+  anthropic_api_key  = var.anthropic_api_key
 }
 
 ############################
@@ -234,6 +236,9 @@ locals {
 
   # Recommended disk size based on GPU configuration
   recommended_disk_size = local.gpu_config.recommended_disk_size
+
+  # Working directory for IDEs and Claude Code
+  repo_dir = "/home/${lower(data.coder_workspace_owner.me.name)}"
 }
 
 ############################

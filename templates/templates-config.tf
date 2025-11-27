@@ -111,3 +111,10 @@ variable "coder_token" {
   type        = string
   sensitive   = true
 }
+
+variable "anthropic_api_key" {
+  description = "Anthropic API key for Claude Code (uses API billing mode, optional)"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
