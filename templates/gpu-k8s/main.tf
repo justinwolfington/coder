@@ -30,15 +30,15 @@ data "coder_workspace_owner" "me" {}
 # SHARED MODULES
 ############################
 module "cpu_resources" {
-  source = "git::https://github.com/abridgeai/coder.git//modules/resources/cpu?ref=v1.4.0"
+  source = "git::https://github.com/abridgeai/coder.git//modules/resources/cpu?ref=v1.5.0"
 }
 
 module "gpu_resources" {
-  source = "git::https://github.com/abridgeai/coder.git//modules/resources/gpu?ref=v1.4.0"
+  source = "git::https://github.com/abridgeai/coder.git//modules/resources/gpu?ref=v1.5.0"
 }
 
 module "git_utilities" {
-  source       = "git::https://github.com/abridgeai/coder.git//modules/utilities/git?ref=v1.4.0"
+  source       = "git::https://github.com/abridgeai/coder.git//modules/utilities/git?ref=v1.5.0"
   start_count  = data.coder_workspace.me.start_count
   agent_id     = coder_agent.main.id
   repo_url     = data.coder_parameter.repository_url.value
@@ -46,30 +46,30 @@ module "git_utilities" {
 }
 
 module "ide_utilities" {
-  source             = "git::https://github.com/abridgeai/coder.git//modules/utilities/ide?ref=v1.4.0"
-  start_count        = data.coder_workspace.me.start_count
-  agent_id           = coder_agent.main.id
-  user_name          = data.coder_workspace_owner.me.name
-  workdir            = local.repo_dir
-  anthropic_api_key  = var.anthropic_api_key
+  source            = "git::https://github.com/abridgeai/coder.git//modules/utilities/ide?ref=v1.5.0"
+  start_count       = data.coder_workspace.me.start_count
+  agent_id          = coder_agent.main.id
+  user_name         = data.coder_workspace_owner.me.name
+  workdir           = local.repo_dir
+  anthropic_api_key = var.anthropic_api_key
 }
 
 module "logger" {
-  source = "git::https://github.com/abridgeai/coder.git//modules/logger?ref=v1.4.0"
+  source = "git::https://github.com/abridgeai/coder.git//modules/logger?ref=v1.5.0"
 }
 
 module "utd_bucket" {
-  source                  = "git::https://github.com/abridgeai/coder.git//modules/utilities/gcs-bucket?ref=v1.4.0"
-  environment             = var.environment
-  workspace_owner_groups  = data.coder_workspace_owner.me.groups
-  required_group          = "UTDACCESS"
-  bucket_name             = "abridge-client-prod-wk-secure-bucket"
-  mount_path              = "/utddata"
-  mount_options           = "implicit-dirs,only-dir=decrypt"
-  parameter_name          = "utd_bucket_access"
-  display_name            = "UTD Bucket Mount"
-  description             = "Enable to mount the UTD secure bucket at /utddata"
-  parameter_order         = 10
+  source                 = "git::https://github.com/abridgeai/coder.git//modules/utilities/gcs-bucket?ref=v1.5.0"
+  environment            = var.environment
+  workspace_owner_groups = data.coder_workspace_owner.me.groups
+  required_group         = "UTDACCESS"
+  bucket_name            = "abridge-client-prod-wk-secure-bucket"
+  mount_path             = "/utddata"
+  mount_options          = "implicit-dirs,only-dir=decrypt"
+  parameter_name         = "utd_bucket_access"
+  display_name           = "UTD Bucket Mount"
+  description            = "Enable to mount the UTD secure bucket at /utddata"
+  parameter_order        = 10
 }
 
 ############################
@@ -163,7 +163,7 @@ locals {
   }
 
   # Startup script for the workspace
-  init_script   = templatefile("${path.module}/startup.tftpl", {
+  init_script = templatefile("${path.module}/startup.tftpl", {
     should_clone = local.should_clone
     repo_url     = local.repo_url
   })
@@ -276,7 +276,7 @@ resource "kubernetes_deployment" "main" {
 
     template {
       metadata {
-        labels      = local.labels
+        labels = local.labels
         annotations = merge(local.annotations, {
           "sidecar.istio.io/inject"                          = "true"
           "gke-gcsfuse/volumes"                              = module.utd_bucket.gcsfuse_annotation
