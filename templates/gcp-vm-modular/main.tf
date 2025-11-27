@@ -2,10 +2,11 @@ terraform {
   required_providers {
     coder = {
       source  = "coder/coder"
-      version = "2.7.0"
+      version = "2.13.1"
     }
     google = {
-      source = "hashicorp/google"
+      source  = "hashicorp/google"
+      version = "7.12.0"
     }
   }
 }
@@ -29,11 +30,11 @@ data "coder_workspace_owner" "me" {}
 # SHARED MODULES
 ############################
 module "gpu_resources" {
-  source = "git::https://github.com/abridgeai/coder.git//modules/resources/gpu?ref=v1.5.0"
+  source = "git::https://github.com/abridgeai/coder.git//modules/resources/gpu?ref=v1.7.0"
 }
 
 module "git_utilities" {
-  source              = "git::https://github.com/abridgeai/coder.git//modules/utilities/git?ref=v1.5.0"
+  source              = "git::https://github.com/abridgeai/coder.git//modules/utilities/git?ref=v1.7.0"
   start_count         = data.coder_workspace.me.start_count
   agent_id            = coder_agent.main.id
   repo_url            = ""
@@ -42,7 +43,7 @@ module "git_utilities" {
 }
 
 module "ide_modules" {
-  source            = "git::https://github.com/abridgeai/coder.git//modules/utilities/ide?ref=v1.5.0"
+  source            = "git::https://github.com/abridgeai/coder.git//modules/utilities/ide?ref=v1.7.0"
   start_count       = data.coder_workspace.me.start_count
   agent_id          = coder_agent.main.id
   user_name         = data.coder_workspace_owner.me.name
@@ -303,7 +304,7 @@ resource "coder_agent" "main" {
 module "code-server" {
   count    = data.coder_workspace.me.start_count
   source   = "registry.coder.com/coder/code-server/coder"
-  version  = "~> 1.0"
+  version  = "1.4.1"
   agent_id = coder_agent.main.id
   folder   = "/home/${lower(data.coder_workspace_owner.me.name)}"
 }

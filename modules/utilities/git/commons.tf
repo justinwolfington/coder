@@ -2,7 +2,7 @@ terraform {
   required_providers {
     coder = {
       source  = "coder/coder"
-      version = "2.7.0"
+      version = "2.13.1"
     }
   }
 }
@@ -10,14 +10,14 @@ terraform {
 module "git-clone" {
   count    = var.start_count > 0 && var.should_clone ? 1 : 0
   source   = "registry.coder.com/coder/git-clone/coder"
-  version  = "1.1.0"
+  version  = "1.2.1"
   agent_id = var.agent_id
   url      = var.repo_url
 }
 
 module "git-config" {
   source                = "registry.coder.com/coder/git-config/coder"
-  version               = "1.0.15"
+  version               = "1.0.32"
   agent_id              = var.agent_id
   allow_username_change = false
   allow_email_change    = false
