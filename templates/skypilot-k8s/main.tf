@@ -58,6 +58,13 @@ data "coder_workspace_owner" "me" {}
 
 ############################
 # PARAMETERS
+data "coder_parameter" "ai_prompt" {
+  type        = "string"
+  name        = "AI Prompt"
+  default     = ""
+  description = "Initial task prompt for Claude Code."
+  mutable     = true
+}
 ############################
 data "coder_parameter" "repository_url" {
   name         = "repository_url"
