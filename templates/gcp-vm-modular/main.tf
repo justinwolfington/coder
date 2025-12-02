@@ -30,11 +30,11 @@ data "coder_workspace_owner" "me" {}
 # SHARED MODULES
 ############################
 module "gpu_resources" {
-  source = "git::https://github.com/abridgeai/coder.git//modules/resources/gpu?ref=v1.7.0"
+  source = "git::https://github.com/abridgeai/coder.git//modules/resources/gpu?ref=v1.8.0"
 }
 
 module "git_utilities" {
-  source              = "git::https://github.com/abridgeai/coder.git//modules/utilities/git?ref=v1.7.0"
+  source              = "git::https://github.com/abridgeai/coder.git//modules/utilities/git?ref=v1.8.0"
   start_count         = data.coder_workspace.me.start_count
   agent_id            = coder_agent.main.id
   repo_url            = ""
@@ -43,7 +43,7 @@ module "git_utilities" {
 }
 
 module "ide_modules" {
-  source            = "git::https://github.com/abridgeai/coder.git//modules/utilities/ide?ref=v1.7.0"
+  source            = "git::https://github.com/abridgeai/coder.git//modules/utilities/ide?ref=v1.8.0"
   start_count       = data.coder_workspace.me.start_count
   agent_id          = coder_agent.main.id
   user_name         = data.coder_workspace_owner.me.name
