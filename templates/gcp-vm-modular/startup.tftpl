@@ -5,9 +5,10 @@ echo "Initializing environment for ${username}..."
 
 # Harden OS: Update and upgrade
 export DEBIAN_FRONTEND=noninteractive
+export NEEDRESTART_MODE=a
 
 echo "Checking dpkg state..."
-dpkg --configure -a || true
+dpkg --configure -a --force-confdef --force-confold || true
 
 # Update and install packages (with built-in retry via apt)
 echo "Updating and installing packages..."
@@ -20,8 +21,10 @@ if [ -n "$pkgs" ]; then
 fi
 
 apt-get update -y
-apt-get upgrade -y --fix-missing || apt-get upgrade -y --fix-missing  # Simple retry
-apt-get install -y --fix-missing curl wget git vim htop unzip jq sudo build-essential
+apt-get upgrade -y --fix-missing -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" || \
+  apt-get upgrade -y --fix-missing -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold"  # Simple retry
+apt-get install -y --fix-missing -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" \
+  curl wget git vim htop unzip jq sudo build-essential
 
 apt-mark unhold $pkgs
 
