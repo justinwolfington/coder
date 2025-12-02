@@ -22,6 +22,7 @@ module "claude-code" {
   agent_id       = var.agent_id
   workdir        = var.workdir
   claude_api_key = var.anthropic_api_key
+  ai_prompt      = "Help me with coding tasks in this workspace"
 }
 
 module "codex" {
