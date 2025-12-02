@@ -24,3 +24,16 @@ variable "anthropic_api_key" {
   sensitive   = true
   default     = ""
 }
+
+variable "openai_api_key" {
+  type        = string
+  description = "OpenAI API key for Codex (optional)"
+  sensitive   = true
+  default     = ""
+}
+
+variable "enable_codex_tasks" {
+  type        = bool
+  description = "Enable task reporting in Codex"
+  default     = false
+}

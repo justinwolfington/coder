@@ -26,3 +26,10 @@ variable "anthropic_api_key" {
   sensitive   = true
   default     = ""
 }
+
+variable "openai_api_key" {
+  type        = string
+  description = "OpenAI API key for Codex (optional)"
+  sensitive   = true
+  default     = ""
+}

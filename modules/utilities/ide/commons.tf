@@ -23,3 +23,13 @@ module "claude-code" {
   workdir        = var.workdir
   claude_api_key = var.anthropic_api_key
 }
+
+module "codex" {
+  count          = var.start_count > 0 && var.openai_api_key != "" ? 1 : 0
+  source         = "registry.coder.com/coder-labs/codex/coder"
+  version        = "3.1.1"
+  agent_id       = var.agent_id
+  openai_api_key = var.openai_api_key
+  workdir        = var.workdir
+  report_tasks   = var.enable_codex_tasks
+}

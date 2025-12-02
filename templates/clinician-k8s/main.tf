@@ -42,6 +42,7 @@ module "ide_utilities" {
   user_name         = data.coder_workspace_owner.me.name
   workdir           = local.repo_dir
   anthropic_api_key = var.anthropic_api_key
+  openai_api_key    = var.openai_api_key
 }
 
 module "logger" {
