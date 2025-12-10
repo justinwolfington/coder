@@ -13,27 +13,8 @@ variable "user_name" {
   description = "User name"
 }
 
-variable "workdir" {
-  type        = string
-  description = "Working directory for Claude Code"
-}
-
-variable "anthropic_api_key" {
-  type        = string
-  description = "Anthropic API key for Claude Code (uses API billing mode, optional)"
-  sensitive   = true
-  default     = ""
-}
-
-variable "openai_api_key" {
-  type        = string
-  description = "OpenAI API key for Codex (optional)"
-  sensitive   = true
-  default     = ""
-}
-
-variable "enable_codex_tasks" {
+variable "enable_jetbrains" {
   type        = bool
-  description = "Enable task reporting in Codex"
+  description = "Enable JetBrains Gateway"
   default     = false
 }

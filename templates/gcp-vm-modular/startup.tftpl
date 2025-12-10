@@ -29,7 +29,7 @@ if ! command -v docker &>/dev/null; then
     usermod -aG docker "${username}"
 fi
 
-# Mount local NVMe SSDs for H100 instances
+# Mount local SSDs if available (for H100 instances)
 if [[ "${gpu_type}" == "nvidia-h100-80gb" ]]; then
     echo "Setting up local NVMe storage..."
     mkdir -p /mnt/nvme
@@ -52,7 +52,13 @@ su - "${username}" -c "
     git config --global user.email '${useremail}'
 "
 
-# Set environment variables
+# Install Claude Code CLI (continue if it fails)
+echo "Installing Claude Code CLI..."
+su - "${username}" -c "
+    curl -fsSL https://claude.ai/install.sh | bash || echo 'Claude Code installation failed, continuing...'
+" || true
+
+# Set up environment variables for the coder agent
 echo "export HOME=/home/${username}" >> /etc/environment
 echo "export USER=${username}" >> /etc/environment
 

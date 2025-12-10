@@ -26,3 +26,7 @@ $CODE_SERVER_DIR/bin/code-server --install-extension ms-toolsai.jupyter
 
 # Start code-server
 $CODE_SERVER_DIR/bin/code-server --auth none --port 13337 >/tmp/code-server.log 2>&1 &
+
+# Install Claude Code CLI (continue if it fails)
+echo "Installing Claude Code CLI..."
+curl -fsSL https://claude.ai/install.sh | bash || echo "Claude Code installation failed, continuing..."

@@ -30,15 +30,15 @@ data "coder_workspace_owner" "me" {}
 # SHARED MODULES
 ############################
 module "cpu_resources" {
-  source = "git::https://github.com/abridgeai/coder.git//modules/resources/cpu?ref=v1.8.1"
+  source = "git::https://github.com/abridgeai/coder.git//modules/resources/cpu?ref=v1.8.6"
 }
 
 module "gpu_resources" {
-  source = "git::https://github.com/abridgeai/coder.git//modules/resources/gpu?ref=v1.8.1"
+  source = "git::https://github.com/abridgeai/coder.git//modules/resources/gpu?ref=v1.8.6"
 }
 
 module "git_utilities" {
-  source       = "git::https://github.com/abridgeai/coder.git//modules/utilities/git?ref=v1.8.1"
+  source       = "git::https://github.com/abridgeai/coder.git//modules/utilities/git?ref=v1.8.6"
   start_count  = data.coder_workspace.me.start_count
   agent_id     = coder_agent.main.id
   repo_url     = data.coder_parameter.repository_url.value
@@ -46,21 +46,19 @@ module "git_utilities" {
 }
 
 module "ide_utilities" {
-  source            = "git::https://github.com/abridgeai/coder.git//modules/utilities/ide?ref=v1.8.1"
-  start_count       = data.coder_workspace.me.start_count
-  agent_id          = coder_agent.main.id
-  user_name         = data.coder_workspace_owner.me.name
-  workdir           = local.repo_dir
-  anthropic_api_key = var.anthropic_api_key
-  openai_api_key    = var.openai_api_key
+  source           = "git::https://github.com/abridgeai/coder.git//modules/utilities/ide?ref=v1.8.6"
+  start_count      = data.coder_workspace.me.start_count
+  agent_id         = coder_agent.main.id
+  user_name        = data.coder_workspace_owner.me.name
+  enable_jetbrains = data.coder_parameter.enable_jetbrains.value
 }
 
 module "logger" {
-  source = "git::https://github.com/abridgeai/coder.git//modules/logger?ref=v1.8.1"
+  source = "git::https://github.com/abridgeai/coder.git//modules/logger?ref=v1.8.6"
 }
 
 module "utd_bucket" {
-  source                 = "git::https://github.com/abridgeai/coder.git//modules/utilities/gcs-bucket?ref=v1.8.1"
+  source                 = "git::https://github.com/abridgeai/coder.git//modules/utilities/gcs-bucket?ref=v1.8.6"
   environment            = var.environment
   workspace_owner_groups = data.coder_workspace_owner.me.groups
   required_group         = "UTDACCESS"
@@ -75,13 +73,6 @@ module "utd_bucket" {
 
 ############################
 # PARAMETERS
-data "coder_parameter" "ai_prompt" {
-  type        = "string"
-  name        = "AI Prompt"
-  default     = ""
-  description = "Initial task prompt for Claude Code."
-  mutable     = true
-}
 ############################
 data "coder_parameter" "repository_url" {
   name         = "repository_url"
@@ -91,6 +82,15 @@ data "coder_parameter" "repository_url" {
   mutable      = true
   order        = 1
   type         = "string"
+}
+
+data "coder_parameter" "enable_jetbrains" {
+  name         = "enable_jetbrains"
+  display_name = "Enable JetBrains Gateway"
+  description  = "Enable JetBrains Gateway IDE access"
+  type         = "bool"
+  default      = false
+  mutable      = true
 }
 
 data "coder_parameter" "gpu_accelerator" {
