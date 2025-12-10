@@ -1,23 +1,23 @@
 #!/bin/bash
-set -e
+set -euo pipefail
 
-# If a repo is requested, ensure GitHub auth is present; fail fast with guidance
+# Check GitHub authentication if repo cloning is required
 if [ "${should_clone}" = "true" ] && [ -z "$${GITHUB_TOKEN}" ]; then
-  echo "GitHub authentication is required to clone ${repo_url} but was not found."
-  echo "Please authenticate with GitHub in Coder (Account → External Authentication), then retry."
+  echo "GitHub authentication required to clone ${repo_url}"
+  echo "Please authenticate via Coder (Account → External Authentication)"
   exit 1
 fi
 
-# Install and start code-server
+# Install code-server if not present
 export CODE_SERVER_DIR="/tmp/code-server"
-
 if [ ! -f "$CODE_SERVER_DIR/bin/code-server" ]; then
   mkdir -p "$CODE_SERVER_DIR"
-  curl -fsSL https://code-server.dev/install.sh | sh -s -- --method=standalone --prefix="$CODE_SERVER_DIR" || exit 1
+  curl -fsSL https://code-server.dev/install.sh | sh -s -- --method=standalone --prefix="$CODE_SERVER_DIR"
 fi
 
 # Install VS Code extensions
 $CODE_SERVER_DIR/bin/code-server --install-extension ms-python.python
 $CODE_SERVER_DIR/bin/code-server --install-extension ms-toolsai.jupyter
 
+# Start code-server
 $CODE_SERVER_DIR/bin/code-server --auth none --port 13337 >/tmp/code-server.log 2>&1 &

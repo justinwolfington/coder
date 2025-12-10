@@ -3,32 +3,16 @@ set -euo pipefail
 
 echo "Initializing environment for ${username}..."
 
-# Harden OS: Update and upgrade
+# Update system packages (skip NVIDIA drivers to avoid version conflicts)
 export DEBIAN_FRONTEND=noninteractive
-export NEEDRESTART_MODE=a
-
-echo "Checking dpkg state..."
-dpkg --configure -a --force-confdef --force-confold || true
-
-# Update and install packages (with built-in retry via apt)
-echo "Updating and installing packages..."
-
-# do not upgrade nvidia packages
-# updating nvidia packages makes the system go out of sync with the ones installed by the image
-pkgs=$(dpkg-query -W -f='$${binary:Package}\n' | grep -E '^(nvidia-|libnvidia-|fabricmanager-)')
-if [ -n "$pkgs" ]; then
-    apt-mark hold $pkgs
-fi
+apt-mark hold 'nvidia-*' 'libnvidia-*' 'fabricmanager-*' 2>/dev/null || true
 
 apt-get update -y
-apt-get upgrade -y --fix-missing -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" || \
-  apt-get upgrade -y --fix-missing -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold"  # Simple retry
-apt-get install -y --fix-missing -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" \
-  curl wget git vim htop unzip jq sudo build-essential
+apt-get install -y curl wget git vim htop unzip jq sudo build-essential
 
-apt-mark unhold $pkgs
+apt-mark unhold 'nvidia-*' 'libnvidia-*' 'fabricmanager-*' 2>/dev/null || true
 
-# User setup with sudo and docker
+# Create user with sudo access
 if ! id "${username}" &>/dev/null; then
     useradd -m -s /bin/bash "${username}"
     echo "${username} ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/${username}
@@ -38,57 +22,38 @@ fi
 
 chown -R "${username}:${username}" "/home/${username}"
 
-# Install Docker (if not already)
+# Install Docker
 if ! command -v docker &>/dev/null; then
     curl -fsSL https://get.docker.com | sh
     systemctl enable --now docker
     usermod -aG docker "${username}"
 fi
-# Mount local SSDs if available (for H100 instances)
+
+# Mount local NVMe SSDs for H100 instances
 if [[ "${gpu_type}" == "nvidia-h100-80gb" ]]; then
     echo "Setting up local NVMe storage..."
     mkdir -p /mnt/nvme
-    # Find and mount NVMe devices
     for device in /dev/nvme*n1; do
         if [[ -e "$device" ]]; then
             mount_point="/mnt/nvme/$(basename "$device")"
             mkdir -p "$mount_point"
-            mkfs.ext4 -F "$device" || echo "Failed to format $device"
-            mount "$device" "$mount_point" || echo "Failed to mount $device"
+            mkfs.ext4 -F "$device" 2>/dev/null || true
+            mount "$device" "$mount_point" 2>/dev/null || true
             chown -R "${username}:${username}" "$mount_point"
         fi
     done
     echo "Local NVMe storage ready"
 fi
 
-# IDE tools (VS Code server)
+# Configure git defaults
 su - "${username}" -c "
-    curl -fsSL https://code-server.dev/install.sh | sh -s -- --method=standalone
-    mkdir -p ~/.config/code-server
-    cat > ~/.config/code-server/config.yaml <<EOL
-bind-addr: 0.0.0.0:8080
-auth: none
-cert: false
-EOL
-"
-
-# Setup user environment
-su - "${username}" -c "
-    export HOME=/home/${username}
-    echo 'export PATH=\$PATH:/usr/local/go/bin:\$HOME/go/bin' >> ~/.bashrc
-    echo 'export HOME=/home/${username}' >> ~/.bashrc
-    mkdir -p ~/workspace ~/projects
     git config --global init.defaultBranch main
     git config --global user.name '${username}'
     git config --global user.email '${useremail}'
 "
 
-# Set up environment variables for the coder agent
+# Set environment variables
 echo "export HOME=/home/${username}" >> /etc/environment
 echo "export USER=${username}" >> /etc/environment
 
 echo "Workspace setup complete for ${username}: Machine: ${gpu_type} | Image: ${dl_image}"
-
-# Cleanup (optional, for security)
-apt-get clean
-echo "Startup script completed!"
