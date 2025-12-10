@@ -89,20 +89,20 @@ data "coder_parameter" "dl_image" {
   display_name = "Deep Learning Image"
   description  = "Select deep learning platform image"
   type         = "string"
-  default      = "pytorch-2-7-cu128-ubuntu-2204-nvidia-570-v20250922"
+  default      = "pytorch-2-7-cu128-ubuntu-2204-nvidia-570-v20251119"
   mutable      = true
 
   option {
     name  = "PyTorch 2.7 + CUDA 12.8 (Ubuntu 22.04)"
-    value = "pytorch-2-7-cu128-ubuntu-2204-nvidia-570-v20250922"
+    value = "pytorch-2-7-cu128-ubuntu-2204-nvidia-570-v20251119"
   }
   option {
     name  = "Multi-Framework + CUDA 12.8 (Ubuntu 22.04)"
-    value = "common-cu128-ubuntu-2204-nvidia-570-v20250922"
+    value = "common-cu128-ubuntu-2204-nvidia-570-v20251209"
   }
   option {
     name  = "Ubuntu 24.04 Noble (Clean Base)"
-    value = "ubuntu-2404-noble-amd64-v20250920"
+    value = "ubuntu-2404-noble-amd64-v20251205"
   }
 }
 
@@ -222,9 +222,9 @@ locals {
   # gcloud compute images list --project ubuntu-os-cloud --format="value(NAME)" --filter="name~ubuntu-2404"
 
   dl_images = {
-    "pytorch-2-7-cu128-ubuntu-2204-nvidia-570-v20250922" = "projects/deeplearning-platform-release/global/images/pytorch-2-7-cu128-ubuntu-2204-nvidia-570-v20250922"
-    "common-cu128-ubuntu-2204-nvidia-570-v20250922"      = "projects/deeplearning-platform-release/global/images/common-cu128-ubuntu-2204-nvidia-570-v20250922"
-    "ubuntu-2404-noble-amd64-v20250920"                  = "projects/ubuntu-os-cloud/global/images/ubuntu-2404-noble-amd64-v20250920"
+    "pytorch-2-7-cu128-ubuntu-2204-nvidia-570-v20251119" = "projects/deeplearning-platform-release/global/images/pytorch-2-7-cu128-ubuntu-2204-nvidia-570-v20251119"
+    "common-cu128-ubuntu-2204-nvidia-570-v20251209"      = "projects/deeplearning-platform-release/global/images/common-cu128-ubuntu-2204-nvidia-570-v20251209"
+    "ubuntu-2404-noble-amd64-v20251205"                  = "projects/ubuntu-os-cloud/global/images/ubuntu-2404-noble-amd64-v20251205"
   }
   image = local.dl_images[data.coder_parameter.dl_image.value]
 
