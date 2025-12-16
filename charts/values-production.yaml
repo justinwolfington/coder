@@ -170,6 +170,13 @@ networkPolicy:
       selector:
         app.kubernetes.io/name: eyes-new
         app.kubernetes.io/instance: eyes-v1
+    
+    - name: mc-llm-gateway-evals-gw
+      namespace: llm-gateway
+      port: 80
+      selector:
+        app: llm-gateway-evals
+        component: gateway-service
 
   # Additional egress rules for general internet access
   additionalEgressRules:
