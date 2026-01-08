@@ -1,6 +1,12 @@
 variable "environment" {
   type        = string
-  description = "Environment (e.g., production, staging)"
+  description = "Current environment (e.g., production, staging)"
+}
+
+variable "supported_environments" {
+  type        = list(string)
+  description = "List of environments where this bucket can be mounted"
+  default     = ["production"]
 }
 
 variable "workspace_owner_groups" {

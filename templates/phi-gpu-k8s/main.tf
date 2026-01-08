@@ -31,15 +31,15 @@ data "coder_workspace_owner" "me" {}
 # SHARED MODULES
 ############################
 module "cpu_resources" {
-  source = "git::https://github.com/abridgeai/coder.git//modules/resources/cpu?ref=v1.8.6"
+  source = "git::https://github.com/abridgeai/coder.git//modules/resources/cpu?ref=v1.8.7"
 }
 
 module "gpu_resources" {
-  source = "git::https://github.com/abridgeai/coder.git//modules/resources/gpu?ref=v1.8.6"
+  source = "git::https://github.com/abridgeai/coder.git//modules/resources/gpu?ref=v1.8.7"
 }
 
 module "git_utilities" {
-  source       = "git::https://github.com/abridgeai/coder.git//modules/utilities/git?ref=v1.8.6"
+  source       = "git::https://github.com/abridgeai/coder.git//modules/utilities/git?ref=v1.8.7"
   start_count  = data.coder_workspace.me.start_count
   agent_id     = coder_agent.main.id
   repo_url     = data.coder_parameter.repository_url.value
@@ -48,11 +48,12 @@ module "git_utilities" {
 }
 
 module "utd_bucket" {
-  source                  = "git::https://github.com/abridgeai/coder.git//modules/utilities/gcs-bucket?ref=v1.8.6"
+  source                  = "git::https://github.com/abridgeai/coder.git//modules/utilities/gcs-bucket?ref=v1.8.7"
   environment             = var.environment
+  supported_environments  = ["production", "staging"]
   workspace_owner_groups  = data.coder_workspace_owner.me.groups
   required_group          = "UTDACCESS"
-  bucket_name             = "abridge-client-prod-wk-secure-bucket"
+  bucket_name             = lookup({ production = "abridge-client-prod-wk-secure-bucket", staging = "abridge-client-staging-wk-secure-bucket" }, var.environment, "")
   mount_path              = "/utddata"
   mount_options           = "implicit-dirs,only-dir=decrypt"
   parameter_name          = "utd_bucket_access"

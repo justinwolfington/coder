@@ -26,6 +26,7 @@ Centralizes GCS bucket mounting logic to:
 module "utd_bucket" {
   source                  = "git::https://github.com/abridgeai/coder.git//modules/utilities/gcs-bucket?ref=COMMIT_HASH"
   environment             = var.environment
+  supported_environments  = ["production", "staging"]
   workspace_owner_groups  = data.coder_workspace_owner.me.groups
   required_group          = "UTDACCESS"
   bucket_name             = "abridge-client-prod-wk-secure-bucket"
@@ -123,7 +124,8 @@ module "research_bucket" {
 
 | Variable | Type | Description | Default |
 |----------|------|-------------|---------|
-| `environment` | string | Environment (e.g., production, staging) | Required |
+| `environment` | string | Current environment (e.g., production, staging) | Required |
+| `supported_environments` | list(string) | List of environments where this bucket can be mounted | `["production"]` |
 | `workspace_owner_groups` | list(string) | List of groups the workspace owner belongs to | Required |
 | `required_group` | string | Group name required for bucket access | Required |
 | `bucket_name` | string | GCS bucket name to mount | Required |

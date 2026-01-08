@@ -7,10 +7,10 @@ terraform {
   }
 }
 
-# Dynamic parameter for GCS bucket access - only visible to authorized groups in specified environment
+# Dynamic parameter for GCS bucket access - only visible to authorized groups in supported environments
 data "coder_parameter" "gcs_bucket_access" {
   count = (
-    var.environment == "production" &&
+    contains(var.supported_environments, var.environment) &&
     contains(var.workspace_owner_groups, var.required_group)
   ) ? 1 : 0
 
