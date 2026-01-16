@@ -173,6 +173,10 @@ networkPolicy:
 
   # Additional egress rules for general internet access
   additionalEgressRules:
+    # Allow access to internal PostgreSQL server (all ports)
+    - to:
+        - ipBlock:
+            cidr: 10.6.0.104/32
     - ports:
         - port: 80
           protocol: TCP
