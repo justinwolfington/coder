@@ -18,4 +18,3 @@ WORKDIR ${PHOENIX_WORKING_DIR}
 EXPOSE ${PHOENIX_PORT} ${PHOENIX_GRPC_PORT}
 
 # Use the default command from the base image
-# This will inherit the CMD from arizephoenix/phoenix:latest
