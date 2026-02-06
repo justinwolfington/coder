@@ -157,19 +157,18 @@ coder:
 # Production-specific network policy configuration
 networkPolicy:
   allowedServices:
-    - name: elms
-      port: 80
-      namespace: elms
-      selector:
-        app.kubernetes.io/name: elms
-        app.kubernetes.io/instance: elms
-
     - name: eyes
       port: 8000
       namespace: eyes-v1
       selector:
         app.kubernetes.io/name: eyes-new
         app.kubernetes.io/instance: eyes-v1
+    - name: llm-gateway-evals
+      port: 80
+      namespace: llm-gateway
+      selector:
+        app: llm-gateway-evals
+        component: gateway-service
 
   # Additional egress rules for general internet access
   additionalEgressRules:
