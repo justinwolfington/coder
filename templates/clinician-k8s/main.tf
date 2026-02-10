@@ -238,6 +238,10 @@ resource "kubernetes_deployment" "main" {
         })
       }
       spec {
+        node_selector = {
+          "cloud.google.com/compute-class" = "cpu-coder-class"
+        }
+
         security_context {
           run_as_user     = "1000"
           fs_group        = "1000"

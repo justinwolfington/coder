@@ -97,7 +97,7 @@ data "coder_parameter" "enable_jetbrains" {
 data "coder_parameter" "gpu_accelerator" {
   name         = "gpu_accelerator"
   display_name = "GPU Accelerator Type"
-  description  = "Choose GPU type. Must match 'cloud.google.com/gke-accelerator' label values on GKE nodes. Leave empty for CPU-only."
+  description  = "Choose GPU type. Leave empty for CPU-only."
   default      = ""
   mutable      = true
   order        = 5
@@ -189,9 +189,15 @@ locals {
     "6_load_host"      = { name = "Load Average (Host)", script = "echo \"`cat /proc/loadavg | awk '{ print $1 }'` `nproc`\" | awk '{ printf \"%0.2f\", $1/$2 }'" }
   }
 
-  gpu_node_selector = data.coder_parameter.gpu_accelerator.value != "" ? {
-    "cloud.google.com/gke-accelerator" = data.coder_parameter.gpu_accelerator.value
-  } : {}
+  compute_class_map = {
+    ""                 = "cpu-coder-class"
+    "nvidia-l4"        = "l4-class"
+    "nvidia-h100-80gb" = "h100-coder-class"
+  }
+
+  node_selector = {
+    "cloud.google.com/compute-class" = local.compute_class_map[data.coder_parameter.gpu_accelerator.value]
+  }
 
   # Conditional GPU resource requests and limits
   gpu_requests = data.coder_parameter.gpu_accelerator.value != "" ? {
@@ -297,7 +303,7 @@ resource "kubernetes_deployment" "main" {
       }
       spec {
         service_account_name = local.utd_bucket_enabled ? "coder" : null
-        node_selector        = data.coder_parameter.gpu_accelerator.value != "" ? local.gpu_node_selector : null
+        node_selector        = local.node_selector
 
         security_context {
           # Run as root for unrestricted access
