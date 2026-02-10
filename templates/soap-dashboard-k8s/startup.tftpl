@@ -1,0 +1,109 @@
+#!/bin/bash
+set -euo pipefail
+
+# Configuration
+export USER_HOME="/home/vscode"
+export REPO_DIR="$USER_HOME/clinician-web"
+export SOAP_DIR="$REPO_DIR/apps/soap-dashboard"
+
+# Check GitHub authentication
+if [ -z "$${GITHUB_TOKEN:-}" ]; then
+  echo "GitHub authentication required to clone clinician-web"
+  echo "Please authenticate via Coder (Account -> External Authentication)"
+  exit 1
+fi
+
+# Set up user environment
+sudo cp /root/.bashrc "$USER_HOME/.bashrc"
+sudo chown vscode:vscode "$USER_HOME/.bashrc"
+
+# Install Node.js 20 via nvm if not present
+export NVM_DIR="$USER_HOME/.nvm"
+if [ ! -d "$NVM_DIR" ]; then
+  echo "Installing nvm and Node.js 20..."
+  curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
+fi
+
+# Load nvm and install node
+export NVM_DIR="$USER_HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+nvm install 20
+nvm use 20
+nvm alias default 20
+
+# Add nvm to bashrc for subsequent shells
+cat >> "$USER_HOME/.bashrc" << 'BASHRC'
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
+BASHRC
+
+# Ensure npm 10
+npm install -g npm@10
+
+# Configure npm auth for @abridge private packages
+if [ -n "$${NPM_TOKEN:-}" ]; then
+  echo "Configuring npm authentication..."
+  echo "//registry.npmjs.org/:_authToken=$${NPM_TOKEN}" >> "$USER_HOME/.npmrc"
+fi
+
+# Google credentials will be written after repo clone
+
+# Install code-server if not present
+export CODE_SERVER_DIR="/tmp/code-server"
+if [ ! -f "$CODE_SERVER_DIR/bin/code-server" ]; then
+  mkdir -p "$CODE_SERVER_DIR"
+  curl -fsSL https://code-server.dev/install.sh | sh -s -- --method=standalone --prefix="$CODE_SERVER_DIR"
+fi
+
+# Install VS Code extensions for web development
+$CODE_SERVER_DIR/bin/code-server --install-extension dbaeumer.vscode-eslint
+$CODE_SERVER_DIR/bin/code-server --install-extension esbenp.prettier-vscode
+$CODE_SERVER_DIR/bin/code-server --install-extension bradlc.vscode-tailwindcss
+
+# Start code-server
+$CODE_SERVER_DIR/bin/code-server --auth none --port 13337 >/tmp/code-server.log 2>&1 &
+
+# Install Claude Code CLI
+echo "Installing Claude Code CLI..."
+curl -fsSL https://claude.ai/install.sh | bash || echo "Claude Code installation failed, continuing..."
+
+# Add Claude Code to PATH in bashrc
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$USER_HOME/.bashrc"
+export PATH="$USER_HOME/.local/bin:$PATH"
+
+cd "$REPO_DIR"
+
+# Install npm dependencies
+echo "Installing npm dependencies..."
+npm install
+
+# Build local dependencies (required before running)
+echo "Building local dependencies..."
+npm run build:deps
+
+# Setup .env.local for soap-dashboard if not exists
+if [ ! -f "$SOAP_DIR/.env.local" ]; then
+  echo "Setting up .env.local from .env.example..."
+  cp "$SOAP_DIR/.env.example" "$SOAP_DIR/.env.local"
+fi
+
+# Set LaunchDarkly SDK key
+if [ -n "$${LAUNCH_DARKLY_SDK_KEY:-}" ]; then
+  echo "Setting LaunchDarkly SDK key..."
+  sed -i "s|^LAUNCH_DARKLY_SDK_KEY=.*|LAUNCH_DARKLY_SDK_KEY=$${LAUNCH_DARKLY_SDK_KEY}|" "$SOAP_DIR/.env.local"
+fi
+
+# Write Google Application Credentials to soap-dashboard directory
+if [ -n "$${GOOGLE_APPLICATION_CREDENTIALS_JSON:-}" ]; then
+  echo "Setting up Google Application Credentials..."
+  echo "$${GOOGLE_APPLICATION_CREDENTIALS_JSON}" > "$SOAP_DIR/.gcp-credentials.json"
+  sed -i "s|^GOOGLE_APPLICATION_CREDENTIALS=.*|GOOGLE_APPLICATION_CREDENTIALS=$SOAP_DIR/.gcp-credentials.json|" "$SOAP_DIR/.env.local"
+fi
+
+# Start SOAP Dashboard dev server
+echo "Starting SOAP Dashboard..."
+npm run dev:soap >/tmp/soap-dashboard.log 2>&1 &
+
+echo "SOAP Dashboard is starting on http://localhost:3000"
+echo "Logs available at /tmp/soap-dashboard.log"

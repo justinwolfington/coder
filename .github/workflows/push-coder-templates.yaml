@@ -22,20 +22,20 @@ on:
   workflow_dispatch:
     inputs:
       template_name:
-        description: 'Specific template name to push (optional, pushes all if empty)'
+        description: "Specific template name to push (optional, pushes all if empty)"
         required: false
         type: string
       environment:
-        description: 'Environment to deploy to (development, staging, production)'
+        description: "Environment to deploy to (development, staging, production)"
         required: true
-        default: 'development'
+        default: "development"
         type: choice
         options:
           - development
           - staging
           - production
       module_version:
-        description: 'Module version to use (optional, uses environment default if empty)'
+        description: "Module version to use (optional, uses environment default if empty)"
         required: false
         type: string
 
@@ -55,7 +55,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: "18"
 
       - name: Set up Terraform
         uses: hashicorp/setup-terraform@v3
@@ -129,13 +129,12 @@ jobs:
         run: |
           # Import terraform state for templates that already exist
           # This prevents "already exists" errors by recognizing existing templates
-          terraform import 'coderd_template.templates["gcp-vm-modular"]' coder/gcp-vm-modular || true
-          terraform import 'coderd_template.templates["k8s-completion-service"]' coder/k8s-completion-service || true
-          terraform import 'coderd_template.templates["cpu-k8s"]' coder/cpu-k8s || true
-          terraform import 'coderd_template.templates["gpu-k8s"]' coder/gpu-k8s || true
-          terraform import 'coderd_template.templates["phi-gpu-k8s"]' coder/phi-gpu-k8s || true
-          terraform import 'coderd_template.templates["skypilot-k8s"]' coder/skypilot-k8s || true
-
+          # Template names are extracted from templates-config.tf so new templates
+          # are picked up automatically without editing this workflow.
+          grep '= merge({' templates-config.tf | sed 's/.*"\([^"]*\)".*/\1/' | while read -r name; do
+            echo "Importing template: ${name}"
+            terraform import "coderd_template.templates[\"${name}\"]" "coder/${name}" || true
+          done
 
       - name: Validate Terraform configuration
         working-directory: ./templates

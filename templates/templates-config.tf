@@ -62,6 +62,14 @@ locals {
       directory    = "./skypilot-k8s"
       environments = ["development", "staging", "production"]
     }, local.standard_timings)
+
+    "soap-dashboard-k8s" = merge({
+      display_name = "SOAP Dashboard"
+      description  = "Development workspace for SOAP Dashboard with Claude Code. Pre-configured for PMs to vibe code."
+      icon         = "/emojis/1f4cb.png"
+      directory    = "./soap-dashboard-k8s"
+      environments = ["development", "staging", "production"]
+    }, local.standard_timings)
   }
 
   # Filter templates based on target environment
