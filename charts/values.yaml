@@ -23,6 +23,8 @@ phiIstio:
     - unpkg.com
     # model repositories
     - huggingface.co
+    - cdn-lfs.huggingface.co
+    - cdn-lfs-us-1.huggingface.co
     # Google OAuth (for gcloud auth login)
     - accounts.google.com
     - oauth2.googleapis.com
