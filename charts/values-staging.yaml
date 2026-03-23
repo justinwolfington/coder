@@ -82,6 +82,9 @@ coder:
       - name: TF_VAR_environment
         value: staging
 
+      - name: TF_VAR_judges_openai_base_url
+        value: "https://llm-gateway-evals.abridge.cafe/v1"
+
     # mount the git secrets to enable coder to pull modules from coder repo
     # the following secrets have read only access to the coder repo
     volumes:

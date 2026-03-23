@@ -358,7 +358,6 @@ resource "kubernetes_deployment" "main" {
             name  = "CODER_AGENT_SUBSYSTEM"
             value = "exectrace"
           }
-
           # Pass GitHub token to container so startup checks and git operations can use it
           env {
             name  = "GITHUB_TOKEN"

@@ -319,6 +319,11 @@ resource "kubernetes_deployment" "main" {
             value = "https://us.api.openai.com/v1"
           }
 
+          env {
+            name  = "JUDGES_OPENAI_BASE_URL"
+            value = var.judges_openai_base_url
+          }
+
           # Pass GitHub token to container so startup checks and git operations can use it
           env {
             name  = "GITHUB_TOKEN"
