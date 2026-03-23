@@ -1,8 +1,8 @@
-# Custom Arize Phoenix Dockerfile based on official image - Last checked: 2025-12-09
+# Custom Arize Phoenix Dockerfile based on official image - Last checked: 2026-03-23
 FROM arizephoenix/phoenix:latest
 
 # Label to track last verification date (forces rebuild when updated)
-LABEL last_verified="2025-12-09"
+LABEL last_verified="2026-03-23"
 
 # Set all environment variables needed for our deployment
 # https://arize.com/docs/phoenix/self-hosting/configuration

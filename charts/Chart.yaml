@@ -5,9 +5,9 @@ type: application
 version: 0.1.0
 dependencies:
   - name: coder
-    version: 2.29.6
+    version: 2.30.4
     repository: https://helm.coder.com/v2
   - name: coder-logstream-kube
-    version: v0.0.13
+    version: v0.0.15
     repository: https://helm.coder.com/logstream-kube
     condition: coder-logstream-kube.enabled
