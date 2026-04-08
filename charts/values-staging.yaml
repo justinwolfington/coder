@@ -17,9 +17,9 @@ coder:
       - name: CODER_PG_CONNECTION_URL
         value: "postgres://$(DB_USER)@localhost:5432/$(DB_NAME)?sslmode=disable"
 
-      # Required: external URL for login/workspace links (e.g. https://coder.abridge.cafe)
+      # Required: external URL for login/workspace links (e.g. https://staging-coder.abridge.teleport.sh)
       - name: CODER_ACCESS_URL
-        value: https://coder.abridge.cafe
+        value: https://staging-coder.abridge.teleport.sh
 
       # Restrict to specific GitHub org(s)
       - name: CODER_OAUTH2_GITHUB_ALLOWED_ORGS
