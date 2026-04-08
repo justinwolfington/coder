@@ -99,11 +99,12 @@ jobs:
 
       - name: Create environment tfvars in each template directory
         run: |
-          echo "Creating terraform.auto.tfvars with environment=${{ github.event.inputs.environment || 'development' }} in each template"
+          echo "Creating terraform.auto.tfvars with environment and coder_url in each template"
           for template_dir in templates/*/; do
             if [ -f "${template_dir}main.tf" ]; then
               cat > "${template_dir}terraform.auto.tfvars" <<EOF
           environment = "${{ github.event.inputs.environment || 'development' }}"
+          coder_url   = "${{ vars.CODER_ACCESS_URL }}"
           EOF
               echo "Created tfvars in ${template_dir}"
             fi

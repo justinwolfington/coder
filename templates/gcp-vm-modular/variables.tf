@@ -1,3 +1,9 @@
+variable "coder_url" {
+  type        = string
+  description = "Coder access URL for the provider."
+  default     = ""
+}
+
 variable "zone" {
   description = "Google Cloud zone for the compute instance"
   type        = string

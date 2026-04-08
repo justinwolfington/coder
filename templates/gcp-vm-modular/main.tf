@@ -14,7 +14,9 @@ terraform {
 ############################
 # PROVIDERS
 ############################
-provider "coder" {}
+provider "coder" {
+  url = var.coder_url
+}
 provider "google" {
   project = local.env_config.project_id
   zone    = var.zone

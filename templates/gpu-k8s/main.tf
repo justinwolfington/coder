@@ -14,7 +14,9 @@ terraform {
 ############################
 # PROVIDERS
 ############################
-provider "coder" {}
+provider "coder" {
+  url = var.coder_url
+}
 
 provider "kubernetes" {
   config_path = null

@@ -4,6 +4,12 @@ variable "namespace" {
   default     = "coder"
 }
 
+variable "coder_url" {
+  type        = string
+  description = "Coder access URL for the provider."
+  default     = ""
+}
+
 variable "judges_openai_base_url" {
   type        = string
   description = "Base URL for the judges OpenAI-compatible API (llm-gateway)."
