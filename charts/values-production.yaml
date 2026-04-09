@@ -17,9 +17,9 @@ coder:
       - name: CODER_PG_CONNECTION_URL
         value: "postgres://$(DB_USER)@localhost:5432/$(DB_NAME)?sslmode=disable"
 
-      # Required: external URL for login/workspace links (e.g. https://prod-coder.abridge.teleport.sh)
+      # Required: external URL for login/workspace links (e.g. https://coder.abridge.services)
       - name: CODER_ACCESS_URL
-        value: https://prod-coder.abridge.teleport.sh
+        value: https://coder.abridge.services
 
       # Restrict to specific GitHub org(s)
       - name: CODER_OAUTH2_GITHUB_ALLOWED_ORGS
@@ -203,4 +203,4 @@ phiIstio:
 # Enable Kubernetes event streaming for production environment
 coder-logstream-kube:
   enabled: true
-  url: https://prod-coder.abridge.teleport.sh # Must match CODER_ACCESS_URL above
+  url: https://coder.abridge.services # Must match CODER_ACCESS_URL above

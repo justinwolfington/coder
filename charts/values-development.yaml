@@ -17,9 +17,9 @@ coder:
       - name: CODER_PG_CONNECTION_URL
         value: "postgres://$(DB_USER)@localhost:5432/$(DB_NAME)?sslmode=disable"
 
-      # Required: external URL for login/workspace links (e.g. https://dev-coder.abridge.teleport.sh)
+      # Required: external URL for login/workspace links (e.g. https://coder.abridge.coffee)
       - name: CODER_ACCESS_URL
-        value: https://dev-coder.abridge.teleport.sh
+        value: https://coder.abridge.coffee
 
       # Restrict to specific GitHub org(s)
       - name: CODER_OAUTH2_GITHUB_ALLOWED_ORGS
@@ -166,7 +166,7 @@ phiIstio:
 # Enable Kubernetes event streaming for development environment
 coder-logstream-kube:
   enabled: false
-  url: https://dev-coder.abridge.teleport.sh # Must match CODER_ACCESS_URL above
+  url: https://coder.abridge.coffee # Must match CODER_ACCESS_URL above
 
 # SOAP Dashboard secrets for clinician-web development
 soapDashboard:
