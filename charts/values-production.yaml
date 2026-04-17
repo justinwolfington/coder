@@ -196,6 +196,10 @@ phiIstio:
   allowedHosts:
     # Coder server - workspace agents need to connect to this
     - coder.abridge.services
+    # Secret Manager - allow JIT-granted roles/secretmanager.secretAccessor
+    # to fetch approved secrets (e.g. ehr_interop_api_key) from inside the
+    # Prod PHI workspace instead of copying them in from outside.
+    - secretmanager.googleapis.com
   allowedHttpHosts:
     - deid.abridge.services
     - encounter-processor-api.abridge.services
