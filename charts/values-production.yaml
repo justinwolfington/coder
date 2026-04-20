@@ -203,6 +203,10 @@ phiIstio:
   allowedHttpHosts:
     - deid.abridge.services
     - encounter-processor-api.abridge.services
+    # ehr-interop API - allow PriorNoteFetcher and other ehr-interop calls
+    # from inside the Prod PHI workspace using an x-api-key fetched via
+    # Secret Manager.
+    - ehr-interop-nestjs-api.abridge.services
 
 # Enable Kubernetes event streaming for production environment
 coder-logstream-kube:
