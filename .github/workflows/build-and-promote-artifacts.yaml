@@ -95,6 +95,16 @@ jobs:
       REPO: coder
       SHORT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
     steps:
+      - name: Free disk space
+        uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be # v1.3.1
+        with:
+          tool-cache: true
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: false
+          swap-storage: true
+
       - name: Set Short SHA
         run: echo "SHORT_SHA=${SHORT_SHA:0:7}" >> $GITHUB_ENV
 

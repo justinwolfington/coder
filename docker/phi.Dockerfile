@@ -14,7 +14,7 @@ ENV UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy
 
 # Copy UV binary from official image and set up
-COPY --from=ghcr.io/astral-sh/uv:0.10.12 /uv /bin/uv
+COPY --from=ghcr.io/astral-sh/uv:0.11.7 /uv /bin/uv
 
 # Copy Node.js from official image
 COPY --from=node:22 /usr/local/bin/node /usr/local/bin/node

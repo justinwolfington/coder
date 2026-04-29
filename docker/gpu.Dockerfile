@@ -14,7 +14,7 @@ ENV UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy
 
 # Copy UV binary from official image and set up
-COPY --from=ghcr.io/astral-sh/uv:0.10.12 /uv /bin/uv
+COPY --from=ghcr.io/astral-sh/uv:0.11.7 /uv /bin/uv
 
 # Install build dependencies and system packages
 RUN apt-get update && \
