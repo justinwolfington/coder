@@ -117,6 +117,10 @@ data "coder_parameter" "gpu_accelerator" {
     name  = "NVIDIA H100 (80GB)"
     value = "nvidia-h100-80gb"
   }
+  option {
+    name  = "NVIDIA RTX PRO 6000"
+    value = "nvidia-rtx-pro-6000"
+  }
 }
 
 data "coder_parameter" "gpu_count" {
@@ -192,9 +196,10 @@ locals {
   }
 
   compute_class_map = {
-    ""                 = "cpu-coder-class"
-    "nvidia-l4"        = "l4-class"
-    "nvidia-h100-80gb" = "h100-coder-class"
+    ""                    = "cpu-coder-class"
+    "nvidia-l4"           = "l4-class"
+    "nvidia-h100-80gb"    = "h100-coder-class"
+    "nvidia-rtx-pro-6000" = "rtx6000-class"
   }
 
   node_selector = {

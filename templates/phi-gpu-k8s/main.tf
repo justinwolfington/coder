@@ -50,18 +50,18 @@ module "git_utilities" {
 }
 
 module "utd_bucket" {
-  source                  = "git::https://github.com/abridgeai/coder.git//modules/utilities/gcs-bucket?ref=v1.8.7"
-  environment             = var.environment
-  supported_environments  = ["production", "staging", "development"]
-  workspace_owner_groups  = data.coder_workspace_owner.me.groups
-  required_group          = "UTDACCESS"
-  bucket_name             = lookup({ production = "abridge-client-prod-wk-secure-bucket", staging = "abridge-client-staging-wk-secure-bucket", development = "client-dev-e301d-wk-secure-bucket" }, var.environment, "")
-  mount_path              = "/utddata"
-  mount_options           = "implicit-dirs,only-dir=decrypt"
-  parameter_name          = "utd_bucket_access"
-  display_name            = "UTD Bucket Mount"
-  description             = "Enable to mount the UTD secure bucket at /utddata"
-  parameter_order         = 10
+  source                 = "git::https://github.com/abridgeai/coder.git//modules/utilities/gcs-bucket?ref=v1.8.7"
+  environment            = var.environment
+  supported_environments = ["production", "staging", "development"]
+  workspace_owner_groups = data.coder_workspace_owner.me.groups
+  required_group         = "UTDACCESS"
+  bucket_name            = lookup({ production = "abridge-client-prod-wk-secure-bucket", staging = "abridge-client-staging-wk-secure-bucket", development = "client-dev-e301d-wk-secure-bucket" }, var.environment, "")
+  mount_path             = "/utddata"
+  mount_options          = "implicit-dirs,only-dir=decrypt"
+  parameter_name         = "utd_bucket_access"
+  display_name           = "UTD Bucket Mount"
+  description            = "Enable to mount the UTD secure bucket at /utddata"
+  parameter_order        = 10
 }
 
 ############################
@@ -97,6 +97,10 @@ data "coder_parameter" "gpu_accelerator" {
   option {
     name  = "NVIDIA H100 (80GB)"
     value = "nvidia-h100-80gb"
+  }
+  option {
+    name  = "NVIDIA RTX PRO 6000"
+    value = "nvidia-rtx-pro-6000"
   }
 }
 
@@ -174,9 +178,10 @@ locals {
   }
 
   compute_class_map = {
-    ""                 = "cpu-coder-class"
-    "nvidia-l4"        = "l4-class"
-    "nvidia-h100-80gb" = "h100-coder-class"
+    ""                    = "cpu-coder-class"
+    "nvidia-l4"           = "l4-class"
+    "nvidia-h100-80gb"    = "h100-coder-class"
+    "nvidia-rtx-pro-6000" = "rtx6000-class"
   }
 
   node_selector = {
@@ -284,7 +289,7 @@ resource "kubernetes_deployment" "main" {
 
     template {
       metadata {
-        labels      = local.labels
+        labels = local.labels
         annotations = merge(local.annotations, {
           "sidecar.istio.io/inject"                          = "true"
           "gke-gcsfuse/volumes"                              = module.utd_bucket.gcsfuse_annotation
