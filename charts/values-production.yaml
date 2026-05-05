@@ -192,6 +192,20 @@ networkPolicy:
               - 172.32.0.0/12
               - 172.48.0.0/22
               - 10.6.0.0/16
+    # Allow UDP/19302 egress for STUN endpoint discovery (Tailscale P2P NAT
+    # traversal). Required before CODER_BLOCK_DIRECT can be flipped to false
+    # in production. Internal CIDRs excepted to keep PHI traffic off the
+    # internet path.
+    - ports:
+        - port: 19302
+          protocol: UDP
+      to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 172.32.0.0/12
+              - 172.48.0.0/22
+              - 10.6.0.0/16
 
 # Enable PHI Istio egress controls in production
 phiIstio:
