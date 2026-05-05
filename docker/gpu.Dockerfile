@@ -1,8 +1,8 @@
-# Base image - Last checked: 2026-03-23
-FROM nvcr.io/nvidia/cuda:12.6.3-cudnn-devel-ubuntu22.04
+# Base image - Last checked: 2026-05-05
+FROM nvcr.io/nvidia/cuda:12.9.1-cudnn-devel-ubuntu22.04
 
 # Label to track last verification date (forces rebuild when updated)
-LABEL last_verified="2026-03-23"
+LABEL last_verified="2026-05-05"
 
 # Set up environment variables
 ENV PYTHONUNBUFFERED=1 \

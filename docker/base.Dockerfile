@@ -1,8 +1,8 @@
-# Base image - Last checked: 2026-03-23
+# Base image - Last checked: 2026-05-05
 FROM mcr.microsoft.com/devcontainers/python:3.12
 
 # Label to track last verification date (forces rebuild when updated)
-LABEL last_verified="2026-03-23"
+LABEL last_verified="2026-05-05"
 
 # Set up environment variables
 ENV PYTHONUNBUFFERED=1 \
