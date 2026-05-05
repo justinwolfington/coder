@@ -37,6 +37,9 @@ coder:
       - name: CODER_BLOCK_DIRECT
         value: "true"
 
+      - name: CODER_DERP_FORCE_WEBSOCKETS
+        value: "true"
+
       # Disable telemetry for the coder server
       - name: CODER_TELEMETRY_ENABLE
         value: "false"
