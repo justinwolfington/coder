@@ -33,9 +33,11 @@ coder:
       - name: CODER_OAUTH2_GITHUB_ALLOWED_TEAMS
         value: "abridgeai/coder-production"
 
-      # Prevent direct (IP-based) access; enforce use of ingress/proxy
+      # Allow Tailscale P2P direct connections between client and workspace agent.
+      # Falls back to DERP relay automatically if P2P fails. End-to-end Wireguard
+      # encryption applies in both modes.
       - name: CODER_BLOCK_DIRECT
-        value: "true"
+        value: "false"
 
       - name: CODER_DERP_FORCE_WEBSOCKETS
         value: "true"
