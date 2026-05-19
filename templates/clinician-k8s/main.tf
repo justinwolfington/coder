@@ -443,6 +443,22 @@ resource "kubernetes_deployment" "main" {
 }
 
 ############################
+# CRON SCRIPTS
+############################
+resource "coder_script" "paired_cache_ttl" {
+  agent_id     = coder_agent.main.id
+  display_name = "paired-cache TTL"
+  icon         = "/icon/clock.svg"
+  run_on_start = true
+  cron         = "0 0 3 * * *"
+  timeout      = 60
+  script       = <<-EOT
+    find "$HOME/.cache/abridge-evals/paired-cache" \
+      -type f -name '*.json' -mtime +14 -delete 2>/dev/null || true
+  EOT
+}
+
+############################
 # METADATA
 ############################
 # --- Coder Metadata (for UI display) ---
