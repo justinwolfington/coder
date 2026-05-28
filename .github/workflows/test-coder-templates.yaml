@@ -50,7 +50,7 @@ jobs:
       should_test: ${{ steps.matrix.outputs.should_test }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -119,7 +119,7 @@ jobs:
         include: ${{ fromJSON(needs.detect-changes.outputs.matrix) }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Coder CLI
         uses: coder/setup-action@v1
