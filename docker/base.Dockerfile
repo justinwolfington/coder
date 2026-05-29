@@ -1,8 +1,8 @@
-# Base image - Last checked: 2026-05-05
+# Base image - Last checked: 2026-05-29
 FROM mcr.microsoft.com/devcontainers/python:3.12
 
 # Label to track last verification date (forces rebuild when updated)
-LABEL last_verified="2026-05-05"
+LABEL last_verified="2026-05-29"
 
 # Set up environment variables
 ENV PYTHONUNBUFFERED=1 \
@@ -14,7 +14,7 @@ ENV UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy
 
 # Copy UV binary from official image and set up
-COPY --from=ghcr.io/astral-sh/uv:0.11.7 /uv /bin/uv
+COPY --from=ghcr.io/astral-sh/uv:0.11.17 /uv /bin/uv
 
 # Install build dependencies
 RUN apt-get update && \

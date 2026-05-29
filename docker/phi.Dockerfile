@@ -1,8 +1,8 @@
-# Base image - Last checked: 2026-05-05
+# Base image - Last checked: 2026-05-29
 FROM nvcr.io/nvidia/cuda:12.9.1-cudnn-devel-ubuntu22.04
 
 # Label to track last verification date (forces rebuild when updated)
-LABEL last_verified="2026-05-05"
+LABEL last_verified="2026-05-29"
 
 # Set up environment variables
 ENV PYTHONUNBUFFERED=1 \
@@ -14,11 +14,11 @@ ENV UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy
 
 # Copy UV binary from official image and set up
-COPY --from=ghcr.io/astral-sh/uv:0.11.7 /uv /bin/uv
+COPY --from=ghcr.io/astral-sh/uv:0.11.17 /uv /bin/uv
 
 # Copy Node.js from official image
-COPY --from=node:22 /usr/local/bin/node /usr/local/bin/node
-COPY --from=node:22 /usr/local/lib/node_modules /usr/local/lib/node_modules
+COPY --from=node:24 /usr/local/bin/node /usr/local/bin/node
+COPY --from=node:24 /usr/local/lib/node_modules /usr/local/lib/node_modules
 RUN ln -s /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm && \
     ln -s /usr/local/lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx
 
@@ -52,7 +52,7 @@ RUN mkdir -p /usr/local/etc/uv && \
     uv tool list > /usr/local/etc/uv/tools_installed
 
 # Install code-server and VS Code extensions
-ENV CODE_SERVER_VERSION=4.112.0
+ENV CODE_SERVER_VERSION=4.122.0
 RUN mkdir -p /opt/code-server && \
     curl -fsSL https://github.com/coder/code-server/releases/download/v${CODE_SERVER_VERSION}/code-server-${CODE_SERVER_VERSION}-linux-amd64.tar.gz | \
     tar -xz -C /opt/code-server --strip-components=1 && \

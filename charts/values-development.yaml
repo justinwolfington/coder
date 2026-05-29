@@ -132,7 +132,7 @@ coder:
       - name: cloud-sql-proxy
         restartPolicy: Always
         # It is recommended to use the latest version of the Cloud SQL Auth Proxy!
-        image: gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.21.1
+        image: gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.22.0
         args:
           # Connect over private IP in VPC-native GKE cluster
           - --private-ip
