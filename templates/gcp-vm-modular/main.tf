@@ -2,7 +2,7 @@ terraform {
   required_providers {
     coder = {
       source  = "coder/coder"
-      version = "2.13.1"
+      version = "2.18.0"
     }
     google = {
       source  = "hashicorp/google"
@@ -32,11 +32,11 @@ data "coder_workspace_owner" "me" {}
 # SHARED MODULES
 ############################
 module "gpu_resources" {
-  source = "git::https://github.com/abridgeai/coder.git//modules/resources/gpu?ref=v1.8.7"
+  source = "git::https://github.com/abridgeai/coder.git//modules/resources/gpu?ref=v1.9.0"
 }
 
 module "git_utilities" {
-  source              = "git::https://github.com/abridgeai/coder.git//modules/utilities/git?ref=v1.8.7"
+  source              = "git::https://github.com/abridgeai/coder.git//modules/utilities/git?ref=v1.9.0"
   start_count         = data.coder_workspace.me.start_count
   agent_id            = coder_agent.main.id
   repo_url            = ""
@@ -45,7 +45,7 @@ module "git_utilities" {
 }
 
 module "ide_modules" {
-  source           = "git::https://github.com/abridgeai/coder.git//modules/utilities/ide?ref=v1.8.7"
+  source           = "git::https://github.com/abridgeai/coder.git//modules/utilities/ide?ref=v1.9.0"
   start_count      = data.coder_workspace.me.start_count
   agent_id         = coder_agent.main.id
   user_name        = data.coder_workspace_owner.me.name
