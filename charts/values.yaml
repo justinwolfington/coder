@@ -57,5 +57,7 @@ phiIstio:
     - api.anthropic.com
     - api.centaurlabs.com
     # Claude Code CLI (installer + release downloads; runtime API uses api.anthropic.com above)
+    # Auth: claude.ai = subscription login, platform.claude.com = Console-account login
     - claude.ai
+    - platform.claude.com
     - downloads.claude.ai
