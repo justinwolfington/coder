@@ -56,3 +56,6 @@ phiIstio:
     - us.api.openai.com
     - api.anthropic.com
     - api.centaurlabs.com
+    # Claude Code CLI (installer + release downloads; runtime API uses api.anthropic.com above)
+    - claude.ai
+    - downloads.claude.ai

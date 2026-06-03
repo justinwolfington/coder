@@ -24,4 +24,8 @@ code-server \
   --extensions-dir /opt/code-server-extensions \
   >/tmp/code-server.log 2>&1 &
 
+# Install Claude Code CLI (continue if it fails)
+echo "Installing Claude Code CLI..."
+curl -fsSL https://claude.ai/install.sh | bash || echo "Claude Code installation failed, continuing..."
+
 echo "PHI workspace ready!"
