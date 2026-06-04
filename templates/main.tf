@@ -14,6 +14,7 @@ provider "coderd" {
 
 # Create Coder templates based on filtered configuration
 # Assumes that the templates are already filtered in the templates-config.tf file
+# (dummy change to validate PR workflow)
 resource "coderd_template" "templates" {
   for_each = local.filtered_templates
 
