@@ -12,6 +12,7 @@ phiIstio:
   commonAllowedHosts:
     # Package repositories
     - us-central1-python.pkg.dev
+    - us-python.pkg.dev
     - pypi.org
     - files.pythonhosted.org
     - download.pytorch.org
