@@ -16,6 +16,7 @@ phiIstio:
     - pypi.org
     - files.pythonhosted.org
     - download.pytorch.org
+    - download-r2.pytorch.org
     - nodejs.org
     - registry.npmjs.org
     - ai2-s2-scispacy.s3-us-west-2.amazonaws.com
