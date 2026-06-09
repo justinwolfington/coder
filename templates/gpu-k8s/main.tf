@@ -59,6 +59,13 @@ module "logger" {
   source = "git::https://github.com/abridgeai/coder.git//modules/logger?ref=v1.9.0"
 }
 
+module "dotfiles" {
+  count    = data.coder_workspace.me.start_count
+  source   = "registry.coder.com/coder/dotfiles/coder"
+  version  = "1.4.2"
+  agent_id = coder_agent.main.id
+}
+
 module "utd_bucket" {
   source                 = "git::https://github.com/abridgeai/coder.git//modules/utilities/gcs-bucket?ref=v1.9.0"
   environment            = var.environment

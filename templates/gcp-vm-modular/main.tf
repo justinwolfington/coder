@@ -52,6 +52,13 @@ module "ide_modules" {
   enable_jetbrains = data.coder_parameter.enable_jetbrains.value
 }
 
+module "dotfiles" {
+  count    = data.coder_workspace.me.start_count
+  source   = "registry.coder.com/coder/dotfiles/coder"
+  version  = "1.4.2"
+  agent_id = coder_agent.main.id
+}
+
 ############################
 # PARAMETERS
 ############################

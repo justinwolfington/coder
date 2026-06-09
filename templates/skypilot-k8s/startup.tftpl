@@ -9,9 +9,14 @@ if [ "${should_clone}" = "true" ] && [ -z "$${GITHUB_TOKEN}" ]; then
 fi
 
 # Set up user environment
+# Seed .bashrc only on a fresh home volume. The home directory is a persistent
+# PVC and this script re-runs on every restart, so an unconditional copy would
+# clobber the user's edits (and any dotfiles-managed .bashrc) each boot.
 export USER_HOME="/home/vscode"
-sudo cp /root/.bashrc "$USER_HOME/.bashrc"
-sudo chown vscode:vscode "$USER_HOME/.bashrc"
+if [ ! -f "$USER_HOME/.bashrc" ]; then
+  sudo cp /root/.bashrc "$USER_HOME/.bashrc"
+  sudo chown vscode:vscode "$USER_HOME/.bashrc"
+fi
 
 # Install code-server if not present
 export CODE_SERVER_DIR="/tmp/code-server"

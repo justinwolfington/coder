@@ -14,8 +14,13 @@ if [ -z "$${GITHUB_TOKEN:-}" ]; then
 fi
 
 # Set up user environment
-sudo cp /root/.bashrc "$USER_HOME/.bashrc"
-sudo chown vscode:vscode "$USER_HOME/.bashrc"
+# Seed .bashrc only on a fresh home volume. The home directory is a persistent
+# PVC and this script re-runs on every restart, so an unconditional copy would
+# clobber the user's edits (and any dotfiles-managed .bashrc) each boot.
+if [ ! -f "$USER_HOME/.bashrc" ]; then
+  sudo cp /root/.bashrc "$USER_HOME/.bashrc"
+  sudo chown vscode:vscode "$USER_HOME/.bashrc"
+fi
 
 # Install Node.js 20 via nvm if not present
 export NVM_DIR="$USER_HOME/.nvm"
@@ -31,8 +36,9 @@ nvm install 20
 nvm use 20
 nvm alias default 20
 
-# Add nvm to bashrc for subsequent shells
-cat >> "$USER_HOME/.bashrc" << 'BASHRC'
+# Add nvm to bashrc for subsequent shells (idempotent: .bashrc now persists
+# across restarts, so guard the append to avoid accumulating duplicates).
+grep -q 'NVM_DIR="$HOME/.nvm"' "$USER_HOME/.bashrc" || cat >> "$USER_HOME/.bashrc" << 'BASHRC'
 export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
 [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
@@ -68,8 +74,9 @@ $CODE_SERVER_DIR/bin/code-server --auth none --port 13337 >/tmp/code-server.log 
 echo "Installing Claude Code CLI..."
 curl -fsSL https://claude.ai/install.sh | bash || echo "Claude Code installation failed, continuing..."
 
-# Add Claude Code to PATH in bashrc
-echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$USER_HOME/.bashrc"
+# Add Claude Code to PATH in bashrc (idempotent: guard against duplicates since
+# .bashrc now persists across restarts).
+grep -q '.local/bin:$PATH' "$USER_HOME/.bashrc" || echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$USER_HOME/.bashrc"
 export PATH="$USER_HOME/.local/bin:$PATH"
 
 cd "$REPO_DIR"
