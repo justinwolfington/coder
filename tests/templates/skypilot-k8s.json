@@ -5,6 +5,6 @@
         "repository_url": "https://github.com/abridgeai/ml-training-utils",
         "repo_clone_path": "/home/vscode",
         "test_code_server": true,
-        "extra_parameters": "cpu: 8\nmemory: 16\nhome_disk_size: 64\nenable_jetbrains: true"
+        "extra_parameters": "cpu: 8\nmemory: 16\nhome_disk_size: 64\nenable_jetbrains: true\ndotfiles_uri: \"\"\ndotfiles_branch: \"\""
     }
 }
