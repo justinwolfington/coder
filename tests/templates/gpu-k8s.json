@@ -14,5 +14,13 @@
         "repo_clone_path": "/root",
         "test_code_server": true,
         "extra_parameters": "gpu_accelerator: \"nvidia-h100-80gb\"\ngpu_count: 1\ncpu: 8\nmemory: 16\nhome_disk_size: 64\nenable_jetbrains: true\ndotfiles_uri: \"\"\ndotfiles_branch: \"\""
+    },
+    "gpu-k8s-h100-cuda13": {
+        "template_name": "gpu-k8s",
+        "home_dir": "/root",
+        "repository_url": "https://github.com/abridgeai/completion-service",
+        "repo_clone_path": "/root",
+        "test_code_server": true,
+        "extra_parameters": "gpu_accelerator: \"nvidia-h100-80gb\"\ngpu_count: 1\ncuda_version: \"13.0\"\ncpu: 8\nmemory: 16\nhome_disk_size: 64\nenable_jetbrains: true\ndotfiles_uri: \"\"\ndotfiles_branch: \"\""
     }
 }

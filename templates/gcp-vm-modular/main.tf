@@ -89,20 +89,30 @@ data "coder_parameter" "dl_image" {
   display_name = "Deep Learning Image"
   description  = "Select deep learning platform image"
   type         = "string"
-  default      = "pytorch-2-7-cu128-ubuntu-2204-nvidia-570-v20251119"
+  default      = "pytorch-2-7-cu128-ubuntu-2204-nvidia-570-v20260320"
   mutable      = true
 
+  # CUDA 12.8 / driver 570 (snapshots refreshed to latest available)
   option {
     name  = "PyTorch 2.7 + CUDA 12.8 (Ubuntu 22.04)"
-    value = "pytorch-2-7-cu128-ubuntu-2204-nvidia-570-v20251119"
+    value = "pytorch-2-7-cu128-ubuntu-2204-nvidia-570-v20260320"
   }
   option {
     name  = "Multi-Framework + CUDA 12.8 (Ubuntu 22.04)"
-    value = "common-cu128-ubuntu-2204-nvidia-570-v20251209"
+    value = "common-cu128-ubuntu-2204-nvidia-570-v20260320"
+  }
+  # CUDA 12.9 / driver 580 (latest DLVM line; CUDA 13 not yet published by GCP)
+  option {
+    name  = "PyTorch 2.9 + CUDA 12.9 (Ubuntu 22.04)"
+    value = "pytorch-2-9-cu129-ubuntu-2204-nvidia-580-v20260611"
+  }
+  option {
+    name  = "Multi-Framework + CUDA 12.9 (Ubuntu 22.04)"
+    value = "common-cu129-ubuntu-2204-nvidia-580-v20260611"
   }
   option {
     name  = "Ubuntu 24.04 Noble (Clean Base)"
-    value = "ubuntu-2404-noble-amd64-v20251205"
+    value = "ubuntu-2404-noble-amd64-v20260517"
   }
 }
 
@@ -231,9 +241,11 @@ locals {
   # gcloud compute images list --project ubuntu-os-cloud --format="value(NAME)" --filter="name~ubuntu-2404"
 
   dl_images = {
-    "pytorch-2-7-cu128-ubuntu-2204-nvidia-570-v20251119" = "projects/deeplearning-platform-release/global/images/pytorch-2-7-cu128-ubuntu-2204-nvidia-570-v20251119"
-    "common-cu128-ubuntu-2204-nvidia-570-v20251209"      = "projects/deeplearning-platform-release/global/images/common-cu128-ubuntu-2204-nvidia-570-v20251209"
-    "ubuntu-2404-noble-amd64-v20251205"                  = "projects/ubuntu-os-cloud/global/images/ubuntu-2404-noble-amd64-v20251205"
+    "pytorch-2-7-cu128-ubuntu-2204-nvidia-570-v20260320" = "projects/deeplearning-platform-release/global/images/pytorch-2-7-cu128-ubuntu-2204-nvidia-570-v20260320"
+    "common-cu128-ubuntu-2204-nvidia-570-v20260320"      = "projects/deeplearning-platform-release/global/images/common-cu128-ubuntu-2204-nvidia-570-v20260320"
+    "pytorch-2-9-cu129-ubuntu-2204-nvidia-580-v20260611" = "projects/deeplearning-platform-release/global/images/pytorch-2-9-cu129-ubuntu-2204-nvidia-580-v20260611"
+    "common-cu129-ubuntu-2204-nvidia-580-v20260611"      = "projects/deeplearning-platform-release/global/images/common-cu129-ubuntu-2204-nvidia-580-v20260611"
+    "ubuntu-2404-noble-amd64-v20260517"                  = "projects/ubuntu-os-cloud/global/images/ubuntu-2404-noble-amd64-v20260517"
   }
   image = local.dl_images[data.coder_parameter.dl_image.value]
 

@@ -130,6 +130,32 @@ data "coder_parameter" "gpu_count" {
   }
 }
 
+data "coder_parameter" "cuda_version" {
+  name         = "cuda_version"
+  display_name = "CUDA Version"
+  description  = "CUDA toolkit version for the workspace image. CUDA 13.0 is only offered for H100 / RTX PRO 6000; NVIDIA L4 nodes run an older driver (R535) and only support CUDA 12.9."
+  default      = "12.9"
+  mutable      = true
+  order        = 7
+  icon         = "/icon/container.svg"
+  type         = "string"
+  option {
+    name  = "CUDA 12.9 (all GPUs)"
+    value = "12.9"
+  }
+  # CUDA 13.0 requires R580+ drivers, so it is only offered for H100 and
+  # RTX PRO 6000. The option is hidden when L4 or no GPU is selected. This
+  # relies on Coder dynamic parameters (server >= 2.25, auto-enabled for new
+  # template versions); the precondition below is the defense-in-depth backstop.
+  dynamic "option" {
+    for_each = contains(["nvidia-h100-80gb", "nvidia-rtx-pro-6000"], data.coder_parameter.gpu_accelerator.value) ? [1] : []
+    content {
+      name  = "CUDA 13.0"
+      value = "13.0"
+    }
+  }
+}
+
 ############################
 # LOCALS
 ############################
@@ -141,7 +167,10 @@ locals {
   utd_bucket_enabled = module.utd_bucket.bucket_enabled
 
   # Image and environment configuration
-  base_image_repo = "us-central1-docker.pkg.dev/abridge-artifact-registry/coder/phi"
+  # CUDA 13.0 selects the "-cuda13" image variant; CUDA 12.9 uses the default image.
+  cuda13          = data.coder_parameter.cuda_version.value == "13.0"
+  image_suffix    = local.cuda13 ? "-cuda13" : ""
+  base_image_repo = "us-central1-docker.pkg.dev/abridge-artifact-registry/coder/phi${local.image_suffix}"
   base_image_tag  = "latest"
   base_image      = "${local.base_image_repo}:${local.base_image_tag}"
 
@@ -283,6 +312,13 @@ resource "kubernetes_deployment" "main" {
   count            = data.coder_workspace.me.start_count
   depends_on       = [kubernetes_persistent_volume_claim.home]
   wait_for_rollout = false
+
+  lifecycle {
+    precondition {
+      condition     = !(data.coder_parameter.gpu_accelerator.value == "nvidia-l4" && local.cuda13)
+      error_message = "CUDA 13.0 is not supported on NVIDIA L4 (nodes run driver R535). Select H100, RTX PRO 6000, or switch CUDA Version back to 12.9."
+    }
+  }
 
   metadata {
     name        = "coder-phi-${data.coder_workspace.me.id}"
