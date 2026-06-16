@@ -5,7 +5,7 @@
         "repository_url": "",
         "repo_clone_path": "",
         "test_code_server": true,
-        "extra_parameters": "gpu_type: \"none\"\ndisk_size: 128\nenable_jetbrains: true\ndl_image: \"pytorch-2-7-cu128-ubuntu-2204-nvidia-570-v20260320\"\nenvironment: \"development\"\ndotfiles_uri: \"\"\ndotfiles_branch: \"\""
+        "extra_parameters": "gpu_type: \"none\"\ndisk_size: 128\nenable_jetbrains: true\njetbrains_ide: \"PY\"\ndl_image: \"pytorch-2-7-cu128-ubuntu-2204-nvidia-570-v20260320\"\nenvironment: \"development\"\ndotfiles_uri: \"\"\ndotfiles_branch: \"\""
     },
     "vm-l4": {
         "template_name": "gcp-vm-modular",
@@ -13,7 +13,7 @@
         "repository_url": "",
         "repo_clone_path": "",
         "test_code_server": true,
-        "extra_parameters": "gpu_type: \"nvidia-l4-2x\"\ndisk_size: 128\nenable_jetbrains: true\ndl_image: \"pytorch-2-7-cu128-ubuntu-2204-nvidia-570-v20260320\"\nenvironment: \"development\"\ndotfiles_uri: \"\"\ndotfiles_branch: \"\""
+        "extra_parameters": "gpu_type: \"nvidia-l4-2x\"\ndisk_size: 128\nenable_jetbrains: true\njetbrains_ide: \"PY\"\ndl_image: \"pytorch-2-7-cu128-ubuntu-2204-nvidia-570-v20260320\"\nenvironment: \"development\"\ndotfiles_uri: \"\"\ndotfiles_branch: \"\""
     },
     "vm-h100": {
         "template_name": "gcp-vm-modular",
@@ -21,7 +21,7 @@
         "repository_url": "",
         "repo_clone_path": "",
         "test_code_server": true,
-        "extra_parameters": "gpu_type: \"nvidia-h100-80gb\"\ndisk_size: 128\nenable_jetbrains: true\ndl_image: \"pytorch-2-7-cu128-ubuntu-2204-nvidia-570-v20260320\"\nenvironment: \"development\"\ndotfiles_uri: \"\"\ndotfiles_branch: \"\""
+        "extra_parameters": "gpu_type: \"nvidia-h100-80gb\"\ndisk_size: 128\nenable_jetbrains: true\njetbrains_ide: \"PY\"\ndl_image: \"pytorch-2-7-cu128-ubuntu-2204-nvidia-570-v20260320\"\nenvironment: \"development\"\ndotfiles_uri: \"\"\ndotfiles_branch: \"\""
     },
     "vm-l4-cu129": {
         "template_name": "gcp-vm-modular",
@@ -29,7 +29,7 @@
         "repository_url": "",
         "repo_clone_path": "",
         "test_code_server": true,
-        "extra_parameters": "gpu_type: \"nvidia-l4-2x\"\ndisk_size: 128\nenable_jetbrains: true\ndl_image: \"pytorch-2-9-cu129-ubuntu-2204-nvidia-580-v20260611\"\nenvironment: \"development\"\ndotfiles_uri: \"\"\ndotfiles_branch: \"\""
+        "extra_parameters": "gpu_type: \"nvidia-l4-2x\"\ndisk_size: 128\nenable_jetbrains: true\njetbrains_ide: \"PY\"\ndl_image: \"pytorch-2-9-cu129-ubuntu-2204-nvidia-580-v20260611\"\nenvironment: \"development\"\ndotfiles_uri: \"\"\ndotfiles_branch: \"\""
     },
     "vm-multi-framework": {
         "template_name": "gcp-vm-modular",
@@ -37,7 +37,7 @@
         "repository_url": "",
         "repo_clone_path": "",
         "test_code_server": true,
-        "extra_parameters": "gpu_type: \"nvidia-l4-2x\"\ndisk_size: 128\nenable_jetbrains: true\ndl_image: \"common-cu129-ubuntu-2204-nvidia-580-v20260611\"\nenvironment: \"development\"\ndotfiles_uri: \"\"\ndotfiles_branch: \"\""
+        "extra_parameters": "gpu_type: \"nvidia-l4-2x\"\ndisk_size: 128\nenable_jetbrains: true\njetbrains_ide: \"PY\"\ndl_image: \"common-cu129-ubuntu-2204-nvidia-580-v20260611\"\nenvironment: \"development\"\ndotfiles_uri: \"\"\ndotfiles_branch: \"\""
     },
     "vm-ubuntu-2404": {
         "template_name": "gcp-vm-modular",
@@ -45,6 +45,6 @@
         "repository_url": "",
         "repo_clone_path": "",
         "test_code_server": true,
-        "extra_parameters": "gpu_type: \"none\"\ndisk_size: 128\nenable_jetbrains: true\ndl_image: \"ubuntu-2404-noble-amd64-v20260517\"\nenvironment: \"development\"\ndotfiles_uri: \"\"\ndotfiles_branch: \"\""
+        "extra_parameters": "gpu_type: \"none\"\ndisk_size: 128\nenable_jetbrains: true\njetbrains_ide: \"PY\"\ndl_image: \"ubuntu-2404-noble-amd64-v20260517\"\nenvironment: \"development\"\ndotfiles_uri: \"\"\ndotfiles_branch: \"\""
     }
 }
