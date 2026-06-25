@@ -8,7 +8,7 @@ export DEBIAN_FRONTEND=noninteractive
 apt-mark hold 'nvidia-*' 'libnvidia-*' 'fabricmanager-*' 2>/dev/null || true
 
 apt-get update -y
-apt-get install -y curl wget git vim htop unzip jq sudo build-essential
+apt-get install -y curl wget git git-lfs vim htop unzip jq sudo build-essential
 
 apt-mark unhold 'nvidia-*' 'libnvidia-*' 'fabricmanager-*' 2>/dev/null || true
 
@@ -50,6 +50,7 @@ su - "${username}" -c "
     git config --global init.defaultBranch main
     git config --global user.name '${username}'
     git config --global user.email '${useremail}'
+    git lfs install
 "
 
 # Install Claude Code CLI (continue if it fails)
