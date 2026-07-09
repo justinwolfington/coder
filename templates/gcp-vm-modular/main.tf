@@ -84,6 +84,36 @@ data "coder_parameter" "gpu_type" {
   }
 }
 
+data "coder_parameter" "cpu_machine_type" {
+  name         = "cpu_machine_type"
+  display_name = "Workspace Size"
+  description  = "vCPU and RAM for the workspace (applies only when GPU Configuration is No GPU)"
+  type         = "string"
+  default      = "e2-standard-4"
+  mutable      = true
+
+  option {
+    name  = "2 vCPU / 8 GB RAM"
+    value = "e2-standard-2"
+  }
+  option {
+    name  = "4 vCPU / 16 GB RAM"
+    value = "e2-standard-4"
+  }
+  option {
+    name  = "8 vCPU / 32 GB RAM"
+    value = "e2-standard-8"
+  }
+  option {
+    name  = "16 vCPU / 64 GB RAM"
+    value = "e2-standard-16"
+  }
+  option {
+    name  = "32 vCPU / 128 GB RAM"
+    value = "e2-standard-32"
+  }
+}
+
 data "coder_parameter" "dl_image" {
   name         = "dl_image"
   display_name = "Deep Learning Image"
@@ -218,6 +248,19 @@ locals {
   }
 
   gpu_config = local.gpu_configs[data.coder_parameter.gpu_type.value]
+
+  # No-GPU workspaces pick their own CPU size; GPU tiers are fixed by the accelerator.
+  machine_type = data.coder_parameter.gpu_type.value == "none" ? data.coder_parameter.cpu_machine_type.value : local.gpu_config.machine_type
+
+  # ponytail: GCP e2 us-central1 on-demand list price, rounded to nearest whole $/day (24h).
+  # Surfaced to nudge against oversized picks; refresh from GCP pricing if rates move.
+  cpu_cost_per_day = {
+    "e2-standard-2"  = 2
+    "e2-standard-4"  = 3
+    "e2-standard-8"  = 6
+    "e2-standard-16" = 13
+    "e2-standard-32" = 26
+  }
 
   # Reservation mapping based on GPU selection
 
@@ -358,7 +401,7 @@ resource "google_compute_disk" "vm_boot_disk" {
 resource "google_compute_instance" "workspace" {
   count        = data.coder_workspace.me.start_count
   name         = "coder-${lower(data.coder_workspace_owner.me.name)}-${lower(data.coder_workspace.me.name)}"
-  machine_type = local.gpu_config.machine_type
+  machine_type = local.machine_type
   zone         = var.zone
 
   network_interface {
@@ -442,7 +485,7 @@ resource "google_compute_instance" "workspace" {
     "workspace-name"    = lower(data.coder_workspace.me.name)
     "gpu-type"          = local.gpu_config.gpu_count > 0 ? local.gpu_config.gpu_type : "none"
     "gpu-count"         = tostring(local.gpu_config.gpu_count)
-    "machine-type"      = local.gpu_config.machine_type
+    "machine-type"      = local.machine_type
     "dl-image"          = data.coder_parameter.dl_image.value
     "environment"       = data.coder_parameter.environment.value
     "managed-by"        = "coder"
@@ -470,11 +513,11 @@ resource "coder_agent_instance" "main" {
 resource "coder_metadata" "workspace_info" {
   count       = data.coder_workspace.me.start_count
   resource_id = google_compute_instance.workspace[0].id
-  daily_cost  = lookup(module.gpu_resources.gpu_cost_per_unit, local.gpu_config.gpu_type, 0) * local.gpu_config.gpu_count
+  daily_cost = local.gpu_config.gpu_count > 0 ? lookup(module.gpu_resources.gpu_cost_per_unit, local.gpu_config.gpu_type, 0) * local.gpu_config.gpu_count : lookup(local.cpu_cost_per_day, local.machine_type, 0)
 
   item {
     key   = "Machine Type"
-    value = local.gpu_config.machine_type
+    value = local.machine_type
   }
 
   item {

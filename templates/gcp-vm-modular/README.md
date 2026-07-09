@@ -27,6 +27,7 @@ Environment-aware GPU-accelerated Google Cloud VM workspace for ML/AI developmen
 |-----------|-------------|---------|---------|
 | Environment | Deployment environment | Development | Development, Staging, Production |
 | GPU Configuration | GPU setup | No GPU | No GPU, NVIDIA L4 (2x), NVIDIA H100 80GB (8x) |
+| Workspace Size | vCPU/RAM for No-GPU workspaces (ignored with a GPU) | 4 vCPU / 16 GB | 2/4/8/16/32 vCPU (4 GB RAM per vCPU) |
 | Deep Learning Image | ML platform image | PyTorch Latest GPU | PyTorch GPU/CPU, TensorFlow GPU/CPU, Common Framework GPU/CPU, Ubuntu 22.04 LTS |
 | Boot Disk Size | Storage size in GB | 256 | 50-2000 GB |
 
@@ -34,7 +35,7 @@ Environment-aware GPU-accelerated Google Cloud VM workspace for ML/AI developmen
 
 | Option | Machine Type | GPUs | Use Case |
 |--------|-------------|------|----------|
-| No GPU | e2-standard-4 | 0 | Development, CPU workloads |
+| No GPU | 2-32 vCPU / 8-128 GB (default 4 vCPU / 16 GB) | 0 | Development, CPU workloads |
 | NVIDIA L4 (1x) | g2-standard-8 | 1x L4 | Light ML training/inference |
 | NVIDIA L4 (2x) | g2-standard-24 | 2x L4 | Medium ML workloads |
 | NVIDIA H100 80GB (8x) | a3-highgpu-8g | 8x H100 | Large-scale ML training |

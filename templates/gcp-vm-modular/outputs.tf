@@ -10,7 +10,7 @@ output "internal_ip" {
 
 output "machine_type" {
   description = "Machine type used for the compute instance"
-  value       = local.gpu_config.machine_type
+  value       = local.machine_type
 }
 
 output "gpu_config" {
