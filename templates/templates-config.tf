@@ -55,14 +55,6 @@ locals {
       environments = ["development", "production"]
     }, local.gpu_timings)
 
-    "skypilot-k8s" = merge({
-      display_name = "SkyPilot K8s"
-      description  = "Kubernetes development workspace with SkyPilot integration."
-      icon         = "/icon/pytorch.svg"
-      directory    = "./skypilot-k8s"
-      environments = ["development", "staging", "production"]
-    }, local.standard_timings)
-
     "soap-dashboard-k8s" = merge({
       display_name = "SOAP Dashboard"
       description  = "Development workspace for SOAP Dashboard with Claude Code. Pre-configured for PMs to vibe code."

@@ -29,7 +29,6 @@ coder/
     ├── cpu-k8s/                  # Lightweight CPU-based workspace template
     ├── gpu-k8s/                  # GPU-based workspace template
     ├── phi-gpu-k8s/              # PHI-compliant secure GPU workspace template
-    ├── skypilot-k8s/             # SkyPilot-enabled CPU workspace template
     ├── gcp-vm-modular/           # GCP VM-based workspace template
     └── templates-config.tf       # Template configuration
     └── main.tf                   # Template Publisher
@@ -73,15 +72,6 @@ coder/
 - **Base Image**: `us-central1-docker.pkg.dev/abridge-artifact-registry/coder/phi-gpu:latest`
 - **Network Policy**: Dedicated `networkPolicyPhi` with complete egress blocking for HIPAA/PHI compliance
 - **Use Cases**: Healthcare data analysis, PHI-compliant ML training, secure AI research, protected health information processing
-
-### SkyPilot K8s Template
-
-- **Purpose**: CPU-based development workspaces with integrated SkyPilot for multi-cloud orchestration
-- **Features**: VS Code, Cursor IDE, Git integration, Python & Jupyter support, SkyPilot pre-installed for multi-cloud deployments
-- **Resources**: 8-16 CPU cores, 16-32GB RAM, 64-1024GB storage
-- **SkyPilot**: Pre-installed `skypilot-nightly[kubernetes,gcp]==1.0.0.dev20250624` for cloud resource management
-- **Base Image**: `us-central1-docker.pkg.dev/abridge-artifact-registry/coder/base:latest`
-- **Use Cases**: Multi-cloud ML workload orchestration, SkyPilot development and testing, cloud-native application development, distributed computing experiments
 
 ### GCP VM Modular Template
 
@@ -142,7 +132,6 @@ Templates use Git tags instead of commit hashes to prevent orphaned references:
 - Kubernetes cluster with proper storage configuration
 - For GPU template: GPU nodes with NVIDIA device plugin installed
 - For PHI template: Kubernetes cluster with network policy support and `networkPolicyPhi` configuration enabled
-- For SkyPilot template: Kubernetes cluster with internet access for SkyPilot installation and API communication
 - For GCP VM template: Google Cloud Platform project with Compute Engine API enabled, VPC network configured, and sufficient GPU quotas
 - GitHub external authentication configured for Git integration
 
@@ -169,13 +158,6 @@ Templates use Git tags instead of commit hashes to prevent orphaned references:
 - Confirm PHI workspaces have `coder-phi-workspace` label
 - Ensure complete network isolation is working (no egress traffic allowed)
 - Verify browser-only access restrictions (SSH/desktop apps disabled)
-
-**SkyPilot Template Issues**
-- Verify internet connectivity from workspace for SkyPilot installation
-- Check SkyPilot configuration: `sky check` within the workspace
-- Ensure proper API endpoint configuration for your environment
-- Verify GCP and Kubernetes backend setup if using those clouds
-- Check SkyPilot logs for authentication or connectivity issues
 
 **GCP VM Template Issues**
 - Verify GCP credentials and project permissions
@@ -237,5 +219,4 @@ For configuration details, see the [Workspace Process Logging documentation](htt
 | CPU K8s | Yes |
 | GPU K8s | Yes |
 | PHI GPU K8s | No |
-| SkyPilot K8s | Yes |
 | GCP VM Modular | No |
