@@ -67,14 +67,25 @@ jobs:
           echo "$FILES"
 
           declare -a IMAGES=()
+          declare -A SEEN=()
 
-          # Only process changed Dockerfiles, not all Dockerfiles
+          add_image() {
+            local name="$1" dockerfile="docker/$1.Dockerfile"
+            [ -f "$dockerfile" ] || return 0
+            [ -n "${SEEN[$name]:-}" ] && return 0
+            SEEN[$name]=1
+            IMAGES+=("{\"name\":\"$name\",\"dockerfile\":\"$dockerfile\",\"context\":\".\"}")
+            echo "Added changed image: $name"
+          }
+
+          # Rebuild on changes to a Dockerfile or to its build-context
+          # directory (docker/<name>/**), not all Dockerfiles
           for file in $FILES; do
             if [[ "$file" == docker/*.Dockerfile ]]; then
-              [ -f "$file" ] || continue
-              IMAGE_NAME=$(basename "$file" .Dockerfile)
-              IMAGES+=("{\"name\":\"$IMAGE_NAME\",\"dockerfile\":\"$file\",\"context\":\".\"}")
-              echo "Added changed image: $IMAGE_NAME from $file"
+              add_image "$(basename "$file" .Dockerfile)"
+            elif [[ "$file" == docker/*/* ]]; then
+              f="${file#docker/}"
+              add_image "${f%%/*}"
             fi
           done
 
@@ -124,6 +135,15 @@ jobs:
         uses: docker/login-action@v4
         with:
           registry: ${{ env.REGISTRY }}
+          username: oauth2accesstoken
+          password: ${{ steps.auth.outputs.access_token }}
+
+      # Chainguard base images are pulled through the GAR cgr remote proxy
+      # (us multi-region), which needs its own registry login.
+      - name: Login to GAR (us multi-region)
+        uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.4.0
+        with:
+          registry: us-docker.pkg.dev
           username: oauth2accesstoken
           password: ${{ steps.auth.outputs.access_token }}
 

@@ -1,0 +1,170 @@
+{{- if .Values.langsmithProxy.enabled }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: langsmith-proxy
+  annotations:
+    iam.gke.io/gcp-service-account: {{ required "langsmithProxy.serviceAccount.gcpServiceAccount is required" .Values.langsmithProxy.serviceAccount.gcpServiceAccount | quote }}
+---
+# Exact ServiceAccount lookup only: the proxy resolves the SPIFFE identity
+# authenticated by Istio to Coder-owned labels for authz and audit attribution.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: langsmith-proxy-serviceaccount-reader
+rules:
+  - apiGroups: [""]
+    resources: ["serviceaccounts"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: langsmith-proxy-serviceaccount-reader
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: langsmith-proxy-serviceaccount-reader
+subjects:
+  - kind: ServiceAccount
+    name: langsmith-proxy
+    namespace: {{ .Release.Namespace }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: langsmith-proxy
+  labels:
+    app.kubernetes.io/name: langsmith-proxy
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: langsmith-proxy
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: langsmith-proxy
+      annotations:
+        # In-mesh so workspace -> proxy traffic is mTLS'd sidecar-to-sidecar.
+        # The inbound sidecar replaces XFCC from the authenticated client
+        # certificate; the application validates its exact KSA metadata.
+        sidecar.istio.io/inject: "true"
+        sidecar.istio.io/rewriteAppHTTPProbers: "true"
+        traffic.sidecar.istio.io/excludeOutboundIPRanges: "169.254.169.254/32,169.254.169.252/32"
+    spec:
+      serviceAccountName: langsmith-proxy
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: langsmith-proxy
+          {{- if .Values.langsmithProxy.image.digest }}
+          image: "{{ .Values.langsmithProxy.image.repository }}@{{ .Values.langsmithProxy.image.digest }}"
+          {{- else }}
+          image: "{{ .Values.langsmithProxy.image.repository }}:{{ required "langsmithProxy.image.tag or image.digest is required" .Values.langsmithProxy.image.tag }}"
+          {{- end }}
+          ports:
+            - containerPort: 8080
+          env:
+            - name: UPSTREAM_URL
+              value: {{ .Values.langsmithProxy.upstreamUrl | quote }}
+            - name: BROKER_AUDIENCE
+              value: {{ required "langsmithProxy.brokerAudience is required" .Values.langsmithProxy.brokerAudience | quote }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 250m
+              memory: 128Mi
+---
+# STRICT ensures XFCC is derived from an authenticated mesh certificate.
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: langsmith-proxy
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: langsmith-proxy
+  mtls:
+    mode: STRICT
+---
+# Coarse mesh gate scoped only to this workload. Any authenticated caller in
+# the Coder namespace may reach the application, which then requires an exact
+# per-workspace PHI KSA. Managed ASM may prune source.serviceAccounts, so the
+# exact identity check remains in application code as in existing S2S flows.
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: langsmith-proxy
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: langsmith-proxy
+  action: ALLOW
+  rules:
+    - to:
+        - operation:
+            paths: ["/healthz"]
+    - from:
+        - source:
+            namespaces: [{{ .Release.Namespace | quote }}]
+{{- if .Values.langsmithProxy.networkPolicy.enabled }}
+---
+# Calico observes the source node IP after GKE SNATs cross-node pod traffic for
+# this cluster's 172.32.0.0/12 pod range. This policy is still scoped only to
+# the proxy; Istio mTLS and the application enforce workload identity.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: langsmith-proxy-ingress
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: langsmith-proxy
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - ipBlock:
+            cidr: {{ required "langsmithProxy.networkPolicy.nodeCIDR is required when networkPolicy is enabled" .Values.langsmithProxy.networkPolicy.nodeCIDR | quote }}
+      ports:
+        # Istio redirects inbound application traffic through Envoy's virtual
+        # inbound listener. Depending on dataplane hook ordering, the
+        # ingress policy can observe either the original service port or the
+        # redirected listener port, so both must be allowed.
+        - port: 8080
+          protocol: TCP
+        - port: 15006
+          protocol: TCP
+{{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: langsmith-proxy
+  labels:
+    app.kubernetes.io/name: langsmith-proxy
+spec:
+  selector:
+    app.kubernetes.io/name: langsmith-proxy
+  ports:
+    - name: http
+      port: 8080
+{{- end }}

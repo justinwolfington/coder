@@ -10,3 +10,20 @@ networkPolicy:
       namespace: example-namespace
       selector:
         app: example-app
+
+phiWorkspaceServiceAccounts:
+  enabled: true
+  utdGcpServiceAccount: coder-phi-workspace-utd@example-project.iam.gserviceaccount.com
+
+# Render the gated langsmith-proxy template in lint (defaults come from values.yaml)
+langsmithProxy:
+  enabled: true
+  networkPolicy:
+    nodeCIDR: 10.6.0.0/16
+  image:
+    tag: test
+    digest: ""
+  upstreamUrl: https://langsmith.example.test/coder-broker
+  brokerAudience: https://langsmith.example.test/coder-broker
+  serviceAccount:
+    gcpServiceAccount: coder-langsmith-proxy@example-project.iam.gserviceaccount.com

@@ -174,6 +174,11 @@ locals {
   # UTD bucket access configuration
   utd_bucket_enabled = module.utd_bucket.bucket_enabled
 
+  # Each non-UTD PHI workspace receives a distinct mesh identity. The
+  # LangSmith proxy resolves this KSA's Coder-owned metadata after Istio mTLS
+  # authentication; it has no Kubernetes RBAC or cloud identity annotation.
+  workspace_service_account_name = "coder-phi-${data.coder_workspace.me.id}"
+
   # Image and environment configuration
   # CUDA 13.0 selects the "-cuda13" image variant; CUDA 12.9 uses the default image.
   cuda13          = data.coder_parameter.cuda_version.value == "13.0"
@@ -308,6 +313,19 @@ resource "coder_app" "code-server" {
 
 # --- Kubernetes Resources ---
 
+resource "kubernetes_service_account" "workspace" {
+  count = local.utd_bucket_enabled ? 0 : 1
+
+  metadata {
+    name        = local.workspace_service_account_name
+    namespace   = var.namespace
+    labels      = local.labels
+    annotations = local.annotations
+  }
+
+  automount_service_account_token = false
+}
+
 resource "kubernetes_persistent_volume_claim" "home" {
   metadata {
     name        = "coder-phi-${data.coder_workspace.me.id}-home"
@@ -365,11 +383,16 @@ resource "kubernetes_deployment" "main" {
         })
       }
       spec {
-        service_account_name = local.utd_bucket_enabled ? "coder" : null
-        node_selector        = local.node_selector
+        service_account_name = local.utd_bucket_enabled ? (
+          var.phi_workspace_utd_service_account != "" ? var.phi_workspace_utd_service_account : "coder"
+          ) : (
+          kubernetes_service_account.workspace[0].metadata[0].name
+        )
+        node_selector = local.node_selector
 
         security_context {
-          # Run as root for unrestricted access
+          # Workspace tooling runs as root; the container-level context below
+          # removes capabilities that would bypass mesh interception.
           run_as_user     = 0
           fs_group        = 0
           run_as_non_root = false
@@ -382,10 +405,15 @@ resource "kubernetes_deployment" "main" {
           command           = ["sh", "-c", coder_agent.main.init_script]
 
           security_context {
-            # Enable read-only filesystem to prevent tool installation
+            # Root remains available for workspace tooling, but the process may
+            # not switch to Istio's reserved UID 1337 or use raw sockets to
+            # bypass sidecar egress interception.
             run_as_user                = 0
-            allow_privilege_escalation = true
+            allow_privilege_escalation = false
             read_only_root_filesystem  = true
+            capabilities {
+              drop = ["NET_RAW", "SETGID", "SETUID"]
+            }
           }
 
           env {
@@ -414,6 +442,20 @@ resource "kubernetes_deployment" "main" {
           env {
             name  = "CODER_AGENT_BLOCK_FILE_TRANSFER"
             value = "true"
+          }
+
+          # PRODSEC-580: LangSmith SDK traffic goes through the in-cluster
+          # broker access proxy; direct egress to the langsmith host
+          # is blocked by the PHI Istio REGISTRY_ONLY policy. UTD workspaces
+          # retain their existing shared identity and must not receive this
+          # endpoint: the broker intentionally accepts only per-workspace
+          # identities so it can bind each request to one Coder user.
+          dynamic "env" {
+            for_each = !local.utd_bucket_enabled && var.langsmith_endpoint != "" ? [1] : []
+            content {
+              name  = "LANGSMITH_ENDPOINT"
+              value = var.langsmith_endpoint
+            }
           }
 
           resources {

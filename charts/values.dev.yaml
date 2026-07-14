@@ -90,6 +90,11 @@ coder:
       - name: TF_VAR_judges_openai_base_url
         value: "https://llm-gateway-evals.abridge.coffee/v1"
 
+      # Development end-to-end test for the Teleport-authorized LangSmith
+      # broker. PHI workspaces receive only the proxy endpoint, never a key.
+      - name: TF_VAR_langsmith_endpoint
+        value: "http://langsmith-proxy.coder.svc.cluster.local:8080/api/v1"
+
     # mount the git secrets to enable coder to pull modules from coder repo
     # the following secrets have read only access to the coder repo
     volumes:
@@ -167,6 +172,19 @@ phiIstio:
   allowedHttpHosts:
     - deid.abridge.coffee
     - encounter-processor-api.abridge.coffee
+
+# Dev proving ground for PRODSEC-580. The proxy authenticates to the
+# LangSmith-side broker with the dedicated dev Workload Identity GSA.
+langsmithProxy:
+  enabled: true
+  networkPolicy:
+    nodeCIDR: "10.6.0.0/16"
+  image:
+    digest: "sha256:92c8f961027acf6067be621f68c1ef3115005d1cab54afc1504a8be5a1ce3e38"
+  upstreamUrl: "https://langsmith.abridge.coffee/coder-broker"
+  brokerAudience: "https://langsmith.abridge.coffee/coder-broker"
+  serviceAccount:
+    gcpServiceAccount: "coder-langsmith-proxy@client-dev-e301d.iam.gserviceaccount.com"
 
 # Enable Kubernetes event streaming for development environment
 coder-logstream-kube:

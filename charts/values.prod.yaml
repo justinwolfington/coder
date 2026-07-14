@@ -90,6 +90,12 @@ coder:
       - name: TF_VAR_judges_openai_base_url
         value: "https://llm-gateway-evals.abridge.services/v1"
 
+      # Preserve the existing production UTD bucket path explicitly until the
+      # dedicated bucket-only identity has been deployed and mount-tested.
+      # The LangSmith proxy rejects this shared identity.
+      - name: TF_VAR_phi_workspace_utd_service_account
+        value: coder
+
     # mount the git secrets to enable coder to pull modules from coder repo
     # the following secrets have read only access to the coder repo
     volumes:
@@ -208,6 +214,22 @@ networkPolicy:
               - 172.32.0.0/12
               - 172.48.0.0/22
               - 10.6.0.0/16
+
+# PRODSEC-580: Coder-side identity proxy for the LangSmith credential broker.
+# This remains disabled until the production broker, its dedicated Workload
+# Identity, and the promoted image are ready. Keep TF_VAR_langsmith_endpoint
+# absent above until the same enablement change, so existing PHI workspaces
+# retain their current LangSmith behavior rather than targeting an absent Service.
+langsmithProxy:
+  enabled: false
+  networkPolicy:
+    nodeCIDR: "10.6.0.0/16"
+  image:
+    tag: "" # short SHA from build-and-promote-artifacts
+  upstreamUrl: https://langsmith-live.abridge.services/coder-broker
+  brokerAudience: https://langsmith-live.abridge.services/coder-broker
+  serviceAccount:
+    gcpServiceAccount: coder-langsmith-proxy@abridge-client-prod.iam.gserviceaccount.com
 
 # Enable PHI Istio egress controls in production
 phiIstio:

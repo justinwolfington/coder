@@ -5,6 +5,32 @@ coder-logstream-kube:
   enabled: false  # Disabled by default, enable per environment
   # Configuration will be overridden in environment-specific values files
 
+# Shared identities retained for old template versions and UTD's bucket-only
+# Workload Identity binding. New non-UTD templates create unique no-RBAC KSAs.
+phiWorkspaceServiceAccounts:
+  enabled: false
+  utdGcpServiceAccount: ""
+
+# Identity-aware proxy for brokered LangSmith access from PHI workspaces
+# (PRODSEC-580). Resolves caller pod metadata, enforces a bounded read API,
+# and authenticates to the LangSmith-side broker with Workload Identity.
+langsmithProxy:
+  enabled: false
+  networkPolicy:
+    # Default-on defense in depth scoped only to the proxy. GKE SNATs the
+    # cross-node source to the node subnet before Calico evaluates ingress.
+    enabled: true
+    nodeCIDR: ""
+  image:
+    repository: us-central1-docker.pkg.dev/abridge-artifact-registry/coder/langsmith-proxy
+    tag: "" # fallback for local lint only; deployed environments use digest
+    digest: ""
+  # upstreamUrl includes the LangSmith-side broker path prefix.
+  upstreamUrl: ""
+  brokerAudience: ""
+  serviceAccount:
+    gcpServiceAccount: ""
+
 # Istio egress controls for PHI workspaces
 phiIstio:
   enabled: false
