@@ -4,40 +4,81 @@ updates:
   - package-ecosystem: "github-actions"
     directory: "/.github/workflows"
     schedule:
-      interval: "monthly"
+      interval: "weekly"
     open-pull-requests-limit: 5
     labels:
       - "dependencies"
       - "github-actions"
+    groups:
+      # Batch all minor/patch action bumps into one PR; majors get their own.
+      github-actions:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
 
   # Terraform provider dependencies in templates
+  # Weekly: coder/coderd move on a fast 0.0.x cadence and drift quickly.
   - package-ecosystem: "terraform"
     directory: "/templates"
     schedule:
-      interval: "monthly"
+      interval: "weekly"
     open-pull-requests-limit: 5
     labels:
       - "dependencies"
       - "terraform"
+    groups:
+      # Coder providers move together; batch them into one reviewable PR.
+      coder-providers:
+        patterns:
+          - "coder/*"
+        update-types:
+          - "minor"
+          - "patch"
+      # Everything else (kubernetes, google) minor/patch grouped.
+      # Majors (e.g. kubernetes 2.x -> 3.x) stay individual for careful review.
+      other-providers:
+        patterns:
+          - "*"
+        exclude-patterns:
+          - "coder/*"
+        update-types:
+          - "minor"
+          - "patch"
 
   # Terraform modules
   - package-ecosystem: "terraform"
     directory: "/modules"
     schedule:
-      interval: "monthly"
+      interval: "weekly"
     open-pull-requests-limit: 3
     labels:
       - "dependencies"
       - "terraform"
       - "modules"
+    groups:
+      module-providers:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
 
   # Docker base images
   - package-ecosystem: "docker"
     directory: "/docker"
     schedule:
-      interval: "monthly"
+      interval: "weekly"
     open-pull-requests-limit: 10
     labels:
       - "dependencies"
       - "docker"
       - "security"
+    groups:
+      docker-base-images:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"

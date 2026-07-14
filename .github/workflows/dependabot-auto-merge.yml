@@ -1,0 +1,38 @@
+name: Dependabot auto-merge
+
+# Auto-arms merge for patch-level Dependabot PRs so low-risk bumps
+# (e.g. coder/coderd 0.0.x, base-image patches) land without manual toil.
+#
+# PREREQUISITES (this workflow is inert until both are set):
+#   1. Repo setting "Allow auto-merge" enabled:
+#        gh api -X PATCH repos/:owner/:repo -F allow_auto_merge=true
+#   2. Branch protection on main requiring the PR-time checks, so --auto has a
+#      gate to wait on (otherwise GitHub refuses to arm on an unprotected branch):
+#        required checks: "push-coder-templates", "lint-charts"
+#
+# Note: coder/coderd is pre-1.0 (0.0.x), where "patch" can still carry breaking
+# changes. Safety comes from the required checks above, not from the version bump.
+
+on: pull_request
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  auto-merge:
+    if: github.actor == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch Dependabot metadata
+        id: meta
+        uses: dependabot/fetch-metadata@v2
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Arm auto-merge for patch updates
+        if: steps.meta.outputs.update-type == 'version-update:semver-patch'
+        run: gh pr merge --auto --squash "$PR_URL"
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,11 +1,8 @@
 ---
-version: '3.9'
-
 services:
     coder:
-        # This MUST be stable for our documentation and
-        # other automations.
-        image: ghcr.io/coder/coder:${CODER_VERSION:-latest}
+        # Pin to a real version; override with CODER_VERSION when needed.
+        image: ghcr.io/coder/coder:${CODER_VERSION:-2.34.5}
         ports:
             - 7080:7080
         environment:
