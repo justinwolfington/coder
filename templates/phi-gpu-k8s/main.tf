@@ -33,20 +33,28 @@ data "coder_workspace_owner" "me" {}
 # SHARED MODULES
 ############################
 module "cpu_resources" {
-  source = "git::https://github.com/abridgeai/coder.git//modules/resources/cpu?ref=v1.9.0"
+  source = "git::https://github.com/abridgeai/coder.git//modules/resources/cpu?ref=v1.11.0"
 }
 
 module "gpu_resources" {
-  source = "git::https://github.com/abridgeai/coder.git//modules/resources/gpu?ref=v1.9.0"
+  source = "git::https://github.com/abridgeai/coder.git//modules/resources/gpu?ref=v1.11.0"
 }
 
 module "git_utilities" {
-  source       = "git::https://github.com/abridgeai/coder.git//modules/utilities/git?ref=v1.9.0"
+  source       = "git::https://github.com/abridgeai/coder.git//modules/utilities/git?ref=v1.11.0"
   start_count  = data.coder_workspace.me.start_count
   agent_id     = coder_agent.main.id
   repo_url     = data.coder_parameter.repository_url.value
   should_clone = data.coder_parameter.repository_url.value != ""
 
+}
+
+module "workspace_scripts" {
+  source       = "git::https://github.com/abridgeai/coder.git//modules/utilities/workspace-scripts?ref=v1.11.0"
+  start_count  = data.coder_workspace.me.start_count
+  agent_id     = coder_agent.main.id
+  should_clone = local.should_clone
+  repo_url     = local.repo_url
 }
 
 # NOTE: PHI egress is locked to an allowlist and the filesystem is read-only
@@ -61,7 +69,7 @@ module "dotfiles" {
 }
 
 module "utd_bucket" {
-  source                 = "git::https://github.com/abridgeai/coder.git//modules/utilities/gcs-bucket?ref=v1.9.0"
+  source                 = "git::https://github.com/abridgeai/coder.git//modules/utilities/gcs-bucket?ref=v1.11.0"
   environment            = var.environment
   supported_environments = ["production", "staging", "development"]
   workspace_owner_groups = data.coder_workspace_owner.me.groups
@@ -201,10 +209,7 @@ locals {
   }
 
   # Startup script for the workspace
-  init_script = templatefile("${path.module}/startup.tftpl", {
-    should_clone = local.should_clone
-    repo_url     = local.repo_url
-  })
+  setup_script = templatefile("${path.module}/startup.tftpl", {})
 
   # Metrics for workspace monitoring
   metrics = {
@@ -243,9 +248,8 @@ locals {
 # CODER AGENT
 ############################
 resource "coder_agent" "main" {
-  os             = "linux"
-  arch           = "amd64"
-  startup_script = local.init_script
+  os   = "linux"
+  arch = "amd64"
 
   # PHI Security: Disable all insecure display apps
   display_apps {
@@ -266,6 +270,20 @@ resource "coder_agent" "main" {
       timeout      = 5
     }
   }
+}
+
+############################
+# STARTUP SCRIPTS
+############################
+# Shared steps (github_auth, claude_code) come from module.workspace_scripts.
+# The code-server chain is template-specific and dependent, so it stays as one
+# local script here (coder_script runs in parallel with no ordering).
+resource "coder_script" "workspace_setup" {
+  agent_id     = coder_agent.main.id
+  display_name = "Workspace setup"
+  icon         = "/icon/code.svg"
+  run_on_start = true
+  script       = local.setup_script
 }
 
 ############################

@@ -26,11 +26,11 @@ provider "kubernetes" {
 # SHARED MODULES
 ############################
 module "cpu_resources" {
-  source = "git::https://github.com/abridgeai/coder.git//modules/resources/cpu?ref=v1.9.0"
+  source = "git::https://github.com/abridgeai/coder.git//modules/resources/cpu?ref=v1.11.0"
 }
 
 module "git_utilities" {
-  source       = "git::https://github.com/abridgeai/coder.git//modules/utilities/git?ref=v1.9.0"
+  source       = "git::https://github.com/abridgeai/coder.git//modules/utilities/git?ref=v1.11.0"
   start_count  = data.coder_workspace.me.start_count
   agent_id     = coder_agent.main.id
   repo_url     = data.coder_parameter.repository_url.value
@@ -38,7 +38,7 @@ module "git_utilities" {
 }
 
 module "ide_utilities" {
-  source           = "git::https://github.com/abridgeai/coder.git//modules/utilities/ide?ref=v1.9.0"
+  source           = "git::https://github.com/abridgeai/coder.git//modules/utilities/ide?ref=v1.11.0"
   start_count      = data.coder_workspace.me.start_count
   agent_id         = coder_agent.main.id
   user_name        = data.coder_workspace_owner.me.name
@@ -46,7 +46,15 @@ module "ide_utilities" {
 }
 
 module "logger" {
-  source = "git::https://github.com/abridgeai/coder.git//modules/logger?ref=v1.9.0"
+  source = "git::https://github.com/abridgeai/coder.git//modules/logger?ref=v1.11.0"
+}
+
+module "workspace_scripts" {
+  source       = "git::https://github.com/abridgeai/coder.git//modules/utilities/workspace-scripts?ref=v1.11.0"
+  start_count  = data.coder_workspace.me.start_count
+  agent_id     = coder_agent.main.id
+  should_clone = local.should_clone
+  repo_url     = local.repo_url
 }
 
 module "dotfiles" {
@@ -126,10 +134,7 @@ locals {
   }
 
   # Startup script for the workspace
-  init_script = templatefile("${path.module}/startup.tftpl", {
-    should_clone = local.should_clone
-    repo_url     = local.repo_url
-  })
+  setup_script = templatefile("${path.module}/startup.tftpl", {})
   logger_script = module.logger.logger_script
 
   # Metrics for workspace monitoring
@@ -147,9 +152,8 @@ locals {
 # CODER AGENT
 ############################
 resource "coder_agent" "main" {
-  os             = "linux"
-  arch           = "amd64"
-  startup_script = local.init_script
+  os   = "linux"
+  arch = "amd64"
 
   dynamic "metadata" {
     for_each = local.metrics
@@ -161,6 +165,20 @@ resource "coder_agent" "main" {
       timeout      = 5
     }
   }
+}
+
+############################
+# STARTUP SCRIPTS
+############################
+# Shared steps (github_auth, claude_code) come from module.workspace_scripts.
+# The code-server chain is template-specific and dependent, so it stays as one
+# local script here (coder_script runs in parallel with no ordering).
+resource "coder_script" "workspace_setup" {
+  agent_id     = coder_agent.main.id
+  display_name = "Workspace setup"
+  icon         = "/icon/code.svg"
+  run_on_start = true
+  script       = local.setup_script
 }
 
 ###########################

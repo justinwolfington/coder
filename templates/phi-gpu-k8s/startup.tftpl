@@ -1,13 +1,6 @@
 #!/bin/bash
 set -euo pipefail
 
-# Check GitHub authentication if repo cloning is required
-if [ "${should_clone}" = "true" ] && [ -z "$${GITHUB_TOKEN}" ]; then
-  echo "GitHub authentication required to clone ${repo_url}"
-  echo "Please authenticate via Coder (Account → External Authentication)"
-  exit 1
-fi
-
 # PHI-compliant workspace initialization
 echo "Initializing PHI-compliant workspace..."
 export PHI_WORKSPACE=true
@@ -23,9 +16,5 @@ code-server \
   --config /tmp/code-server-config/config.yaml \
   --extensions-dir /opt/code-server-extensions \
   >/tmp/code-server.log 2>&1 &
-
-# Install Claude Code CLI (continue if it fails)
-echo "Installing Claude Code CLI..."
-curl -fsSL https://claude.ai/install.sh | bash || echo "Claude Code installation failed, continuing..."
 
 echo "PHI workspace ready!"

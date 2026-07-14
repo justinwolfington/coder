@@ -1,13 +1,6 @@
 #!/bin/bash
 set -euo pipefail
 
-# Check GitHub authentication if repo cloning is required
-if [ "${should_clone}" = "true" ] && [ -z "$${GITHUB_TOKEN}" ]; then
-  echo "GitHub authentication required to clone ${repo_url}"
-  echo "Please authenticate via Coder (Account → External Authentication)"
-  exit 1
-fi
-
 # Set up user environment
 # Seed .bashrc only on a fresh home volume. The home directory is a persistent
 # PVC and this script re-runs on every restart, so an unconditional copy would
@@ -31,7 +24,3 @@ $CODE_SERVER_DIR/bin/code-server --install-extension ms-toolsai.jupyter
 
 # Start code-server
 $CODE_SERVER_DIR/bin/code-server --auth none --port 13337 >/tmp/code-server.log 2>&1 &
-
-# Install Claude Code CLI (continue if it fails)
-echo "Installing Claude Code CLI..."
-curl -fsSL https://claude.ai/install.sh | bash || echo "Claude Code installation failed, continuing..."
