@@ -90,11 +90,15 @@ coder:
       - name: TF_VAR_judges_openai_base_url
         value: "https://llm-gateway-evals.abridge.services/v1"
 
-      # Preserve the existing production UTD bucket path explicitly until the
-      # dedicated bucket-only identity has been deployed and mount-tested.
-      # The LangSmith proxy rejects this shared identity.
+      # PHI workspaces reach LangSmith only through the Teleport-authorized
+      # broker proxy; they never receive a key directly.
+      - name: TF_VAR_langsmith_endpoint
+        value: "http://langsmith-proxy.coder.svc.cluster.local:8080/api/v1"
+
+      # Dedicated bucket-only identity for UTD-enabled PHI workspaces; the
+      # LangSmith proxy rejects the shared coder identity.
       - name: TF_VAR_phi_workspace_utd_service_account
-        value: coder
+        value: coder-phi-workspace-utd
 
     # mount the git secrets to enable coder to pull modules from coder repo
     # the following secrets have read only access to the coder repo
@@ -216,16 +220,15 @@ networkPolicy:
               - 10.6.0.0/16
 
 # PRODSEC-580: Coder-side identity proxy for the LangSmith credential broker.
-# This remains disabled until the production broker, its dedicated Workload
-# Identity, and the promoted image are ready. Keep TF_VAR_langsmith_endpoint
-# absent above until the same enablement change, so existing PHI workspaces
-# retain their current LangSmith behavior rather than targeting an absent Service.
+# Enabled for prod-live: PHI workspaces reach LangSmith only through this proxy
+# (see TF_VAR_langsmith_endpoint above), authenticating to the broker with the
+# dedicated coder-langsmith-proxy Workload Identity.
 langsmithProxy:
-  enabled: false
+  enabled: true
   networkPolicy:
     nodeCIDR: "10.6.0.0/16"
   image:
-    tag: "" # short SHA from build-and-promote-artifacts
+    tag: "7cb6f2d" # short SHA from build-and-promote-artifacts (coder #226)
   upstreamUrl: https://langsmith-live.abridge.services/coder-broker
   brokerAudience: https://langsmith-live.abridge.services/coder-broker
   serviceAccount:
