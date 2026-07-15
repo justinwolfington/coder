@@ -1,4 +1,4 @@
-# Based on: https://github.com/coder/coder/blob/v2.34.5/helm/coder/values.yaml
+# Based on: https://github.com/coder/coder/blob/v2.34.6/helm/coder/values.yaml
 ---
 # Coder logstream configuration for Kubernetes event streaming
 coder-logstream-kube:
