@@ -1,0 +1,31 @@
+{{- /*
+Allows the Coder provisioner SA (coder:coder) to manage the per-workspace
+ServiceAccounts created by the PHI templates. The upstream Coder chart's
+workspace Role does not grant access to serviceaccounts, so keep this as a
+separate namespace-scoped Role and RoleBinding.
+*/}}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: coder-workspace-sa-manager
+  namespace: coder
+rules:
+  - apiGroups: [""]
+    resources: ["serviceaccounts"]
+    # Terraform's Kubernetes provider creates, reads, patches, and deletes the
+    # per-workspace identity. It does not list, watch, or replace it.
+    verbs: ["get", "create", "patch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: coder-workspace-sa-manager
+  namespace: coder
+subjects:
+  - kind: ServiceAccount
+    name: coder
+    namespace: coder
+roleRef:
+  kind: Role
+  name: coder-workspace-sa-manager
+  apiGroup: rbac.authorization.k8s.io

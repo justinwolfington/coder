@@ -219,6 +219,13 @@ networkPolicy:
               - 172.48.0.0/22
               - 10.6.0.0/16
 
+# Shared identities for legacy PHI workspaces and the UTD bucket mount. The
+# UTD identity has only the bucket-level IAM granted in infrastructure; normal
+# PHI workspaces continue to receive unique, non-GCP ServiceAccounts.
+phiWorkspaceServiceAccounts:
+  enabled: true
+  utdGcpServiceAccount: "coder-phi-workspace-utd@abridge-client-prod.iam.gserviceaccount.com"
+
 # PRODSEC-580: Coder-side identity proxy for the LangSmith credential broker.
 # Enabled for prod-live: PHI workspaces reach LangSmith only through this proxy
 # (see TF_VAR_langsmith_endpoint above), authenticating to the broker with the
