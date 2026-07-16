@@ -38,6 +38,7 @@ RUN apt-get update && \
     apt-utils \
     screen \
     tmux \
+    xz-utils \
     ranger && \
     rm -rf /var/lib/apt/lists/*
 
@@ -70,3 +71,15 @@ RUN mkdir -p /opt/code-server-extensions && \
 # Create writable directories for code-server runtime
 RUN mkdir -p /tmp/code-server-data /tmp/code-server-config && \
     chmod 777 /tmp/code-server-data /tmp/code-server-config
+
+# Install the LangSmith and Hex CLIs, pinned (bump the versions below to upgrade).
+# PHI workspaces reach LangSmith only through the in-cluster broker proxy set on
+# the pod as LANGSMITH_ENDPOINT (PRODSEC-580), so the CLI needs no extra config.
+# The binaries are fetched at build time, so the runtime egress policy is unaffected.
+ENV LANGSMITH_CLI_VERSION=v0.2.40 \
+    HEX_CLI_VERSION=v1.2026.07.15
+RUN curl -fsSL https://cli.langsmith.com/install.sh | \
+      VERSION=${LANGSMITH_CLI_VERSION} INSTALL_DIR=/usr/local/bin sh && \
+    curl --proto '=https' --tlsv1.2 -fsSL \
+      https://github.com/hex-inc/hex-cli/releases/download/${HEX_CLI_VERSION}/hex-installer.sh | \
+      HEX_INSTALL_DIR=/usr/local/bin HEX_NO_MODIFY_PATH=1 HEX_DISABLE_UPDATE=1 sh
