@@ -251,6 +251,7 @@ phiIstio:
     # to fetch approved secrets (e.g. ehr_interop_api_key) from inside the
     # Prod PHI workspace instead of copying them in from outside.
     - secretmanager.googleapis.com
+    - llm-gateway-evals.abridge.services
   allowedHttpHosts:
     - deid.abridge.services
     - encounter-processor-api.abridge.services

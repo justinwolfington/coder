@@ -169,6 +169,7 @@ phiIstio:
   allowedHosts:
     # Coder server - workspace agents need to connect to this
     - coder.abridge.coffee
+    - llm-gateway-evals.abridge.coffee
   allowedHttpHosts:
     - deid.abridge.coffee
     - encounter-processor-api.abridge.coffee
