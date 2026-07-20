@@ -89,3 +89,7 @@ phiIstio:
     - claude.ai
     - platform.claude.com
     - downloads.claude.ai
+    # NOTEGEN-354: LaunchDarkly REST API - lets the notegen team's read-only
+    # Reader token inspect flags (ldcli / MCP / REST) from inside PHI
+    # workspaces. Read-only, so allowed in every environment.
+    - app.launchdarkly.com

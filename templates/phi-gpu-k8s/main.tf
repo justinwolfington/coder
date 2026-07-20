@@ -461,6 +461,21 @@ resource "kubernetes_deployment" "main" {
             }
           }
 
+          # NOTEGEN-354: notegen team's read-only LaunchDarkly Reader token,
+          # injected from the coder-notegen-launchdarkly-secrets k8s secret
+          # (external-secrets, present in every env). optional = true so
+          # workspaces still start if the secret hasn't synced yet.
+          env {
+            name = "LAUNCHDARKLY_NOTEGEN_READONLY_ACCESS_TOKEN"
+            value_from {
+              secret_key_ref {
+                name     = "coder-notegen-launchdarkly-secrets"
+                key      = "LAUNCHDARKLY_NOTEGEN_READONLY_ACCESS_TOKEN"
+                optional = true
+              }
+            }
+          }
+
           resources {
             requests = merge(
               {
