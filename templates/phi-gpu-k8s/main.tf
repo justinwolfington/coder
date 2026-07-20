@@ -383,6 +383,9 @@ resource "kubernetes_deployment" "main" {
         })
       }
       spec {
+        # Apply this to the Pod, rather than only the per-workspace service
+        # account, because UTD workspaces use the shared UTD service account.
+        automount_service_account_token = false
         service_account_name = local.utd_bucket_enabled ? (
           var.phi_workspace_utd_service_account != "" ? var.phi_workspace_utd_service_account : "coder"
           ) : (
