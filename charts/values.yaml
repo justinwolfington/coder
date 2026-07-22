@@ -77,6 +77,7 @@ phiIstio:
     - raw.githubusercontent.com
     - githubusercontent.com
     - release-assets.githubusercontent.com
+    - github-cloud.githubusercontent.com   # git-lfs object downloads (alambic/media CDN)
     # internal services
     - abridge.wandb.io
     # external services for datagen/annotation
