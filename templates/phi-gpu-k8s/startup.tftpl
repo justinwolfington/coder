@@ -5,6 +5,10 @@ set -euo pipefail
 echo "Initializing PHI-compliant workspace..."
 export PHI_WORKSPACE=true
 export PHI_COMPLIANCE_MODE=enabled
+export LANGSMITH_API_KEY=coder
+
+# Register Git LFS filters in the workspace user's Git config.
+git lfs install
 
 # Start code-server with pre-installed extensions
 # Use writable directories in /tmp since the filesystem is read-only
