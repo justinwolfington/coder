@@ -12,6 +12,25 @@ apt-get install -y curl wget git git-lfs vim htop unzip jq sudo build-essential
 
 apt-mark unhold 'nvidia-*' 'libnvidia-*' 'fabricmanager-*' 2>/dev/null || true
 
+# --- Mount the persistent /home data disk (attached as device_name "home") ---
+# This disk survives stop/start, rebuilds, and image bumps; the boot disk does not.
+# Mount it BEFORE creating the user so useradd populates the persistent volume.
+HOME_DEV="/dev/disk/by-id/google-home"
+HOME_DIR="/home/${username}"
+HOME_FRESH=0
+mkdir -p "$HOME_DIR"
+if [[ -e "$HOME_DEV" ]]; then
+    # Format ONLY when the disk has no filesystem. NEVER force-format: that wipes user data.
+    if ! blkid "$HOME_DEV" &>/dev/null; then
+        echo "Formatting fresh persistent home disk (first boot only)..."
+        mkfs.ext4 -m 0 "$HOME_DEV"
+        HOME_FRESH=1
+    fi
+    mountpoint -q "$HOME_DIR" || mount "$HOME_DEV" "$HOME_DIR"
+    # /etc/fstab lives on the ephemeral boot disk, so re-assert the mount each boot.
+    grep -q "google-home" /etc/fstab || echo "$HOME_DEV $HOME_DIR ext4 defaults,nofail 0 2" >> /etc/fstab
+fi
+
 # Create user with sudo access
 if ! id "${username}" &>/dev/null; then
     useradd -m -s /bin/bash "${username}"
@@ -20,7 +39,12 @@ if ! id "${username}" &>/dev/null; then
     usermod -aG sudo "${username}"
 fi
 
-chown -R "${username}:${username}" "/home/${username}"
+# Own the home dir. Recursive chown only on first format - a recursive chown over
+# a full multi-TB home on every boot would be needlessly slow.
+chown "${username}:${username}" "/home/${username}"
+if [[ "$HOME_FRESH" == "1" ]]; then
+    chown -R "${username}:${username}" "/home/${username}"
+fi
 
 # Install Docker
 if ! command -v docker &>/dev/null; then
@@ -35,9 +59,17 @@ if [[ "${gpu_type}" == "nvidia-h100-80gb" ]]; then
     mkdir -p /mnt/nvme
     for device in /dev/nvme*n1; do
         if [[ -e "$device" ]]; then
+            # On a3 the boot disk and the persistent /home disk are NVMe too. Skip any
+            # device already mounted so we only touch free local-SSD scratch.
+            if findmnt -S "$device" >/dev/null 2>&1; then
+                continue
+            fi
             mount_point="/mnt/nvme/$(basename "$device")"
             mkdir -p "$mount_point"
-            mkfs.ext4 -F "$device" 2>/dev/null || true
+            # Local SSDs are ephemeral scratch (wiped on stop); only format if unformatted.
+            if ! blkid "$device" &>/dev/null; then
+                mkfs.ext4 "$device" 2>/dev/null || true
+            fi
             mount "$device" "$mount_point" 2>/dev/null || true
             chown -R "${username}:${username}" "$mount_point"
         fi

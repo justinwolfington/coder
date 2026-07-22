@@ -148,8 +148,8 @@ data "coder_parameter" "dl_image" {
 
 data "coder_parameter" "disk_size" {
   name         = "disk_size"
-  display_name = "Boot Disk Size (GB)"
-  description  = "Boot disk size in GB. Recommended: 500GB+ for L4 instances, 1TB+ for H100 instances to accommodate datasets and models."
+  display_name = "Home Disk Size (GB)"
+  description  = "Size of your persistent /home data disk in GB. This disk survives workspace stop/start, rebuilds, and image upgrades - keep your code, datasets, and caches here. Recommended: 500GB+ for L4, 1TB+ for H100. (Lowering this replaces the disk and wipes /home.)"
   type         = "number"
   default      = 500
   mutable      = true
@@ -312,6 +312,12 @@ locals {
 
   # Working directory for IDEs and Claude Code
   repo_dir = "/home/${lower(data.coder_workspace_owner.me.name)}"
+
+  # Boot disk holds only the OS + tooling (conda, docker layers). It is
+  # image-derived and therefore REPLACED on image bumps / rebuilds, so nothing
+  # durable may live here - user data lives on google_compute_disk.home_disk.
+  # ponytail: fixed 200GB; promote to a coder_parameter if OS/docker outgrows it.
+  boot_disk_size = 200
 }
 
 ############################
@@ -389,12 +395,28 @@ resource "google_compute_disk" "vm_boot_disk" {
   name  = "coder-${lower(data.coder_workspace_owner.me.name)}-${lower(data.coder_workspace.me.name)}-boot-disk"
   type  = local.gpu_config.disk_type
   zone  = var.zone
-  size  = data.coder_parameter.disk_size.value
+  size  = local.boot_disk_size
   image = local.image
   labels = {
     "coder-workspace"   = data.coder_workspace.me.id
     "coder_replaceable" = "yes"
     "workspace-type"    = local.gpu_config.gpu_count > 0 ? "gpu" : "cpu"
+  }
+}
+
+# Persistent /home data disk. Deliberately created WITHOUT an image, so it is a
+# blank volume: changing the deep-learning image or rebuilding the workspace
+# replaces the boot disk above but NEVER touches this one. No count -> survives
+# stop/start. Not labeled coder_replaceable - it holds the user's data.
+# Only a workspace DELETE (terraform destroy) removes it.
+resource "google_compute_disk" "home_disk" {
+  name = "coder-${lower(data.coder_workspace_owner.me.name)}-${lower(data.coder_workspace.me.name)}-home-disk"
+  type = local.gpu_config.disk_type
+  zone = var.zone
+  size = data.coder_parameter.disk_size.value
+  labels = {
+    "coder-workspace" = data.coder_workspace.me.id
+    "workspace-type"  = local.gpu_config.gpu_count > 0 ? "gpu" : "cpu"
   }
 }
 
@@ -413,6 +435,13 @@ resource "google_compute_instance" "workspace" {
   boot_disk {
     source      = google_compute_disk.vm_boot_disk.self_link
     auto_delete = false
+  }
+
+  # Persistent /home; surfaces in the guest at /dev/disk/by-id/google-home.
+  attached_disk {
+    source      = google_compute_disk.home_disk.self_link
+    device_name = "home"
+    mode        = "READ_WRITE"
   }
 
   dynamic "scratch_disk" {
@@ -513,7 +542,7 @@ resource "coder_agent_instance" "main" {
 resource "coder_metadata" "workspace_info" {
   count       = data.coder_workspace.me.start_count
   resource_id = google_compute_instance.workspace[0].id
-  daily_cost = local.gpu_config.gpu_count > 0 ? lookup(module.gpu_resources.gpu_cost_per_unit, local.gpu_config.gpu_type, 0) * local.gpu_config.gpu_count : lookup(local.cpu_cost_per_day, local.machine_type, 0)
+  daily_cost  = local.gpu_config.gpu_count > 0 ? lookup(module.gpu_resources.gpu_cost_per_unit, local.gpu_config.gpu_type, 0) * local.gpu_config.gpu_count : lookup(local.cpu_cost_per_day, local.machine_type, 0)
 
   item {
     key   = "Machine Type"

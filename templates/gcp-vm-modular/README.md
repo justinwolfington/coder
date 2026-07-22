@@ -29,7 +29,19 @@ Environment-aware GPU-accelerated Google Cloud VM workspace for ML/AI developmen
 | GPU Configuration | GPU setup | No GPU | No GPU, NVIDIA L4 (2x), NVIDIA H100 80GB (8x) |
 | Workspace Size | vCPU/RAM for No-GPU workspaces (ignored with a GPU) | 4 vCPU / 16 GB | 2/4/8/16/32 vCPU (4 GB RAM per vCPU) |
 | Deep Learning Image | ML platform image | PyTorch Latest GPU | PyTorch GPU/CPU, TensorFlow GPU/CPU, Common Framework GPU/CPU, Ubuntu 22.04 LTS |
-| Boot Disk Size | Storage size in GB | 256 | 50-2000 GB |
+| Home Disk Size | Size of the persistent `/home` data disk in GB (survives stop/start, rebuilds, and image upgrades) | 500 | 100-2000 GB |
+
+## Storage & data persistence
+
+Know where your data lives before you run long experiments:
+
+| Path | Backing | Survives stop/start | Survives rebuild / image change | Survives workspace delete |
+|------|---------|:---:|:---:|:---:|
+| `/home/<user>` | dedicated persistent disk (`home_disk`) | yes | yes | no |
+| `/` and everything outside `/home` | image-derived boot disk | yes | **no** (recreated from image) | no |
+| `/mnt/nvme/*` (H100 only) | local SSD scratch | **no** (wiped on every stop) | no | no |
+
+Keep code, datasets, and caches under `/home`. Use `/mnt/nvme` only for reproducible scratch. Nothing on the VM survives a workspace **delete** - push anything you cannot lose to GCS.
 
 ## GPU Configurations
 
