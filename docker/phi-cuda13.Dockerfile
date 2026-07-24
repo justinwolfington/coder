@@ -45,6 +45,10 @@ RUN apt-get update && \
     ranger && \
     rm -rf /var/lib/apt/lists/*
 
+RUN mkdir -p /etc/claude-code && \
+    printf '%s\n' '{"model":"opus","availableModels":["opus","sonnet","haiku"],"enforceAvailableModels":true}' \
+      > /etc/claude-code/managed-settings.json
+
 # Install Google Cloud SDK
 RUN curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-linux-x86_64.tar.gz && \
     tar -xf google-cloud-cli-linux-x86_64.tar.gz && \
