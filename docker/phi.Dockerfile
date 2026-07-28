@@ -44,7 +44,7 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 RUN mkdir -p /etc/claude-code && \
-    printf '%s\n' '{"model":"opus","availableModels":["opus","sonnet","haiku"],"enforceAvailableModels":true}' \
+    printf '%s\n' '{"model":"opus","availableModels":["opus","sonnet","haiku"],"enforceAvailableModels":true,"tui":"default"}' \
       > /etc/claude-code/managed-settings.json
 
 # Install Google Cloud SDK

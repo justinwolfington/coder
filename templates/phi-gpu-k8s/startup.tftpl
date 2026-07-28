@@ -13,6 +13,15 @@ git lfs install
 # Start code-server with pre-installed extensions
 # Use writable directories in /tmp since the filesystem is read-only
 # With egress locked down, code server will not support installing new extensions
+mkdir -p /tmp/code-server-data/User
+if [ ! -f /tmp/code-server-data/User/settings.json ]; then
+  cat > /tmp/code-server-data/User/settings.json <<'EOF'
+{
+  "workbench.colorTheme": "Dark Modern"
+}
+EOF
+fi
+
 code-server \
   --auth none \
   --port 13337 \
