@@ -313,7 +313,7 @@ resource "coder_app" "code-server" {
 
 # --- Kubernetes Resources ---
 
-resource "kubernetes_service_account" "workspace" {
+resource "kubernetes_service_account_v1" "workspace" {
   count = local.utd_bucket_enabled ? 0 : 1
 
   metadata {
@@ -326,6 +326,12 @@ resource "kubernetes_service_account" "workspace" {
   automount_service_account_token = false
 }
 
+# NOTE: deliberately NOT renamed to kubernetes_persistent_volume_claim_v1.
+# The kubernetes provider implements no cross-type state move, so a `moved` block
+# errors at plan time and a bare rename destroys the PVC, wiping every workspace's
+# /home. Renaming requires rewriting the resource type in each existing workspace's
+# state (coder state pull/push) in the same change. The deprecation warning is the
+# deliberate cost of not doing that.
 resource "kubernetes_persistent_volume_claim" "home" {
   metadata {
     name        = "coder-phi-${data.coder_workspace.me.id}-home"
@@ -344,7 +350,7 @@ resource "kubernetes_persistent_volume_claim" "home" {
   }
 }
 
-resource "kubernetes_deployment" "main" {
+resource "kubernetes_deployment_v1" "main" {
   count            = data.coder_workspace.me.start_count
   depends_on       = [kubernetes_persistent_volume_claim.home]
   wait_for_rollout = false
@@ -389,7 +395,7 @@ resource "kubernetes_deployment" "main" {
         service_account_name = local.utd_bucket_enabled ? (
           var.phi_workspace_utd_service_account != "" ? var.phi_workspace_utd_service_account : "coder"
           ) : (
-          kubernetes_service_account.workspace[0].metadata[0].name
+          kubernetes_service_account_v1.workspace[0].metadata[0].name
         )
         node_selector = local.node_selector
 
@@ -550,7 +556,7 @@ resource "kubernetes_deployment" "main" {
 # --- Coder Metadata (for UI display) ---
 resource "coder_metadata" "workspace_info" {
   count       = data.coder_workspace.me.start_count
-  resource_id = kubernetes_deployment.main[0].id
+  resource_id = kubernetes_deployment_v1.main[0].id
   daily_cost = (module.cpu_resources.cpu_cost_per_core * module.cpu_resources.cpu.value +
   module.cpu_resources.ram_cost_per_gb * module.cpu_resources.memory.value) + lookup(module.gpu_resources.gpu_cost_per_unit, data.coder_parameter.gpu_accelerator.value, 0) * data.coder_parameter.gpu_count.value
 

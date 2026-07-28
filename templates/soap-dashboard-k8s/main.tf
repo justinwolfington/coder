@@ -170,6 +170,12 @@ resource "coder_app" "soap-dashboard" {
 
 # --- Kubernetes Resources ---
 
+# NOTE: deliberately NOT renamed to kubernetes_persistent_volume_claim_v1.
+# The kubernetes provider implements no cross-type state move, so a `moved` block
+# errors at plan time and a bare rename destroys the PVC, wiping every workspace's
+# /home. Renaming requires rewriting the resource type in each existing workspace's
+# state (coder state pull/push) in the same change. The deprecation warning is the
+# deliberate cost of not doing that.
 resource "kubernetes_persistent_volume_claim" "home" {
   metadata {
     name        = "coder-${data.coder_workspace.me.id}-home"
@@ -188,7 +194,7 @@ resource "kubernetes_persistent_volume_claim" "home" {
   }
 }
 
-resource "kubernetes_deployment" "main" {
+resource "kubernetes_deployment_v1" "main" {
   count            = data.coder_workspace.me.start_count
   depends_on       = [kubernetes_persistent_volume_claim.home]
   wait_for_rollout = false
@@ -350,7 +356,7 @@ resource "kubernetes_deployment" "main" {
 ############################
 resource "coder_metadata" "workspace_info" {
   count       = data.coder_workspace.me.start_count
-  resource_id = kubernetes_deployment.main[0].id
+  resource_id = kubernetes_deployment_v1.main[0].id
   daily_cost = (module.cpu_resources.cpu_cost_per_core * module.cpu_resources.cpu.value +
   module.cpu_resources.ram_cost_per_gb * module.cpu_resources.memory.value)
 
