@@ -243,8 +243,18 @@ locals {
     "nvidia-rtx-pro-6000" = "rtx6000-class"
   }
 
+  # CUDA 13 images carry NVIDIA_REQUIRE_CUDA cuda>=13.0 and will not start on the
+  # R535 driver. h100-coder-class prefers R580 but falls back to R535, and a pod
+  # selects a compute class rather than a driver, so a CUDA 13 workspace can land
+  # on a node it can never run on. h100-coder-latest-class pins R580 with no fallback.
+  compute_class = (
+    local.cuda13 && data.coder_parameter.gpu_accelerator.value == "nvidia-h100-80gb"
+    ? "h100-coder-latest-class"
+    : local.compute_class_map[data.coder_parameter.gpu_accelerator.value]
+  )
+
   node_selector = {
-    "cloud.google.com/compute-class" = local.compute_class_map[data.coder_parameter.gpu_accelerator.value]
+    "cloud.google.com/compute-class" = local.compute_class
   }
 
   # Conditional GPU resource requests and limits
