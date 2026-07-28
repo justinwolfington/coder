@@ -19,6 +19,7 @@ COPY --from=ghcr.io/astral-sh/uv:0.11.17 /uv /bin/uv
 # Install build dependencies
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
+    git-lfs \
     gcc \
     build-essential \
     vim \
