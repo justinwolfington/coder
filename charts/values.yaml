@@ -85,8 +85,11 @@ phiIstio:
     - us.api.openai.com
     - api.anthropic.com
     - api.centaurlabs.com
-    - "*prod-gcp-us-c1.gcp-us-ctr1-abr.psc.baseten.co"   # inference, us-central1
-    - "*prod-gcp-us-c1.gcp-us-e4-abr.psc.baseten.co"  
+    # Baseten private (PSC) inference clusters. Per-deployment hostnames vary
+    # (<deployment>-prod-gcp-us-c1.<cluster>.psc.baseten.co), so these are
+    # wildcards: Istio only accepts a wildcard as a whole leading label.
+    - "*.gcp-us-ctr1-abr.psc.baseten.co"   # inference, us-central1
+    - "*.gcp-us-e4-abr.psc.baseten.co"     # inference, us-east4
     # Claude Code CLI (installer + release downloads; runtime API uses api.anthropic.com above)
     # Auth: claude.ai = subscription login, platform.claude.com = Console-account login
     - claude.ai

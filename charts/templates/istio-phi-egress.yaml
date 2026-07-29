@@ -3,6 +3,15 @@
 {{- $allowedHosts := uniq (concat $commonHosts ( .Values.phiIstio.allowedHosts | default (list) )) -}}
 {{- $allowedHttpHosts := uniq ( .Values.phiIstio.allowedHttpHosts | default (list) ) -}}
 {{- $allHosts := uniq (concat $allowedHosts $allowedHttpHosts) -}}
+{{- $exactHosts := list -}}
+{{- $wildcardHosts := list -}}
+{{- range $allHosts -}}
+  {{- if hasPrefix "*" . -}}
+    {{- $wildcardHosts = append $wildcardHosts . -}}
+  {{- else -}}
+    {{- $exactHosts = append $exactHosts . -}}
+  {{- end -}}
+{{- end -}}
 ---
 # ServiceEntry for allowed external hosts
 apiVersion: networking.istio.io/v1beta1
@@ -14,7 +23,7 @@ spec:
   exportTo:
     - "."
   hosts:
-  {{- range $allHosts }}
+  {{- range $exactHosts }}
     - {{ . | quote }}
   {{- end }}
   ports:
@@ -26,6 +35,33 @@ spec:
       protocol: HTTP
   resolution: DNS
   location: MESH_EXTERNAL
+{{- if $wildcardHosts }}
+---
+# Wildcard hosts need their own ServiceEntry: resolution DNS requires FQDNs
+# unless endpoints are given, so wildcards use NONE (original-destination
+# passthrough, the workspace resolves the name itself).
+apiVersion: networking.istio.io/v1beta1
+kind: ServiceEntry
+metadata:
+  name: phi-allowed-external-wildcard
+  namespace: {{ .Release.Namespace }}
+spec:
+  exportTo:
+    - "."
+  hosts:
+  {{- range $wildcardHosts }}
+    - {{ . | quote }}
+  {{- end }}
+  ports:
+    - number: 443
+      name: tls
+      protocol: TLS
+    - number: 80
+      name: http
+      protocol: HTTP
+  resolution: NONE
+  location: MESH_EXTERNAL
+{{- end }}
 ---
 # Sidecar to restrict egress for PHI workspaces
 apiVersion: networking.istio.io/v1beta1
@@ -66,7 +102,7 @@ spec:
 apiVersion: networking.istio.io/v1beta1
 kind: DestinationRule
 metadata:
-  name: phi-dr-{{ . | replace "." "-" }}
+  name: phi-dr-{{ . | replace "*." "wildcard-" | replace "." "-" }}
   namespace: {{ $.Release.Namespace }}
 spec:
   host: {{ . | quote }}
