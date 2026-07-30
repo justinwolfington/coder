@@ -24,10 +24,11 @@ resource "coderd_template" "templates" {
   icon         = each.value.icon
 
   # Optional timing parameters - only set if specified in config
-  activity_bump_ms    = try(each.value.activity_bump_ms, null)
-  failure_ttl_ms      = try(each.value.failure_ttl_ms, null)
-  time_til_dormant_ms = try(each.value.time_til_dormant_ms, null)
-  default_ttl_ms      = try(each.value.default_ttl_ms, null)
+  activity_bump_ms               = try(each.value.activity_bump_ms, null)
+  failure_ttl_ms                 = try(each.value.failure_ttl_ms, null)
+  time_til_dormant_ms            = try(each.value.time_til_dormant_ms, null)
+  time_til_dormant_autodelete_ms = try(each.value.time_til_dormant_autodelete_ms, null)
+  default_ttl_ms                 = try(each.value.default_ttl_ms, null)
 
   # Version management through the Coder provider
   versions = [{
