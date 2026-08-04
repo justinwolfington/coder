@@ -420,11 +420,20 @@ resource "google_compute_disk" "home_disk" {
   }
 }
 
+# Without this, dropping count reads as a new resource and plans destroy+create.
+moved {
+  from = google_compute_instance.workspace[0]
+  to   = google_compute_instance.workspace
+}
+
+# Stopped, not destroyed. count = start_count dropped the instance from state on
+# every stop, so a build failing mid-write orphaned a VM that still held the
+# disks above, and the next destroy hit resourceInUseByAnotherResource.
 resource "google_compute_instance" "workspace" {
-  count        = data.coder_workspace.me.start_count
-  name         = "coder-${lower(data.coder_workspace_owner.me.name)}-${lower(data.coder_workspace.me.name)}"
-  machine_type = local.machine_type
-  zone         = var.zone
+  name           = "coder-${lower(data.coder_workspace_owner.me.name)}-${lower(data.coder_workspace.me.name)}"
+  machine_type   = local.machine_type
+  zone           = var.zone
+  desired_status = data.coder_workspace.me.start_count > 0 ? "RUNNING" : "TERMINATED"
 
   network_interface {
     network    = "projects/${local.env_config.project_id}/global/networks/${local.env_config.network}"
@@ -533,7 +542,7 @@ resource "google_compute_instance" "workspace" {
 resource "coder_agent_instance" "main" {
   count       = data.coder_workspace.me.start_count
   agent_id    = coder_agent.main.id
-  instance_id = google_compute_instance.workspace[0].instance_id
+  instance_id = google_compute_instance.workspace.instance_id
 }
 
 ############################
@@ -541,7 +550,7 @@ resource "coder_agent_instance" "main" {
 ############################
 resource "coder_metadata" "workspace_info" {
   count       = data.coder_workspace.me.start_count
-  resource_id = google_compute_instance.workspace[0].id
+  resource_id = google_compute_instance.workspace.id
   daily_cost  = local.gpu_config.gpu_count > 0 ? lookup(module.gpu_resources.gpu_cost_per_unit, local.gpu_config.gpu_type, 0) * local.gpu_config.gpu_count : lookup(local.cpu_cost_per_day, local.machine_type, 0)
 
   item {
@@ -586,6 +595,6 @@ resource "coder_metadata" "workspace_info" {
 
   item {
     key   = "Internal IP"
-    value = google_compute_instance.workspace[0].network_interface[0].network_ip
+    value = google_compute_instance.workspace.network_interface[0].network_ip
   }
 }
