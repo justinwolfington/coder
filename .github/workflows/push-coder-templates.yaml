@@ -9,6 +9,17 @@ on:
     branches:
       - main
 
+  # Deploy template changes merged to main. The workflow_run trigger above only
+  # fires after a docker/** artifact build, so a template-only merge deployed
+  # nothing and sat on main until someone dispatched this by hand.
+  push:
+    branches:
+      - main
+    paths:
+      - "templates/**"
+      - "modules/**"
+      - ".github/workflows/push-coder-templates.yaml"
+
   # Run on pull requests to test templates
   pull_request:
     branches:
@@ -41,6 +52,14 @@ on:
 
 permissions:
   contents: read
+
+# A commit touching both docker/** and templates/** fires workflow_run and push.
+# Serialize rather than cancel: cancelling mid-apply would leave a half-applied
+# template. The later run may hit a 409 on the duplicate version name, which is
+# noisy but harmless - settings are applied before the version is created.
+concurrency:
+  group: publish-templates-${{ github.event.inputs.environment || 'development' }}
+  cancel-in-progress: false
 
 jobs:
   push-templates:
