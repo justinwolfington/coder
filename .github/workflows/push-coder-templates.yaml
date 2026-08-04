@@ -63,7 +63,11 @@ concurrency:
 
 jobs:
   push-templates:
-    if: github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request' && github.event.pull_request.draft == false|| github.event.workflow_run.conclusion == 'success'
+    if: >-
+      github.event_name == 'workflow_dispatch'
+      || github.event_name == 'push'
+      || (github.event_name == 'pull_request' && github.event.pull_request.draft == false)
+      || github.event.workflow_run.conclusion == 'success'
     runs-on: abridge-runner-${{ github.event.inputs.environment || 'development' }}
     environment: ${{ github.event.inputs.environment || 'development' }}
 
