@@ -29,6 +29,11 @@ resource "coderd_template" "templates" {
   time_til_dormant_ms            = try(each.value.time_til_dormant_ms, null)
   time_til_dormant_autodelete_ms = try(each.value.time_til_dormant_autodelete_ms, null)
   default_ttl_ms                 = try(each.value.default_ttl_ms, null)
+  allow_user_auto_stop           = try(each.value.allow_user_auto_stop, null)
+
+  # "" not null: null leaves it Computed, so a template could never be
+  # un-deprecated. coderd also drops this on create, only applies on update.
+  deprecation_message = try(each.value.deprecation_message, "")
 
   # Version management through the Coder provider
   versions = [{

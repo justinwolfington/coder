@@ -10,3 +10,6 @@ charts/charts/
 templates/*.tfvars
 *.tfstate
 *.tfstate.*
+
+# oh-my-claudecode session state - tooling scratch, never belongs in the repo
+.omc/

@@ -1,74 +1,45 @@
 locals {
-  # Template timing parameters (all in milliseconds):
-  # - activity_bump_ms: How much to extend workspace deadline when activity detected
-  # - failure_ttl_ms: How long to keep failed workspaces before cleanup
-  # - default_ttl_ms: Default time-to-live for workspaces
-  # - time_til_dormant_ms: Idle time before a workspace is stopped and marked dormant
-  # - time_til_dormant_autodelete_ms: Dormant time before the workspace is deleted
-  #
-  # Dormancy is measured from last_used_at, which tracks user connections rather than
-  # compute. A workspace running an unattended job nobody connects to will go dormant.
-  # Setting autodelete without time_til_dormant_ms is a no-op: isEligibleForDelete
-  # requires DormantAt, which only isEligibleForDormantStop sets.
-  # 21 days idle -> stopped + dormant, 7 more -> deleted. 28 days from last
-  # connection.
-  #
-  # The non-PHI idle distribution has no natural gap to cut at - it runs
-  # continuously from 0d out past 250d - so the threshold is a judgement call
-  # rather than something the data picks for us. 21d leaves three weeks before
-  # a workspace is touched, which covers a normal holiday, then only 7 days of
-  # dormancy before deletion.
+  # Dormancy runs off last_used_at, not compute, so an unattended job still goes
+  # dormant. Autodelete is a no-op unless time_til_dormant_ms is set too.
   retention = {
-    time_til_dormant_ms            = 1814400000 # 21 days idle -> stopped + dormant
-    time_til_dormant_autodelete_ms = 604800000  # 7 days dormant -> deleted
+    time_til_dormant_ms            = 1814400000 # 21d idle -> dormant
+    time_til_dormant_autodelete_ms = 604800000  # 7d dormant -> deleted
   }
 
-  # PHI workspaces hold real patient data, so they get a much shorter window:
-  # 7 days idle -> dormant, 7 more -> deleted. 14 days from last connection
-  # instead of 44.
-  #
-  # Deliberately aggressive. Measured against the 32 prod PHI workspaces, a 7d
-  # threshold catches 21 where 14d catches 15 and 30d catches 14 - the extra 6
-  # sit at 7-15 days idle, so this will reach workspaces someone used last week.
-  # That is the intended trade: PHI should not sit unattended, and a stopped
-  # workspace is recoverable for 7 days before anything is destroyed.
-  #
-  # Consequence worth knowing: two weeks away without touching the workspace
-  # means deletion. Coder emails the owner at both the dormant and the pending
-  # deletion step, but someone on leave may not act on either.
+  # PHI holds patient data: 11 days from last connection instead of 28.
+  # allow_user_auto_stop=false pins default_ttl_ms on; without it a user can
+  # null their ttl and run forever, which is how one PHI workspace reached 318d.
   phi_retention = {
-    time_til_dormant_ms            = 604800000 # 7 days idle -> stopped + dormant
-    time_til_dormant_autodelete_ms = 604800000 # 7 days dormant -> deleted
+    time_til_dormant_ms            = 604800000 # 7d idle -> dormant
+    time_til_dormant_autodelete_ms = 345600000 # 4d dormant -> deleted
+    default_ttl_ms                 = 259200000 # 72h, overrides the 48h GPU default
+    allow_user_auto_stop           = false
   }
 
-  # GPU-specific timing configuration to prevent abuse while allowing productive work
+  # Stops workspaces stuck in the failed state. Does not retry a failed delete
+  # transition, so leaked VMs still need the orphan sweep.
+  failure_cleanup = {
+    failure_ttl_ms = 7200000 # 2h
+  }
+
   gpu_timings = merge({
-    activity_bump_ms = 86400000  # 1 day (extend workspace when active)
-    default_ttl_ms   = 172800000 # 2 days (auto-stop)
-    failure_ttl_ms   = 7200000   # 2 hours (cleanup failed workspaces)
-  }, local.retention)
+    activity_bump_ms = 86400000  # 1d
+    default_ttl_ms   = 172800000 # 2d auto-stop
+  }, local.retention, local.failure_cleanup)
 
-  # Same compute guardrails as GPU workspaces, but the shorter PHI window.
-  phi_timings = merge(local.gpu_timings, local.phi_retention)
-
-  # Retention only: CPU workspaces are cheap to leave running, so no auto-stop,
-  # but they should not accumulate home volumes indefinitely.
-  cpu_timings = local.retention
-
-  # Non-GPU templates: no auto-stop or failure cleanup, but the same retention
-  # as everything else. These were previously exempt entirely, which left 45
-  # idle workspaces (27 of them running) outside the policy - k8s-completion-
-  # service alone accounts for 43 of those and is the largest single block of
-  # reclaimable compute in the fleet.
-  standard_timings = local.retention
+  phi_timings      = merge(local.gpu_timings, local.phi_retention)
+  cpu_timings      = merge(local.retention, local.failure_cleanup)
+  standard_timings = merge(local.retention, local.failure_cleanup)
 
   templates = {
+    # Named for abridgeai/completion-service, archived 2026-05-15; work moved to bilrost.
     "k8s-completion-service" = merge({
-      display_name = "Kubernetes Completion Service with Phoenix"
-      description  = "Kubernetes workspace with Arize Phoenix. Includes completion service, uv package manager, and gcloud CLI."
-      icon         = "/emojis/1f33c.png"
-      directory    = "./clinician-k8s"
-      environments = ["development", "staging", "production"]
+      display_name        = "Kubernetes Completion Service with Phoenix"
+      description         = "Kubernetes workspace with Arize Phoenix. Includes completion service, uv package manager, and gcloud CLI."
+      icon                = "/emojis/1f33c.png"
+      directory           = "./clinician-k8s"
+      environments        = ["development", "staging", "production"]
+      deprecation_message = "This template is deprecated and will be removed. Use cpu-k8s for CPU work or phi-gpu-k8s for GPU work. Existing workspaces keep running, but new ones cannot be created from this template."
     }, local.standard_timings)
 
     "cpu-k8s" = merge({

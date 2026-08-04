@@ -2,9 +2,9 @@
     "cpu-k8s": {
         "template_name": "cpu-k8s",
         "home_dir": "/home/vscode",
-        "repository_url": "https://github.com/abridgeai/completion-service",
+        "repository_url": "https://github.com/abridgeai/bilrost",
         "repo_clone_path": "/home/vscode",
         "test_code_server": true,
-        "extra_parameters": "cpu: 8\nmemory: 16\nhome_disk_size: 64\nenable_jetbrains: true\njetbrains_ide: \"PY\"\ndotfiles_uri: \"\"\ndotfiles_branch: \"\""
+        "extra_parameters": "cpu: 8\nmemory: 16\nhome_disk_size: 64\ndotfiles_uri: \"\"\ndotfiles_branch: \"\""
     }
 }

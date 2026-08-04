@@ -14,7 +14,6 @@ Centralizes frequently used utility modules to avoid duplication across template
 
 ### IDE Utilities (ide/)
 - `cursor` - Cursor IDE
-- `jetbrains_gateway` - JetBrains Gateway with PyCharm
 
 ### Storage Utilities (gcs-bucket/)
 - `gcs-bucket` - Mount GCS buckets with conditional access control

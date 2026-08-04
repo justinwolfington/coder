@@ -6,7 +6,7 @@ terraform {
     }
     google = {
       source  = "hashicorp/google"
-      version = "7.34.0"
+      version = "7.42.0"
     }
   }
 }
@@ -32,11 +32,11 @@ data "coder_workspace_owner" "me" {}
 # SHARED MODULES
 ############################
 module "gpu_resources" {
-  source = "git::https://github.com/abridgeai/coder.git//modules/resources/gpu?ref=v1.9.0"
+  source = "git::https://github.com/abridgeai/coder.git//modules/resources/gpu?ref=v1.12.1"
 }
 
 module "git_utilities" {
-  source              = "git::https://github.com/abridgeai/coder.git//modules/utilities/git?ref=v1.9.0"
+  source              = "git::https://github.com/abridgeai/coder.git//modules/utilities/git?ref=v1.12.1"
   start_count         = data.coder_workspace.me.start_count
   agent_id            = coder_agent.main.id
   repo_url            = ""
@@ -45,11 +45,9 @@ module "git_utilities" {
 }
 
 module "ide_modules" {
-  source           = "git::https://github.com/abridgeai/coder.git//modules/utilities/ide?ref=v1.9.0"
+  source           = "git::https://github.com/abridgeai/coder.git//modules/utilities/ide?ref=v1.12.1"
   start_count      = data.coder_workspace.me.start_count
   agent_id         = coder_agent.main.id
-  user_name        = data.coder_workspace_owner.me.name
-  enable_jetbrains = data.coder_parameter.enable_jetbrains.value
 }
 
 module "dotfiles" {
@@ -158,15 +156,6 @@ data "coder_parameter" "disk_size" {
     min = 100
     max = 2000
   }
-}
-
-data "coder_parameter" "enable_jetbrains" {
-  name         = "enable_jetbrains"
-  display_name = "Enable JetBrains Gateway"
-  description  = "Enable JetBrains Gateway IDE access"
-  type         = "bool"
-  default      = false
-  mutable      = true
 }
 
 data "coder_parameter" "environment" {
@@ -382,7 +371,7 @@ resource "coder_agent" "main" {
 module "code-server" {
   count    = data.coder_workspace.me.start_count
   source   = "registry.coder.com/coder/code-server/coder"
-  version  = "1.4.1"
+  version  = "1.5.2"
   agent_id = coder_agent.main.id
   folder   = "/home/${lower(data.coder_workspace_owner.me.name)}"
 }
