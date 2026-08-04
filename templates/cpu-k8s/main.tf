@@ -190,11 +190,6 @@ resource "coder_app" "code-server" {
   subdomain    = false
   share        = "owner"
 
-  healthcheck {
-    url       = "http://localhost:13337/healthz"
-    interval  = 3
-    threshold = 10
-  }
 }
 
 

@@ -194,11 +194,6 @@ resource "coder_app" "code-server" {
   subdomain    = false
   share        = "owner"
 
-  healthcheck {
-    url       = "http://localhost:13337/healthz"
-    interval  = 3
-    threshold = 10
-  }
 }
 
 # --- Coder Application: Arize Phoenix ---
@@ -211,11 +206,6 @@ resource "coder_app" "arize-phoenix" {
   subdomain    = false
   share        = "owner"
 
-  healthcheck {
-    url       = "http://localhost:6006"
-    interval  = 10
-    threshold = 15
-  }
 }
 
 # --- Kubernetes Resources ---
