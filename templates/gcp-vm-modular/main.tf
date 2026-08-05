@@ -117,30 +117,49 @@ data "coder_parameter" "dl_image" {
   display_name = "Deep Learning Image"
   description  = "Select deep learning platform image"
   type         = "string"
-  default      = "pytorch-2-7-cu128-ubuntu-2204-nvidia-570-v20260320"
+  default      = "pytorch-2-9-cu129-ubuntu-2204-nvidia-580-v20260730"
   mutable      = true
 
-  # CUDA 12.8 / driver 570 (snapshots refreshed to latest available)
-  option {
-    name  = "PyTorch 2.7 + CUDA 12.8 (Ubuntu 22.04)"
-    value = "pytorch-2-7-cu128-ubuntu-2204-nvidia-570-v20260320"
-  }
-  option {
-    name  = "Multi-Framework + CUDA 12.8 (Ubuntu 22.04)"
-    value = "common-cu128-ubuntu-2204-nvidia-570-v20260320"
-  }
-  # CUDA 12.9 / driver 580 (latest DLVM line; CUDA 13 not yet published by GCP)
+  # CUDA 12.9 / driver 580. The active line; CUDA 13 is still unpublished by GCP.
   option {
     name  = "PyTorch 2.9 + CUDA 12.9 (Ubuntu 22.04)"
-    value = "pytorch-2-9-cu129-ubuntu-2204-nvidia-580-v20260611"
+    value = "pytorch-2-9-cu129-ubuntu-2204-nvidia-580-v20260730"
   }
   option {
     name  = "Multi-Framework + CUDA 12.9 (Ubuntu 22.04)"
-    value = "common-cu129-ubuntu-2204-nvidia-580-v20260611"
+    value = "common-cu129-ubuntu-2204-nvidia-580-v20260804"
   }
   option {
     name  = "Ubuntu 24.04 Noble (Clean Base)"
+    value = "ubuntu-2404-noble-amd64-v20260723"
+  }
+  # Superseded snapshots. Retained as options because dl_images is an exact-match
+  # lookup with no fallback and coder validates a stored value against this list,
+  # so removing one breaks the next build of any workspace still holding it.
+  # Prune once usage is confirmed zero.
+  option {
+    name  = "PyTorch 2.9 + CUDA 12.9 (superseded, Jun snapshot)"
+    value = "pytorch-2-9-cu129-ubuntu-2204-nvidia-580-v20260611"
+  }
+  option {
+    name  = "Multi-Framework + CUDA 12.9 (superseded, Jun snapshot)"
+    value = "common-cu129-ubuntu-2204-nvidia-580-v20260611"
+  }
+  option {
+    name  = "Ubuntu 24.04 Noble (superseded, May snapshot)"
     value = "ubuntu-2404-noble-amd64-v20260517"
+  }
+  # CUDA 12.8 / driver 570. GCP stopped publishing this family after v20260320,
+  # so these cannot be refreshed. Kept only so existing workspaces still resolve
+  # their stored parameter; they boot today but will fail once GCP moves the
+  # snapshots from DEPRECATED to OBSOLETE. Migrate to a CUDA 12.9 option.
+  option {
+    name  = "PyTorch 2.7 + CUDA 12.8 (discontinued, migrate off)"
+    value = "pytorch-2-7-cu128-ubuntu-2204-nvidia-570-v20260320"
+  }
+  option {
+    name  = "Multi-Framework + CUDA 12.8 (discontinued, migrate off)"
+    value = "common-cu128-ubuntu-2204-nvidia-570-v20260320"
   }
 }
 
@@ -278,6 +297,13 @@ locals {
     "pytorch-2-9-cu129-ubuntu-2204-nvidia-580-v20260611" = "projects/deeplearning-platform-release/global/images/pytorch-2-9-cu129-ubuntu-2204-nvidia-580-v20260611"
     "common-cu129-ubuntu-2204-nvidia-580-v20260611"      = "projects/deeplearning-platform-release/global/images/common-cu129-ubuntu-2204-nvidia-580-v20260611"
     "ubuntu-2404-noble-amd64-v20260517"                  = "projects/ubuntu-os-cloud/global/images/ubuntu-2404-noble-amd64-v20260517"
+
+    # Current snapshots. Old keys above are kept because this is an exact-match
+    # lookup with no fallback, so a workspace holding a superseded value would
+    # fail at plan time if its key disappeared.
+    "pytorch-2-9-cu129-ubuntu-2204-nvidia-580-v20260730" = "projects/deeplearning-platform-release/global/images/pytorch-2-9-cu129-ubuntu-2204-nvidia-580-v20260730"
+    "common-cu129-ubuntu-2204-nvidia-580-v20260804"      = "projects/deeplearning-platform-release/global/images/common-cu129-ubuntu-2204-nvidia-580-v20260804"
+    "ubuntu-2404-noble-amd64-v20260723"                  = "projects/ubuntu-os-cloud/global/images/ubuntu-2404-noble-amd64-v20260723"
   }
   image = local.dl_images[data.coder_parameter.dl_image.value]
 
