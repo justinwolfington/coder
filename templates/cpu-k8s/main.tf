@@ -38,9 +38,9 @@ module "git_utilities" {
 }
 
 module "ide_utilities" {
-  source           = "git::https://github.com/abridgeai/coder.git//modules/utilities/ide?ref=v1.12.1"
-  start_count      = data.coder_workspace.me.start_count
-  agent_id         = coder_agent.main.id
+  source      = "git::https://github.com/abridgeai/coder.git//modules/utilities/ide?ref=v1.12.1"
+  start_count = data.coder_workspace.me.start_count
+  agent_id    = coder_agent.main.id
 }
 
 module "logger" {
@@ -205,6 +205,15 @@ resource "kubernetes_persistent_volume_claim" "home" {
         storage = "${module.cpu_resources.home_disk_size.value}Gi"
       }
     }
+    storage_class_name = "hyperdisk-balanced"
+  }
+
+  # storage_class_name is ForceNew and standard-rwo reclaims Delete, so acting on
+  # this diff would destroy every pre-existing home volume on its owner's next
+  # stop or start. Ignoring it leaves existing workspaces on pd-balanced and
+  # gives Hyperdisk only to volumes created from here on.
+  lifecycle {
+    ignore_changes = [spec[0].storage_class_name]
   }
 }
 
