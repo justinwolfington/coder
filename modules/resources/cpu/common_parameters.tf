@@ -24,7 +24,7 @@ data "coder_parameter" "cpu" {
 data "coder_parameter" "memory" {
   name         = "memory"
   display_name = "Memory (GB)"
-  description  = "The amount of memory in GB (between 16-32)"
+  description  = "The amount of memory in GB (between 16-48)"
   default      = "16"
   icon         = "/icon/memory.svg"
   mutable      = true
@@ -32,7 +32,7 @@ data "coder_parameter" "memory" {
   type         = "number"
   validation {
     min = 16
-    max = 32
+    max = 48
   }
 }
 
