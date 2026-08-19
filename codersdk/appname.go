@@ -1,6 +1,8 @@
 package codersdk
 
 import (
+	"encoding/json"
+	"slices"
 	"strings"
 
 	utilstrings "github.com/coder/coder/v2/coderd/util/strings"
@@ -47,6 +49,53 @@ var appNameFamilies = map[string]AppFamilyName{
 	"zed":              AppFamilySSH,
 	"ssh":              AppFamilySSH,
 	"reconnecting_pty": AppFamilyReconnectingPTY,
+}
+
+// attributedAppFamilies are the families usage reporting has somewhere to
+// put. Every value in appNameFamilies must appear here or its sessions go
+// uncounted, which TestEveryFamilyIsAttributed enforces.
+var attributedAppFamilies = []AppFamilyName{
+	AppFamilyVSCode,
+	AppFamilyJetBrains,
+	AppFamilySSH,
+	AppFamilyReconnectingPTY,
+}
+
+// AppNamesInFamily returns the app names belonging to a family, sorted so
+// query parameters stay stable across calls.
+func AppNamesInFamily(family AppFamilyName) []string {
+	var names []string
+	for appName, appFamily := range appNameFamilies {
+		if appFamily == family {
+			names = append(names, appName)
+		}
+	}
+	slices.Sort(names)
+	return names
+}
+
+// SessionCountAppFamilies returns the session count attribution registry:
+// every attributed family mapped to its sorted app names. This is the single
+// definition point the session count read queries take as one parameter, so
+// adding a family to appNameFamilies and attributedAppFamilies flows to every
+// caller automatically.
+func SessionCountAppFamilies() map[AppFamilyName][]string {
+	families := make(map[AppFamilyName][]string, len(attributedAppFamilies))
+	for _, family := range attributedAppFamilies {
+		families[family] = AppNamesInFamily(family)
+	}
+	return families
+}
+
+// SessionCountAppFamiliesJSON is SessionCountAppFamilies marshaled for the
+// jsonb parameter the session count read queries accept.
+func SessionCountAppFamiliesJSON() json.RawMessage {
+	// Marshaling a map with a string-keyed type cannot fail.
+	data, err := json.Marshal(SessionCountAppFamilies())
+	if err != nil {
+		panic("developer error: marshal session count app families: " + err.Error())
+	}
+	return data
 }
 
 // AppNameFamily normalizes an app name and returns its family, or

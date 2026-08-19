@@ -1,6 +1,8 @@
 package codersdk_test
 
 import (
+	"encoding/json"
+	"slices"
 	"strings"
 	"testing"
 
@@ -82,4 +84,43 @@ func TestAppNameFamily(t *testing.T) {
 			require.Equal(t, tc.want, codersdk.AppNameFamily(tc.input))
 		})
 	}
+}
+
+func TestAppNamesInFamily(t *testing.T) {
+	t.Parallel()
+
+	// Forks share the VS Code family, and the list is sorted.
+	vscode := codersdk.AppNamesInFamily(codersdk.AppFamilyVSCode)
+	require.Contains(t, vscode, "cursor")
+	require.Contains(t, vscode, "vscode")
+	require.True(t, slices.IsSorted(vscode))
+
+	// Zed speaks SSH, so it reports under the SSH family.
+	require.Equal(t, []string{"ssh", "zed"},
+		codersdk.AppNamesInFamily(codersdk.AppFamilySSH))
+
+	require.Empty(t, codersdk.AppNamesInFamily("no_such_family"))
+}
+
+func TestSessionCountAppFamilies(t *testing.T) {
+	t.Parallel()
+
+	families := codersdk.SessionCountAppFamilies()
+	require.Len(t, families, 4, "every attributed family must be present")
+	require.Contains(t, families, codersdk.AppFamilyVSCode)
+	require.Contains(t, families, codersdk.AppFamilyJetBrains)
+	require.Contains(t, families, codersdk.AppFamilySSH)
+	require.Contains(t, families, codersdk.AppFamilyReconnectingPTY)
+	require.Equal(t, codersdk.AppNamesInFamily(codersdk.AppFamilyVSCode), families[codersdk.AppFamilyVSCode])
+}
+
+func TestSessionCountAppFamiliesJSON(t *testing.T) {
+	t.Parallel()
+
+	raw := codersdk.SessionCountAppFamiliesJSON()
+	require.NotEmpty(t, raw)
+
+	var decoded map[codersdk.AppFamilyName][]string
+	require.NoError(t, json.Unmarshal(raw, &decoded), "registry must marshal to a valid jsonb object")
+	require.Equal(t, codersdk.SessionCountAppFamilies(), decoded)
 }

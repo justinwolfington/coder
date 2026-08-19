@@ -65,7 +65,11 @@ func TestGetDeploymentWorkspaceAgentStats(t *testing.T) {
 			RxBytes:                   1,
 			ConnectionMedianLatencyMS: 2,
 		}, map[string]int64{"vscode": 1})
-		stats, err := db.GetDeploymentWorkspaceAgentStats(ctx, dbtime.Now().Add(-time.Hour))
+		appFamilies := codersdk.SessionCountAppFamiliesJSON()
+		stats, err := db.GetDeploymentWorkspaceAgentStats(ctx, database.GetDeploymentWorkspaceAgentStatsParams{
+			CreatedAt:   dbtime.Now().Add(-time.Hour),
+			AppFamilies: appFamilies,
+		})
 		require.NoError(t, err)
 
 		require.Equal(t, int64(2), stats.WorkspaceTxBytes)
@@ -100,7 +104,11 @@ func TestGetDeploymentWorkspaceAgentStats(t *testing.T) {
 			RxBytes:                   1,
 			ConnectionMedianLatencyMS: 2,
 		}, map[string]int64{"vscode": 1})
-		stats, err := db.GetDeploymentWorkspaceAgentStats(ctx, dbtime.Now().Add(-time.Hour))
+		appFamilies := codersdk.SessionCountAppFamiliesJSON()
+		stats, err := db.GetDeploymentWorkspaceAgentStats(ctx, database.GetDeploymentWorkspaceAgentStatsParams{
+			CreatedAt:   dbtime.Now().Add(-time.Hour),
+			AppFamilies: appFamilies,
+		})
 		require.NoError(t, err)
 
 		require.Equal(t, int64(2), stats.WorkspaceTxBytes)
@@ -163,7 +171,11 @@ func TestGetDeploymentWorkspaceAgentUsageStats(t *testing.T) {
 			Usage:     true,
 		}, map[string]int64{"ssh": 1})
 
-		stats, err := db.GetDeploymentWorkspaceAgentUsageStats(ctx, dbtime.Now().Add(-time.Hour))
+		appFamilies := codersdk.SessionCountAppFamiliesJSON()
+		stats, err := db.GetDeploymentWorkspaceAgentUsageStats(ctx, database.GetDeploymentWorkspaceAgentUsageStatsParams{
+			CreatedAt:   dbtime.Now().Add(-time.Hour),
+			AppFamilies: appFamilies,
+		})
 		require.NoError(t, err)
 
 		require.Equal(t, int64(2), stats.WorkspaceTxBytes)
@@ -198,7 +210,11 @@ func TestGetDeploymentWorkspaceAgentUsageStats(t *testing.T) {
 			Usage:     true,
 		}, map[string]int64{"ssh": 1})
 
-		stats, err := db.GetDeploymentWorkspaceAgentUsageStats(ctx, cutoff)
+		appFamilies := codersdk.SessionCountAppFamiliesJSON()
+		stats, err := db.GetDeploymentWorkspaceAgentUsageStats(ctx, database.GetDeploymentWorkspaceAgentUsageStatsParams{
+			CreatedAt:   cutoff,
+			AppFamilies: appFamilies,
+		})
 		require.NoError(t, err)
 		require.Zero(t, stats.SessionCountVSCode)
 		require.Equal(t, int64(1), stats.SessionCountSSH)
@@ -223,7 +239,11 @@ func TestGetDeploymentWorkspaceAgentUsageStats(t *testing.T) {
 			ConnectionMedianLatencyMS: 2,
 		}, map[string]int64{"ssh": 3, "vscode": 1}) // Should be ignored.
 
-		stats, err := db.GetDeploymentWorkspaceAgentUsageStats(ctx, dbtime.Now().Add(-time.Hour))
+		appFamilies := codersdk.SessionCountAppFamiliesJSON()
+		stats, err := db.GetDeploymentWorkspaceAgentUsageStats(ctx, database.GetDeploymentWorkspaceAgentUsageStatsParams{
+			CreatedAt:   dbtime.Now().Add(-time.Hour),
+			AppFamilies: appFamilies,
+		})
 		require.NoError(t, err)
 
 		require.Equal(t, int64(3), stats.WorkspaceTxBytes)
@@ -751,28 +771,39 @@ func TestGetTemplateInsightsByTemplate(t *testing.T) {
 	insertStat(40*time.Second, templateID, userID, otherWorkspaceID, 0, map[string]int64{"reconnecting_pty": 1, "vscode": 1})
 	insertStat(time.Minute+5*time.Second, templateID, userID, otherWorkspaceID, 1, map[string]int64{"ssh": 1, "vscode": 1})
 
-	// Unknown apps do not contribute activity or active users.
-	insertStat(10*time.Second, templateID, uuid.New(), uuid.New(), 1, map[string]int64{"unknown": 1})
+	// An app outside every family is still activity, so its user counts as
+	// active even though the session lands in no usage bucket.
+	unattributedUserID := uuid.New()
+	insertStat(10*time.Second, templateID, unattributedUserID, uuid.New(), 1, map[string]int64{"unknown": 1})
 
-	// Unknown activity cannot supply a connection for known activity.
-	noKnownConnectionTemplateID := uuid.New()
-	noKnownConnectionUserID := uuid.New()
-	insertStat(15*time.Second, noKnownConnectionTemplateID, noKnownConnectionUserID, uuid.New(), 0, map[string]int64{"vscode": 1})
-	insertStat(30*time.Second, noKnownConnectionTemplateID, noKnownConnectionUserID, uuid.New(), 1, map[string]int64{"unknown": 1})
+	// Connections are read across the whole minute, so an unattributed session
+	// supplies the connection its user's attributed sessions lack.
+	sharedConnectionTemplateID := uuid.New()
+	sharedConnectionUserID := uuid.New()
+	insertStat(15*time.Second, sharedConnectionTemplateID, sharedConnectionUserID, uuid.New(), 0, map[string]int64{"vscode": 1})
+	insertStat(30*time.Second, sharedConnectionTemplateID, sharedConnectionUserID, uuid.New(), 1, map[string]int64{"unknown": 1})
 
+	appFamilies := codersdk.SessionCountAppFamiliesJSON()
 	insights, err := db.GetTemplateInsightsByTemplate(ctx, database.GetTemplateInsightsByTemplateParams{
-		StartTime: startTime,
-		EndTime:   endTime,
+		StartTime:   startTime,
+		EndTime:     endTime,
+		AppFamilies: appFamilies,
 	})
 	require.NoError(t, err)
-	require.Equal(t, []database.GetTemplateInsightsByTemplateRow{
+	// The query does not order its rows.
+	require.ElementsMatch(t, []database.GetTemplateInsightsByTemplateRow{
 		{
 			TemplateID:                  templateID,
-			ActiveUsers:                 1,
+			ActiveUsers:                 2,
 			UsageVscodeSeconds:          120,
 			UsageJetbrainsSeconds:       60,
 			UsageReconnectingPtySeconds: 60,
 			UsageSshSeconds:             120,
+		},
+		{
+			TemplateID:         sharedConnectionTemplateID,
+			ActiveUsers:        1,
+			UsageVscodeSeconds: 60,
 		},
 	}, insights)
 }
@@ -886,7 +917,11 @@ func TestGetWorkspaceAgentUsageStats(t *testing.T) {
 		}, map[string]int64{"jetbrains": 1})
 
 		reqTime := dbtime.Now().Add(-time.Hour)
-		stats, err := db.GetWorkspaceAgentUsageStats(ctx, reqTime)
+		appFamilies := codersdk.SessionCountAppFamiliesJSON()
+		stats, err := db.GetWorkspaceAgentUsageStats(ctx, database.GetWorkspaceAgentUsageStatsParams{
+			CreatedAt:   reqTime,
+			AppFamilies: appFamilies,
+		})
 		require.NoError(t, err)
 
 		ws1Stats, ws2Stats := stats[0], stats[1]
@@ -928,7 +963,11 @@ func TestGetWorkspaceAgentUsageStats(t *testing.T) {
 			ConnectionMedianLatencyMS: 2,
 		}, map[string]int64{"ssh": 3, "vscode": 1}) // Should be ignored.
 
-		stats, err := db.GetWorkspaceAgentUsageStats(ctx, dbtime.Now().Add(-time.Hour))
+		appFamilies := codersdk.SessionCountAppFamiliesJSON()
+		stats, err := db.GetWorkspaceAgentUsageStats(ctx, database.GetWorkspaceAgentUsageStatsParams{
+			CreatedAt:   dbtime.Now().Add(-time.Hour),
+			AppFamilies: appFamilies,
+		})
 		require.NoError(t, err)
 
 		require.Len(t, stats, 1)
@@ -1156,7 +1195,11 @@ func TestGetWorkspaceAgentUsageStatsAndLabels(t *testing.T) {
 			Usage:       true,
 		}, map[string]int64{"ssh": 1})
 
-		stats, err := db.GetWorkspaceAgentUsageStatsAndLabels(ctx, insertTime.Add(-time.Hour))
+		appFamilies := codersdk.SessionCountAppFamiliesJSON()
+		stats, err := db.GetWorkspaceAgentUsageStatsAndLabels(ctx, database.GetWorkspaceAgentUsageStatsAndLabelsParams{
+			CreatedAt:   insertTime.Add(-time.Hour),
+			AppFamilies: appFamilies,
+		})
 		require.NoError(t, err)
 
 		require.Len(t, stats, 2)
@@ -1222,7 +1265,11 @@ func TestGetWorkspaceAgentUsageStatsAndLabels(t *testing.T) {
 			ConnectionMedianLatencyMS: 1,
 		}, map[string]int64{"vscode": 3, "ssh": 1}) // Should be ignored.
 
-		stats, err := db.GetWorkspaceAgentUsageStatsAndLabels(ctx, insertTime.Add(-time.Hour))
+		appFamilies := codersdk.SessionCountAppFamiliesJSON()
+		stats, err := db.GetWorkspaceAgentUsageStatsAndLabels(ctx, database.GetWorkspaceAgentUsageStatsAndLabelsParams{
+			CreatedAt:   insertTime.Add(-time.Hour),
+			AppFamilies: appFamilies,
+		})
 		require.NoError(t, err)
 
 		require.Len(t, stats, 1)
@@ -19610,4 +19657,72 @@ func TestGetChatSiteConfigValue(t *testing.T) {
 	value, err = db.GetChatSiteConfigValue(ctx, "derp_mesh_key")
 	require.NoError(t, err)
 	require.Equal(t, database.GetChatSiteConfigValueRow{}, value)
+}
+
+func TestSessionCountsAttributeByFamily(t *testing.T) {
+	t.Parallel()
+	if testing.Short() {
+		t.SkipNow()
+	}
+
+	sqlDB := testSQLDB(t)
+	err := migrations.Up(sqlDB)
+	require.NoError(t, err)
+	db := database.New(sqlDB)
+	ctx := context.Background()
+
+	cursorTemplate := uuid.New()
+	zedTemplate := uuid.New()
+	unknownTemplate := uuid.New()
+	for _, tc := range []struct {
+		templateID uuid.UUID
+		counts     map[string]int64
+	}{
+		{cursorTemplate, map[string]int64{"cursor": 2}},
+		{zedTemplate, map[string]int64{"zed": 1}},
+		{unknownTemplate, map[string]int64{"some_new_ide": 5}},
+	} {
+		dbgen.WorkspaceAgentStat(t, db, database.WorkspaceAgentStat{
+			TemplateID:                tc.templateID,
+			UserID:                    uuid.New(),
+			AgentID:                   uuid.New(),
+			ConnectionCount:           1,
+			ConnectionMedianLatencyMS: 1,
+			Usage:                     true,
+		}, tc.counts)
+	}
+
+	appFamilies := codersdk.SessionCountAppFamiliesJSON()
+
+	// A VS Code fork counts as VS Code, and Zed counts as SSH.
+	stats, err := db.GetDeploymentWorkspaceAgentStats(ctx, database.GetDeploymentWorkspaceAgentStatsParams{
+		CreatedAt:   dbtime.Now().Add(-time.Hour),
+		AppFamilies: appFamilies,
+	})
+	require.NoError(t, err)
+	require.Equal(t, int64(2), stats.SessionCountVSCode)
+	require.Equal(t, int64(1), stats.SessionCountSSH)
+	require.Zero(t, stats.SessionCountJetBrains)
+	require.Zero(t, stats.SessionCountReconnectingPTY)
+
+	insights, err := db.GetTemplateInsightsByTemplate(ctx, database.GetTemplateInsightsByTemplateParams{
+		StartTime:   dbtime.Now().Add(-time.Hour),
+		EndTime:     dbtime.Now().Add(time.Hour),
+		AppFamilies: appFamilies,
+	})
+	require.NoError(t, err)
+
+	byTemplate := make(map[uuid.UUID]database.GetTemplateInsightsByTemplateRow, len(insights))
+	for _, row := range insights {
+		byTemplate[row.TemplateID] = row
+	}
+	require.Equal(t, int64(60), byTemplate[cursorTemplate].UsageVscodeSeconds)
+	require.Equal(t, int64(60), byTemplate[zedTemplate].UsageSshSeconds)
+
+	// An app with no family is still activity, so the user is not counted idle.
+	unknown, ok := byTemplate[unknownTemplate]
+	require.True(t, ok, "a session with no family must still appear as usage")
+	require.Equal(t, int64(1), unknown.ActiveUsers)
+	require.Zero(t, unknown.UsageVscodeSeconds)
+	require.Zero(t, unknown.UsageSshSeconds)
 }

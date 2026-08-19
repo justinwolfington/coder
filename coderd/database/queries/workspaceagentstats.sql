@@ -66,7 +66,16 @@ WHERE
 	);
 
 -- name: GetDeploymentWorkspaceAgentStats :one
-WITH stats AS (
+-- app_families maps each attributed family to its app names, so the probes
+-- below stay one expression per family. fams extracts each list once; doing
+-- it inline per row is 3x slower on these scans.
+WITH fams AS (
+	SELECT
+		ARRAY(SELECT jsonb_array_elements_text(@app_families::jsonb -> 'vscode')) AS vscode,
+		ARRAY(SELECT jsonb_array_elements_text(@app_families::jsonb -> 'ssh')) AS ssh,
+		ARRAY(SELECT jsonb_array_elements_text(@app_families::jsonb -> 'jetbrains')) AS jetbrains,
+		ARRAY(SELECT jsonb_array_elements_text(@app_families::jsonb -> 'reconnecting_pty')) AS reconnecting_pty
+), stats AS (
 	SELECT
 		agent_id,
 		created_at,
@@ -84,14 +93,20 @@ SELECT
 	-- The greater than 0 is to support legacy agents that don't report connection_median_latency_ms.
 	coalesce((PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY connection_median_latency_ms) FILTER (WHERE connection_median_latency_ms > 0)), -1)::FLOAT AS workspace_connection_latency_50,
 	coalesce((PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY connection_median_latency_ms) FILTER (WHERE connection_median_latency_ms > 0)), -1)::FLOAT AS workspace_connection_latency_95,
-	coalesce(SUM((session_counts ->> 'vscode')::bigint) FILTER (WHERE rn = 1), 0)::bigint AS session_count_vscode,
-	coalesce(SUM((session_counts ->> 'ssh')::bigint) FILTER (WHERE rn = 1), 0)::bigint AS session_count_ssh,
-	coalesce(SUM((session_counts ->> 'jetbrains')::bigint) FILTER (WHERE rn = 1), 0)::bigint AS session_count_jetbrains,
-	coalesce(SUM((session_counts ->> 'reconnecting_pty')::bigint) FILTER (WHERE rn = 1), 0)::bigint AS session_count_reconnecting_pty
+	coalesce(SUM((SELECT coalesce(SUM((stats.session_counts ->> app)::bigint), 0) FROM fams, unnest(fams.vscode) AS app)) FILTER (WHERE rn = 1), 0)::bigint AS session_count_vscode,
+	coalesce(SUM((SELECT coalesce(SUM((stats.session_counts ->> app)::bigint), 0) FROM fams, unnest(fams.ssh) AS app)) FILTER (WHERE rn = 1), 0)::bigint AS session_count_ssh,
+	coalesce(SUM((SELECT coalesce(SUM((stats.session_counts ->> app)::bigint), 0) FROM fams, unnest(fams.jetbrains) AS app)) FILTER (WHERE rn = 1), 0)::bigint AS session_count_jetbrains,
+	coalesce(SUM((SELECT coalesce(SUM((stats.session_counts ->> app)::bigint), 0) FROM fams, unnest(fams.reconnecting_pty) AS app)) FILTER (WHERE rn = 1), 0)::bigint AS session_count_reconnecting_pty
 FROM stats;
 
 -- name: GetDeploymentWorkspaceAgentUsageStats :one
-WITH agent_stats AS (
+WITH fams AS (
+	SELECT
+		ARRAY(SELECT jsonb_array_elements_text(@app_families::jsonb -> 'vscode')) AS vscode,
+		ARRAY(SELECT jsonb_array_elements_text(@app_families::jsonb -> 'ssh')) AS ssh,
+		ARRAY(SELECT jsonb_array_elements_text(@app_families::jsonb -> 'jetbrains')) AS jetbrains,
+		ARRAY(SELECT jsonb_array_elements_text(@app_families::jsonb -> 'reconnecting_pty')) AS reconnecting_pty
+), agent_stats AS (
 	SELECT
 		coalesce(SUM(rx_bytes), 0)::bigint AS workspace_rx_bytes,
 		coalesce(SUM(tx_bytes), 0)::bigint AS workspace_tx_bytes,
@@ -117,10 +132,10 @@ latest_minutes AS (
 ),
 latest_agent_stats AS (
 	SELECT
-		coalesce(SUM((stats.session_counts ->> 'vscode')::bigint), 0)::bigint AS session_count_vscode,
-		coalesce(SUM((stats.session_counts ->> 'ssh')::bigint), 0)::bigint AS session_count_ssh,
-		coalesce(SUM((stats.session_counts ->> 'jetbrains')::bigint), 0)::bigint AS session_count_jetbrains,
-		coalesce(SUM((stats.session_counts ->> 'reconnecting_pty')::bigint), 0)::bigint AS session_count_reconnecting_pty
+		coalesce(SUM((SELECT coalesce(SUM((stats.session_counts ->> app)::bigint), 0) FROM fams, unnest(fams.vscode) AS app)), 0)::bigint AS session_count_vscode,
+		coalesce(SUM((SELECT coalesce(SUM((stats.session_counts ->> app)::bigint), 0) FROM fams, unnest(fams.ssh) AS app)), 0)::bigint AS session_count_ssh,
+		coalesce(SUM((SELECT coalesce(SUM((stats.session_counts ->> app)::bigint), 0) FROM fams, unnest(fams.jetbrains) AS app)), 0)::bigint AS session_count_jetbrains,
+		coalesce(SUM((SELECT coalesce(SUM((stats.session_counts ->> app)::bigint), 0) FROM fams, unnest(fams.reconnecting_pty) AS app)), 0)::bigint AS session_count_reconnecting_pty
 	FROM
 		latest_minutes
 	JOIN
@@ -135,7 +150,13 @@ latest_agent_stats AS (
 SELECT * FROM agent_stats, latest_agent_stats;
 
 -- name: GetWorkspaceAgentStats :many
-WITH agent_stats AS (
+WITH fams AS (
+	SELECT
+		ARRAY(SELECT jsonb_array_elements_text(@app_families::jsonb -> 'vscode')) AS vscode,
+		ARRAY(SELECT jsonb_array_elements_text(@app_families::jsonb -> 'ssh')) AS ssh,
+		ARRAY(SELECT jsonb_array_elements_text(@app_families::jsonb -> 'jetbrains')) AS jetbrains,
+		ARRAY(SELECT jsonb_array_elements_text(@app_families::jsonb -> 'reconnecting_pty')) AS reconnecting_pty
+), agent_stats AS (
 	SELECT
 		user_id,
 		agent_id,
@@ -153,10 +174,10 @@ WITH agent_stats AS (
 ), latest_agent_stats AS (
 	SELECT
 		a.agent_id,
-		coalesce(SUM((a.session_counts ->> 'vscode')::bigint), 0)::bigint AS session_count_vscode,
-		coalesce(SUM((a.session_counts ->> 'ssh')::bigint), 0)::bigint AS session_count_ssh,
-		coalesce(SUM((a.session_counts ->> 'jetbrains')::bigint), 0)::bigint AS session_count_jetbrains,
-		coalesce(SUM((a.session_counts ->> 'reconnecting_pty')::bigint), 0)::bigint AS session_count_reconnecting_pty
+		coalesce(SUM((SELECT coalesce(SUM((a.session_counts ->> app)::bigint), 0) FROM fams, unnest(fams.vscode) AS app)), 0)::bigint AS session_count_vscode,
+		coalesce(SUM((SELECT coalesce(SUM((a.session_counts ->> app)::bigint), 0) FROM fams, unnest(fams.ssh) AS app)), 0)::bigint AS session_count_ssh,
+		coalesce(SUM((SELECT coalesce(SUM((a.session_counts ->> app)::bigint), 0) FROM fams, unnest(fams.jetbrains) AS app)), 0)::bigint AS session_count_jetbrains,
+		coalesce(SUM((SELECT coalesce(SUM((a.session_counts ->> app)::bigint), 0) FROM fams, unnest(fams.reconnecting_pty) AS app)), 0)::bigint AS session_count_reconnecting_pty
 	 FROM (
 		SELECT *, ROW_NUMBER() OVER(PARTITION BY agent_id ORDER BY created_at DESC) AS rn
 		FROM workspace_agent_stats WHERE created_at > $1
@@ -167,7 +188,13 @@ WITH agent_stats AS (
 SELECT * FROM agent_stats JOIN latest_agent_stats ON agent_stats.agent_id = latest_agent_stats.agent_id;
 
 -- name: GetWorkspaceAgentUsageStats :many
-WITH stats AS (
+WITH fams AS (
+	SELECT
+		ARRAY(SELECT jsonb_array_elements_text(@app_families::jsonb -> 'vscode')) AS vscode,
+		ARRAY(SELECT jsonb_array_elements_text(@app_families::jsonb -> 'ssh')) AS ssh,
+		ARRAY(SELECT jsonb_array_elements_text(@app_families::jsonb -> 'jetbrains')) AS jetbrains,
+		ARRAY(SELECT jsonb_array_elements_text(@app_families::jsonb -> 'reconnecting_pty')) AS reconnecting_pty
+), stats AS (
 	SELECT
 		*,
 		-- The greater than 0 is to support legacy agents that don't report connection_median_latency_ms.
@@ -192,16 +219,22 @@ SELECT
 	-- Repeated so this row keeps the same layout as GetWorkspaceAgentStats, which
 	-- telemetry converts between.
 	agent_id,
-	coalesce(SUM((session_counts ->> 'vscode')::bigint) FILTER (WHERE in_latest_usage_minute), 0)::bigint AS session_count_vscode,
-	coalesce(SUM((session_counts ->> 'ssh')::bigint) FILTER (WHERE in_latest_usage_minute), 0)::bigint AS session_count_ssh,
-	coalesce(SUM((session_counts ->> 'jetbrains')::bigint) FILTER (WHERE in_latest_usage_minute), 0)::bigint AS session_count_jetbrains,
-	coalesce(SUM((session_counts ->> 'reconnecting_pty')::bigint) FILTER (WHERE in_latest_usage_minute), 0)::bigint AS session_count_reconnecting_pty
+	coalesce(SUM((SELECT coalesce(SUM((stats.session_counts ->> app)::bigint), 0) FROM fams, unnest(fams.vscode) AS app)) FILTER (WHERE in_latest_usage_minute), 0)::bigint AS session_count_vscode,
+	coalesce(SUM((SELECT coalesce(SUM((stats.session_counts ->> app)::bigint), 0) FROM fams, unnest(fams.ssh) AS app)) FILTER (WHERE in_latest_usage_minute), 0)::bigint AS session_count_ssh,
+	coalesce(SUM((SELECT coalesce(SUM((stats.session_counts ->> app)::bigint), 0) FROM fams, unnest(fams.jetbrains) AS app)) FILTER (WHERE in_latest_usage_minute), 0)::bigint AS session_count_jetbrains,
+	coalesce(SUM((SELECT coalesce(SUM((stats.session_counts ->> app)::bigint), 0) FROM fams, unnest(fams.reconnecting_pty) AS app)) FILTER (WHERE in_latest_usage_minute), 0)::bigint AS session_count_reconnecting_pty
 FROM stats
 GROUP BY user_id, agent_id, workspace_id, template_id
 HAVING BOOL_OR(reports_latency);
 
 -- name: GetWorkspaceAgentStatsAndLabels :many
-WITH agent_stats AS (
+WITH fams AS (
+	SELECT
+		ARRAY(SELECT jsonb_array_elements_text(@app_families::jsonb -> 'vscode')) AS vscode,
+		ARRAY(SELECT jsonb_array_elements_text(@app_families::jsonb -> 'ssh')) AS ssh,
+		ARRAY(SELECT jsonb_array_elements_text(@app_families::jsonb -> 'jetbrains')) AS jetbrains,
+		ARRAY(SELECT jsonb_array_elements_text(@app_families::jsonb -> 'reconnecting_pty')) AS reconnecting_pty
+), agent_stats AS (
 	SELECT
 		user_id,
 		agent_id,
@@ -214,10 +247,10 @@ WITH agent_stats AS (
 ), latest_agent_stats AS (
 	SELECT
 		a.agent_id,
-		coalesce(SUM((a.session_counts ->> 'vscode')::bigint), 0)::bigint AS session_count_vscode,
-		coalesce(SUM((a.session_counts ->> 'ssh')::bigint), 0)::bigint AS session_count_ssh,
-		coalesce(SUM((a.session_counts ->> 'jetbrains')::bigint), 0)::bigint AS session_count_jetbrains,
-		coalesce(SUM((a.session_counts ->> 'reconnecting_pty')::bigint), 0)::bigint AS session_count_reconnecting_pty,
+		coalesce(SUM((SELECT coalesce(SUM((a.session_counts ->> app)::bigint), 0) FROM fams, unnest(fams.vscode) AS app)), 0)::bigint AS session_count_vscode,
+		coalesce(SUM((SELECT coalesce(SUM((a.session_counts ->> app)::bigint), 0) FROM fams, unnest(fams.ssh) AS app)), 0)::bigint AS session_count_ssh,
+		coalesce(SUM((SELECT coalesce(SUM((a.session_counts ->> app)::bigint), 0) FROM fams, unnest(fams.jetbrains) AS app)), 0)::bigint AS session_count_jetbrains,
+		coalesce(SUM((SELECT coalesce(SUM((a.session_counts ->> app)::bigint), 0) FROM fams, unnest(fams.reconnecting_pty) AS app)), 0)::bigint AS session_count_reconnecting_pty,
 		coalesce(SUM(a.connection_count), 0)::bigint AS connection_count,
 		coalesce(MAX(a.connection_median_latency_ms), 0)::float AS connection_median_latency_ms
 	 FROM (
@@ -253,7 +286,13 @@ ON
 	workspaces.id = agent_stats.workspace_id;
 
 -- name: GetWorkspaceAgentUsageStatsAndLabels :many
-WITH agent_stats AS (
+WITH fams AS (
+	SELECT
+		ARRAY(SELECT jsonb_array_elements_text(@app_families::jsonb -> 'vscode')) AS vscode,
+		ARRAY(SELECT jsonb_array_elements_text(@app_families::jsonb -> 'ssh')) AS ssh,
+		ARRAY(SELECT jsonb_array_elements_text(@app_families::jsonb -> 'jetbrains')) AS jetbrains,
+		ARRAY(SELECT jsonb_array_elements_text(@app_families::jsonb -> 'reconnecting_pty')) AS reconnecting_pty
+), agent_stats AS (
 	SELECT
 		user_id,
 		agent_id,
@@ -268,10 +307,10 @@ WITH agent_stats AS (
 ), latest_agent_stats AS (
 	SELECT
 		agent_id,
-		coalesce(SUM((session_counts ->> 'vscode')::bigint), 0)::bigint AS session_count_vscode,
-		coalesce(SUM((session_counts ->> 'ssh')::bigint), 0)::bigint AS session_count_ssh,
-		coalesce(SUM((session_counts ->> 'jetbrains')::bigint), 0)::bigint AS session_count_jetbrains,
-		coalesce(SUM((session_counts ->> 'reconnecting_pty')::bigint), 0)::bigint AS session_count_reconnecting_pty,
+		coalesce(SUM((SELECT coalesce(SUM((workspace_agent_stats.session_counts ->> app)::bigint), 0) FROM fams, unnest(fams.vscode) AS app)), 0)::bigint AS session_count_vscode,
+		coalesce(SUM((SELECT coalesce(SUM((workspace_agent_stats.session_counts ->> app)::bigint), 0) FROM fams, unnest(fams.ssh) AS app)), 0)::bigint AS session_count_ssh,
+		coalesce(SUM((SELECT coalesce(SUM((workspace_agent_stats.session_counts ->> app)::bigint), 0) FROM fams, unnest(fams.jetbrains) AS app)), 0)::bigint AS session_count_jetbrains,
+		coalesce(SUM((SELECT coalesce(SUM((workspace_agent_stats.session_counts ->> app)::bigint), 0) FROM fams, unnest(fams.reconnecting_pty) AS app)), 0)::bigint AS session_count_reconnecting_pty,
 		coalesce(SUM(connection_count), 0)::bigint AS connection_count
 	FROM workspace_agent_stats
 	-- We only want the latest stats, but those stats might be
