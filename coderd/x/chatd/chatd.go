@@ -32,7 +32,6 @@ import (
 	"github.com/coder/coder/v2/coderd/database/dbauthz"
 	"github.com/coder/coder/v2/coderd/database/pubsub"
 	"github.com/coder/coder/v2/coderd/httpmw"
-	"github.com/coder/coder/v2/coderd/mcpssrf"
 	"github.com/coder/coder/v2/coderd/notifications"
 	coderdpubsub "github.com/coder/coder/v2/coderd/pubsub"
 	"github.com/coder/coder/v2/coderd/rbac"
@@ -3047,7 +3046,7 @@ func New(ps pubsub.Pubsub, cfg Config) *Server {
 
 	mcpHTTPClient := cfg.MCPHTTPClient
 	if mcpHTTPClient == nil {
-		mcpHTTPClient = mcpssrf.NewHTTPClient(&http.Client{}, nil)
+		mcpHTTPClient = mcpclient.NewHTTPClient(nil)
 	}
 
 	workerID := cfg.ReplicaID
