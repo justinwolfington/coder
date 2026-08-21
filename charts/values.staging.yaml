@@ -3,7 +3,9 @@
 coder:
   # coder.httpRoute -- The HTTPRoute object to expose for Coder.
   httpRoute:
-    hostname: coder.abridge.cafe
+    hostnames:
+      - coder.abridge.cafe
+      - coder.abridge.love
 
   coder:
     # Staging-specific configuration
