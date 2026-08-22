@@ -76,6 +76,33 @@ coder:
             name: coder-github-app
             key: CODER_OAUTH2_GITHUB_CLIENT_SECRET
 
+      # Okta OIDC. Uses the org authorization server (issuer has no path
+      # suffix): abridge.okta.com has no API Access Management licence, so
+      # the /oauth2/default custom server returns E0000015.
+      - name: CODER_OIDC_ISSUER_URL
+        value: https://abridge.okta.com
+
+      - name: CODER_OIDC_EMAIL_DOMAIN
+        value: abridge.com
+
+      - name: CODER_OIDC_SIGN_IN_TEXT
+        value: Sign in with Okta
+
+      - name: CODER_OIDC_ICON_URL
+        value: /icon/okta.svg
+
+      - name: CODER_OIDC_CLIENT_ID
+        valueFrom:
+          secretKeyRef:
+            name: coder-okta-oidc-app
+            key: CODER_OIDC_CLIENT_ID
+
+      - name: CODER_OIDC_CLIENT_SECRET
+        valueFrom:
+          secretKeyRef:
+            name: coder-okta-oidc-app
+            key: CODER_OIDC_CLIENT_SECRET
+
       # Coder by default writes audit logs to /dev/stderr
       - name: CODER_LOGGING_HUMAN
         value: /dev/stdout
@@ -268,3 +295,7 @@ phiIstio:
 coder-logstream-kube:
   enabled: true
   url: https://coder.abridge.services # Must match CODER_ACCESS_URL above
+
+# Okta OIDC login for the coder.abridge.services deployment
+oidcAuth:
+  enabled: true
