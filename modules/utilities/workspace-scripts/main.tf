@@ -35,3 +35,15 @@ resource "coder_script" "claude_code" {
     curl -fsSL https://claude.ai/install.sh | bash || echo "Claude Code installation failed, continuing..."
   EOT
 }
+
+resource "coder_script" "codex" {
+  count        = var.install_codex ? var.start_count : 0
+  agent_id     = var.agent_id
+  display_name = "Install Codex"
+  run_on_start = true
+  script       = <<-EOT
+    #!/bin/bash
+    echo "Installing Codex CLI..."
+    curl -fsSL https://chatgpt.com/codex/install.sh | CODEX_NON_INTERACTIVE=1 sh || echo "Codex installation failed, continuing..."
+  EOT
+}

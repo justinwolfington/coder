@@ -24,3 +24,9 @@ variable "install_claude_code" {
   description = "Install the Claude Code CLI as a non-blocking startup step"
   default     = true
 }
+
+variable "install_codex" {
+  type        = bool
+  description = "Install the Codex CLI as a non-blocking startup step"
+  default     = true
+}
