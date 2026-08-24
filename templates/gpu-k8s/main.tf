@@ -32,15 +32,15 @@ data "coder_workspace_owner" "me" {}
 # SHARED MODULES
 ############################
 module "cpu_resources" {
-  source = "git::https://github.com/abridgeai/coder.git//modules/resources/cpu?ref=v1.13.0"
+  source = "git::https://github.com/abridgeai/coder.git//modules/resources/cpu?ref=v1.14.0"
 }
 
 module "gpu_resources" {
-  source = "git::https://github.com/abridgeai/coder.git//modules/resources/gpu?ref=v1.13.0"
+  source = "git::https://github.com/abridgeai/coder.git//modules/resources/gpu?ref=v1.14.0"
 }
 
 module "git_utilities" {
-  source       = "git::https://github.com/abridgeai/coder.git//modules/utilities/git?ref=v1.13.0"
+  source       = "git::https://github.com/abridgeai/coder.git//modules/utilities/git?ref=v1.14.0"
   start_count  = data.coder_workspace.me.start_count
   agent_id     = coder_agent.main.id
   repo_url     = data.coder_parameter.repository_url.value
@@ -48,17 +48,17 @@ module "git_utilities" {
 }
 
 module "ide_utilities" {
-  source      = "git::https://github.com/abridgeai/coder.git//modules/utilities/ide?ref=v1.13.0"
+  source      = "git::https://github.com/abridgeai/coder.git//modules/utilities/ide?ref=v1.14.0"
   start_count = data.coder_workspace.me.start_count
   agent_id    = coder_agent.main.id
 }
 
 module "logger" {
-  source = "git::https://github.com/abridgeai/coder.git//modules/logger?ref=v1.13.0"
+  source = "git::https://github.com/abridgeai/coder.git//modules/logger?ref=v1.14.0"
 }
 
 module "workspace_scripts" {
-  source       = "git::https://github.com/abridgeai/coder.git//modules/utilities/workspace-scripts?ref=v1.13.0"
+  source       = "git::https://github.com/abridgeai/coder.git//modules/utilities/workspace-scripts?ref=v1.14.0"
   start_count  = data.coder_workspace.me.start_count
   agent_id     = coder_agent.main.id
   should_clone = local.should_clone
@@ -73,7 +73,7 @@ module "dotfiles" {
 }
 
 module "utd_bucket" {
-  source                 = "git::https://github.com/abridgeai/coder.git//modules/utilities/gcs-bucket?ref=v1.13.0"
+  source                 = "git::https://github.com/abridgeai/coder.git//modules/utilities/gcs-bucket?ref=v1.14.0"
   environment            = var.environment
   supported_environments = ["production", "staging", "development"]
   workspace_owner_groups = data.coder_workspace_owner.me.groups
