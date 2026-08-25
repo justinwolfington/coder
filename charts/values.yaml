@@ -1,5 +1,10 @@
 # Based on: https://github.com/coder/coder/blob/v2.35.4/helm/coder/values.yaml
 ---
+coder:
+  coder:
+    # The autoscaler evicts coderd off shared workspace nodes; one replica blanks the NEG.
+    replicaCount: 2
+
 # Coder logstream configuration for Kubernetes event streaming
 coder-logstream-kube:
   enabled: false  # Disabled by default, enable per environment
