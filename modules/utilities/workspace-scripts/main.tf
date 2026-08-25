@@ -47,3 +47,21 @@ resource "coder_script" "codex" {
     curl -fsSL https://chatgpt.com/codex/install.sh | CODEX_NON_INTERACTIVE=1 sh || echo "Codex installation failed, continuing..."
   EOT
 }
+
+# Both installers above land in ~/.local/bin and then warn it is not on PATH,
+# so the CLIs report success and are then not callable. Only .bashrc is needed:
+# Debian's .profile sources it, so login and interactive shells both pick it up.
+resource "coder_script" "local_bin_path" {
+  count        = var.start_count
+  agent_id     = var.agent_id
+  display_name = "Add ~/.local/bin to PATH"
+  run_on_start = true
+  script       = <<-EOT
+    #!/bin/bash
+    set -euo pipefail
+    line='export PATH="$HOME/.local/bin:$PATH"'
+    touch "$HOME/.bashrc"
+    grep -qxF "$line" "$HOME/.bashrc" || echo "$line" >> "$HOME/.bashrc"
+    echo "~/.local/bin on PATH via $HOME/.bashrc"
+  EOT
+}
