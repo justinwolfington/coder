@@ -1806,6 +1806,17 @@ func (q *querier) AcquireStaleChatDiffStatuses(ctx context.Context, limitVal int
 	return q.db.AcquireStaleChatDiffStatuses(ctx, limitVal)
 }
 
+func (q *querier) AcquireUserSoftDeleteGuardLock(ctx context.Context, userID uuid.UUID) error {
+	user, err := q.db.GetUserByID(ctx, userID)
+	if err != nil {
+		return err
+	}
+	if err := q.authorizeContext(ctx, policy.ActionRead, user); err != nil {
+		return err
+	}
+	return q.db.AcquireUserSoftDeleteGuardLock(ctx, userID)
+}
+
 func (q *querier) ActivityBumpWorkspace(ctx context.Context, arg database.ActivityBumpWorkspaceParams) error {
 	fetch := func(ctx context.Context, arg database.ActivityBumpWorkspaceParams) (database.Workspace, error) {
 		return q.db.GetWorkspaceByID(ctx, arg.WorkspaceID)

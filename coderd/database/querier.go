@@ -40,6 +40,14 @@ type sqlcQuerier interface {
 	// https://www.postgresql.org/docs/9.5/sql-select.html#SQL-FOR-UPDATE-SHARE
 	AcquireProvisionerJob(ctx context.Context, arg AcquireProvisionerJobParams) (ProvisionerJob, error)
 	AcquireStaleChatDiffStatuses(ctx context.Context, limitVal int32) ([]AcquireStaleChatDiffStatusesRow, error)
+	// Acquires the users-row lock that the *_fail_if_user_deleted guard triggers
+	// take on child-table inserts. Transactions that delete a guarded child row
+	// and later insert a replacement (for example the OAuth2 token exchange,
+	// which replaces api_keys rows) must call this before the delete so their
+	// lock order (users first, then the child row) matches
+	// delete_deleted_user_resources and cannot deadlock with a concurrent user
+	// soft-delete.
+	AcquireUserSoftDeleteGuardLock(ctx context.Context, userID uuid.UUID) error
 	// Bumps the workspace deadline by the template's configured "activity_bump"
 	// duration (default 1h). If the workspace bump will cross an autostart
 	// threshold, then the bump is autostart + TTL. This is the deadline behavior if

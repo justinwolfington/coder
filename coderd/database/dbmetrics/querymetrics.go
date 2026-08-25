@@ -144,6 +144,14 @@ func (m queryMetricsStore) AcquireStaleChatDiffStatuses(ctx context.Context, lim
 	return r0, r1
 }
 
+func (m queryMetricsStore) AcquireUserSoftDeleteGuardLock(ctx context.Context, userID uuid.UUID) error {
+	start := time.Now()
+	r0 := m.s.AcquireUserSoftDeleteGuardLock(ctx, userID)
+	m.queryLatencies.WithLabelValues("AcquireUserSoftDeleteGuardLock").Observe(time.Since(start).Seconds())
+	m.queryCounts.WithLabelValues(httpmw.ExtractHTTPRoute(ctx), httpmw.ExtractHTTPMethod(ctx), "AcquireUserSoftDeleteGuardLock").Inc()
+	return r0
+}
+
 func (m queryMetricsStore) ActivityBumpWorkspace(ctx context.Context, arg database.ActivityBumpWorkspaceParams) error {
 	start := time.Now()
 	r0 := m.s.ActivityBumpWorkspace(ctx, arg)

@@ -249,14 +249,24 @@ func TestSoftDeleteGuardUpdatePathTakesNoUserLock(t *testing.T) {
 	require.Equal(t, user.ID, lockedUserID)
 
 	// All updates must complete while the users row is locked; blocking
-	// here would mean a trigger locked the parent on the UPDATE path.
-	_, err = sqlDB.ExecContext(ctx,
+	// here would mean a trigger locked the parent on the UPDATE path. The
+	// lock_timeout bounds the wait so a blocked update fails the test
+	// instead of waiting for the shared context deadline to roll back
+	// lockTx and release the lock (which would let the update succeed and
+	// mask a missing TG_OP gate).
+	updateConn, err := sqlDB.Conn(ctx)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = updateConn.Close() })
+	_, err = updateConn.ExecContext(ctx, `SET lock_timeout = '5s'`)
+	require.NoError(t, err)
+
+	_, err = updateConn.ExecContext(ctx,
 		`UPDATE user_skills SET description = 'edited' WHERE user_id = $1`, user.ID)
 	require.NoError(t, err)
-	_, err = sqlDB.ExecContext(ctx,
+	_, err = updateConn.ExecContext(ctx,
 		`UPDATE user_links SET linked_id = 'edited' WHERE user_id = $1`, user.ID)
 	require.NoError(t, err)
-	_, err = sqlDB.ExecContext(ctx,
+	_, err = updateConn.ExecContext(ctx,
 		`UPDATE user_secrets SET description = 'edited' WHERE user_id = $1`, user.ID)
 	require.NoError(t, err)
 }

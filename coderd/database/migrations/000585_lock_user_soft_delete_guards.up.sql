@@ -23,6 +23,13 @@
 -- row. The UPDATE path keeps the unlocked read: an existing row is cleaned
 -- up by the soft-delete either way.
 --
+-- The INSERT-path lock imposes an ordering contract on writers: deadlocks
+-- are per-transaction statement order, not per-trigger-operation, so any
+-- transaction that deletes a guarded child row and later inserts one (for
+-- example the OAuth2 token exchange, which replaces api_keys rows) must
+-- take the users lock first via AcquireUserSoftDeleteGuardLock so its lock
+-- order (users, then child) matches delete_deleted_user_resources.
+--
 -- Safe under any isolation level: READ COMMITTED re-reads the committed
 -- users.deleted after the lock wait, and a REPEATABLE READ or SERIALIZABLE
 -- waiter fails with a serialization error (40001) because the soft-delete

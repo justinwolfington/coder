@@ -118,6 +118,20 @@ func (mr *MockStoreMockRecorder) AcquireStaleChatDiffStatuses(ctx, limitVal any)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AcquireStaleChatDiffStatuses", reflect.TypeOf((*MockStore)(nil).AcquireStaleChatDiffStatuses), ctx, limitVal)
 }
 
+// AcquireUserSoftDeleteGuardLock mocks base method.
+func (m *MockStore) AcquireUserSoftDeleteGuardLock(ctx context.Context, userID uuid.UUID) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "AcquireUserSoftDeleteGuardLock", ctx, userID)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// AcquireUserSoftDeleteGuardLock indicates an expected call of AcquireUserSoftDeleteGuardLock.
+func (mr *MockStoreMockRecorder) AcquireUserSoftDeleteGuardLock(ctx, userID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AcquireUserSoftDeleteGuardLock", reflect.TypeOf((*MockStore)(nil).AcquireUserSoftDeleteGuardLock), ctx, userID)
+}
+
 // ActivityBumpWorkspace mocks base method.
 func (m *MockStore) ActivityBumpWorkspace(ctx context.Context, arg database.ActivityBumpWorkspaceParams) error {
 	m.ctrl.T.Helper()

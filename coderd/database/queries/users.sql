@@ -742,3 +742,15 @@ WHERE
 SELECT *
 FROM users
 WHERE id = @id::uuid;
+
+-- Acquires the users-row lock that the *_fail_if_user_deleted guard triggers
+-- take on child-table inserts. Transactions that delete a guarded child row
+-- and later insert a replacement (for example the OAuth2 token exchange,
+-- which replaces api_keys rows) must call this before the delete so their
+-- lock order (users first, then the child row) matches
+-- delete_deleted_user_resources and cannot deadlock with a concurrent user
+-- soft-delete.
+-- name: AcquireUserSoftDeleteGuardLock :exec
+SELECT 1 FROM users
+WHERE id = @user_id
+FOR NO KEY UPDATE;

@@ -403,6 +403,16 @@ func authorizationCodeGrant(ctx context.Context, db database.Store, app database
 
 	err = db.InTx(func(tx database.Store) error {
 		ctx := dbauthz.As(ctx, actor)
+
+		// Lock the users row before deleting the previous key so this
+		// transaction's lock order (users, then api_keys) matches the
+		// soft-delete cleanup's and cannot deadlock with a concurrent user
+		// deletion; the InsertAPIKey guard trigger takes the same lock.
+		err = tx.AcquireUserSoftDeleteGuardLock(ctx, dbCode.UserID)
+		if err != nil {
+			return xerrors.Errorf("acquire user soft-delete guard lock: %w", err)
+		}
+
 		err = tx.DeleteOAuth2ProviderAppCodeByID(ctx, dbCode.ID)
 		if err != nil {
 			return xerrors.Errorf("delete oauth2 app code: %w", err)
@@ -540,6 +550,16 @@ func refreshTokenGrant(ctx context.Context, db database.Store, app database.OAut
 
 	err = db.InTx(func(tx database.Store) error {
 		ctx := dbauthz.As(ctx, actor)
+
+		// Lock the users row before deleting the previous key so this
+		// transaction's lock order (users, then api_keys) matches the
+		// soft-delete cleanup's and cannot deadlock with a concurrent user
+		// deletion; the InsertAPIKey guard trigger takes the same lock.
+		err = tx.AcquireUserSoftDeleteGuardLock(ctx, dbToken.UserID)
+		if err != nil {
+			return xerrors.Errorf("acquire user soft-delete guard lock: %w", err)
+		}
+
 		err = tx.DeleteAPIKeyByID(ctx, prevKey.ID) // This cascades to the token.
 		if err != nil {
 			return xerrors.Errorf("delete oauth2 app token: %w", err)

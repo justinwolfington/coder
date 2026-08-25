@@ -30952,6 +30952,24 @@ func (q *sqlQuerier) UpdateUserSkillByUserIDAndName(ctx context.Context, arg Upd
 	return i, err
 }
 
+const acquireUserSoftDeleteGuardLock = `-- name: AcquireUserSoftDeleteGuardLock :exec
+SELECT 1 FROM users
+WHERE id = $1
+FOR NO KEY UPDATE
+`
+
+// Acquires the users-row lock that the *_fail_if_user_deleted guard triggers
+// take on child-table inserts. Transactions that delete a guarded child row
+// and later insert a replacement (for example the OAuth2 token exchange,
+// which replaces api_keys rows) must call this before the delete so their
+// lock order (users first, then the child row) matches
+// delete_deleted_user_resources and cannot deadlock with a concurrent user
+// soft-delete.
+func (q *sqlQuerier) AcquireUserSoftDeleteGuardLock(ctx context.Context, userID uuid.UUID) error {
+	_, err := q.db.ExecContext(ctx, acquireUserSoftDeleteGuardLock, userID)
+	return err
+}
+
 const allUserIDs = `-- name: AllUserIDs :many
 SELECT DISTINCT id FROM USERS
 	WHERE CASE WHEN $1::bool THEN TRUE ELSE is_system = false END
