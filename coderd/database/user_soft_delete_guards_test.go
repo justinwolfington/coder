@@ -89,7 +89,7 @@ func runLockRace(ctx context.Context, t *testing.T, sqlDB *sql.DB, blocking []st
 	}
 }
 
-// TestSoftDeleteGuardWinsConcurrentInsert verifies that all four soft-delete
+// TestSoftDeleteGuardWinsConcurrentInsert verifies that all six soft-delete
 // guard triggers serialize against a concurrent user soft-delete via the
 // parent-row lock added in migration 000585: the insert blocks on the locked
 // users row and, once the soft-delete commits, fails with the guard's
@@ -101,6 +101,10 @@ func TestSoftDeleteGuardWinsConcurrentInsert(t *testing.T) {
 	}
 
 	db, _, sqlDB := dbtestutil.NewDBWithSQLDB(t)
+
+	// Shared parents for the FK-bearing tables.
+	org := dbgen.Organization(t, db, database.Organization{})
+	provider := dbgen.AIProvider(t, db, database.AIProvider{})
 
 	testCases := []struct {
 		name       string
@@ -152,6 +156,28 @@ func TestSoftDeleteGuardWinsConcurrentInsert(t *testing.T) {
 				`, []any{uuid.New(), userID}}
 			},
 		},
+		{
+			name:       "UserAIProviderKey",
+			table:      "user_ai_provider_keys",
+			constraint: "user_ai_provider_key_user_deleted",
+			insert: func(userID uuid.UUID) stmt {
+				return stmt{`
+					INSERT INTO user_ai_provider_keys (id, user_id, ai_provider_id, api_key)
+					VALUES ($1, $2, $3, 'race-key')
+				`, []any{uuid.New(), userID, provider.ID}}
+			},
+		},
+		{
+			name:       "OrganizationMember",
+			table:      "organization_members",
+			constraint: "organization_member_user_deleted",
+			insert: func(userID uuid.UUID) stmt {
+				return stmt{`
+					INSERT INTO organization_members (user_id, organization_id, created_at, updated_at)
+					VALUES ($1, $2, now(), now())
+				`, []any{userID, org.ID}}
+			},
+		},
 	}
 
 	for _, tc := range testCases {
@@ -181,12 +207,11 @@ func TestSoftDeleteGuardWinsConcurrentInsert(t *testing.T) {
 	}
 }
 
-// TestSoftDeleteGuardUpdatePathTakesNoUserLock pins the TG_OP gate: the
-// guards take no users-row lock on the UPDATE path, so routine child-row
-// updates proceed while the users row is locked. Without the gate this
-// would block here and could deadlock in production against
-// delete_deleted_user_resources. user_secrets is excluded because its
-// separate per-user cap trigger already locks the users row on UPDATE.
+// TestSoftDeleteGuardUpdatePathTakesNoUserLock pins the TG_OP gates: neither
+// the soft-delete guards nor the user_secrets cap trigger take a users-row
+// lock on the UPDATE path, so routine child-row updates proceed while the
+// users row is locked. Without the gates this would block here and could
+// deadlock in production against delete_deleted_user_resources.
 func TestSoftDeleteGuardUpdatePathTakesNoUserLock(t *testing.T) {
 	t.Parallel()
 	if testing.Short() {
@@ -207,6 +232,11 @@ func TestSoftDeleteGuardUpdatePathTakesNoUserLock(t *testing.T) {
 		VALUES ($1, 'github', 'gate-link')
 	`, user.ID)
 	require.NoError(t, err)
+	_, err = sqlDB.ExecContext(ctx, `
+		INSERT INTO user_secrets (id, user_id, name, description, value, env_name)
+		VALUES ($1, $2, 'gate-secret', '', 'value', 'GATE_SECRET')
+	`, uuid.New(), user.ID)
+	require.NoError(t, err)
 
 	lockTx, err := sqlDB.BeginTx(ctx, nil)
 	require.NoError(t, err)
@@ -218,12 +248,15 @@ func TestSoftDeleteGuardUpdatePathTakesNoUserLock(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, user.ID, lockedUserID)
 
-	// Both updates must complete while the users row is locked; blocking
-	// here would mean the guard locked the parent on the UPDATE path.
+	// All updates must complete while the users row is locked; blocking
+	// here would mean a trigger locked the parent on the UPDATE path.
 	_, err = sqlDB.ExecContext(ctx,
 		`UPDATE user_skills SET description = 'edited' WHERE user_id = $1`, user.ID)
 	require.NoError(t, err)
 	_, err = sqlDB.ExecContext(ctx,
 		`UPDATE user_links SET linked_id = 'edited' WHERE user_id = $1`, user.ID)
+	require.NoError(t, err)
+	_, err = sqlDB.ExecContext(ctx,
+		`UPDATE user_secrets SET description = 'edited' WHERE user_id = $1`, user.ID)
 	require.NoError(t, err)
 }

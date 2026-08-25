@@ -1069,8 +1069,11 @@ DECLARE
     env_bytes_limit   constant bigint := 24576;    -- 24 KiB
 BEGIN
     -- Serialize cap checks per user so concurrent inserts cannot all
-    -- observe the same pre-insert aggregates and exceed the cap.
-    PERFORM 1 FROM users WHERE id = NEW.user_id FOR UPDATE;
+    -- observe the same pre-insert aggregates and exceed the cap. INSERT
+    -- only: locking on UPDATE deadlocks against the soft-delete cleanup.
+    IF (TG_OP = 'INSERT') THEN
+        PERFORM 1 FROM users WHERE id = NEW.user_id FOR UPDATE;
+    END IF;
 
     -- Sum existing rows excluding the row being updated (so UPDATE statements
     -- don't double-count NEW). On INSERT, no row matches NEW.id, so
@@ -1188,6 +1191,25 @@ BEGIN
 END;
 $$;
 
+CREATE FUNCTION insert_organization_member_fail_if_user_deleted() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+	user_deleted boolean;
+BEGIN
+	SELECT deleted INTO user_deleted
+	FROM users
+	WHERE id = NEW.user_id
+	FOR NO KEY UPDATE;
+	IF (user_deleted) THEN
+		RAISE EXCEPTION 'Cannot create organization_member for deleted user'
+			USING ERRCODE = 'check_violation',
+				  CONSTRAINT = 'organization_member_user_deleted';
+	END IF;
+	RETURN NEW;
+END;
+$$;
+
 CREATE FUNCTION insert_organization_system_roles() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
@@ -1229,6 +1251,25 @@ BEGIN
         NOW()
     );
     RETURN NEW;
+END;
+$$;
+
+CREATE FUNCTION insert_user_ai_provider_key_fail_if_user_deleted() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+	user_deleted boolean;
+BEGIN
+	SELECT deleted INTO user_deleted
+	FROM users
+	WHERE id = NEW.user_id
+	FOR NO KEY UPDATE;
+	IF (user_deleted) THEN
+		RAISE EXCEPTION 'Cannot create user_ai_provider_key for deleted user'
+			USING ERRCODE = 'check_violation',
+				  CONSTRAINT = 'user_ai_provider_key_user_deleted';
+	END IF;
+	RETURN NEW;
 END;
 $$;
 
@@ -5255,7 +5296,11 @@ CREATE TRIGGER trigger_enforce_user_ai_budget_override_membership BEFORE INSERT 
 
 CREATE TRIGGER trigger_insert_apikeys BEFORE INSERT ON api_keys FOR EACH ROW EXECUTE FUNCTION insert_apikey_fail_if_user_deleted();
 
+CREATE TRIGGER trigger_insert_organization_members BEFORE INSERT ON organization_members FOR EACH ROW EXECUTE FUNCTION insert_organization_member_fail_if_user_deleted();
+
 CREATE TRIGGER trigger_insert_organization_system_roles AFTER INSERT ON organizations FOR EACH ROW EXECUTE FUNCTION insert_organization_system_roles();
+
+CREATE TRIGGER trigger_insert_user_ai_provider_keys BEFORE INSERT ON user_ai_provider_keys FOR EACH ROW EXECUTE FUNCTION insert_user_ai_provider_key_fail_if_user_deleted();
 
 CREATE TRIGGER trigger_nullify_next_start_at_on_workspace_autostart_modificati AFTER UPDATE ON workspaces FOR EACH ROW EXECUTE FUNCTION nullify_next_start_at_on_workspace_autostart_modification();
 

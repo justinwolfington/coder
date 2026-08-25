@@ -3565,6 +3565,20 @@ func TestMigration000585LockUserSoftDeleteGuards(t *testing.T) {
 		require.NoError(t, err)
 	}
 
+	orgID := uuid.New()
+	_, err = sqlDB.ExecContext(ctx,
+		`INSERT INTO organizations (id, name, display_name, description, icon, created_at, updated_at, is_default, default_org_member_roles)
+		VALUES ($1, 'guards-org', 'Guards Org', '', '', $2, $2, false, '{}')`,
+		orgID, now,
+	)
+	require.NoError(t, err)
+	providerID := uuid.New()
+	_, err = sqlDB.ExecContext(ctx,
+		`INSERT INTO ai_providers (id, type, name, base_url) VALUES ($1, 'openai', 'guards-provider', 'https://example.com')`,
+		providerID,
+	)
+	require.NoError(t, err)
+
 	// One row per guarded table for both users.
 	for _, id := range []uuid.UUID{liveUser, doomedUser} {
 		_, err = sqlDB.ExecContext(ctx,
@@ -3590,6 +3604,18 @@ func TestMigration000585LockUserSoftDeleteGuards(t *testing.T) {
 			uuid.New(), id,
 		)
 		require.NoError(t, err)
+		_, err = sqlDB.ExecContext(ctx,
+			`INSERT INTO user_ai_provider_keys (id, user_id, ai_provider_id, api_key)
+			VALUES ($1, $2, $3, 'seed-key')`,
+			uuid.New(), id, providerID,
+		)
+		require.NoError(t, err)
+		_, err = sqlDB.ExecContext(ctx,
+			`INSERT INTO organization_members (user_id, organization_id, created_at, updated_at)
+			VALUES ($1, $2, $3, $3)`,
+			id, orgID, now,
+		)
+		require.NoError(t, err)
 	}
 
 	// Reproduce the race outcome the migration cleans up: a user that is
@@ -3610,7 +3636,7 @@ func TestMigration000585LockUserSoftDeleteGuards(t *testing.T) {
 		require.NoError(t, err)
 		return count
 	}
-	guardedTables := []string{"api_keys", "user_links", "user_secrets", "user_skills"}
+	guardedTables := []string{"api_keys", "user_links", "user_secrets", "user_skills", "user_ai_provider_keys", "organization_members"}
 	for _, table := range guardedTables {
 		require.Equal(t, 1, countRows(table, doomedUser), "pre-migration: %s row for the doomed user must exist", table)
 	}

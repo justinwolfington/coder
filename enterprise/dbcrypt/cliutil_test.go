@@ -115,6 +115,24 @@ func upsertUserAIProviderKey(ctx context.Context, t *testing.T, store database.S
 	return key
 }
 
+// softDeleteUserKeepingRows soft-deletes the user while suppressing the
+// delete_deleted_user_resources cleanup, reproducing the orphaned child rows
+// that could exist before migration 000585 closed the insert-vs-soft-delete
+// race (the insert guards now also reject new rows for deleted users, so the
+// orphan state can only be constructed this way). Rotation and decryption
+// must still handle such legacy rows.
+func softDeleteUserKeepingRows(ctx context.Context, t *testing.T, sqlDB *sql.DB, userID uuid.UUID) {
+	t.Helper()
+	_, err := sqlDB.ExecContext(ctx, `ALTER TABLE users DISABLE TRIGGER trigger_update_users`)
+	require.NoError(t, err)
+	defer func() {
+		_, err := sqlDB.ExecContext(ctx, `ALTER TABLE users ENABLE TRIGGER trigger_update_users`)
+		require.NoError(t, err)
+	}()
+	_, err = sqlDB.ExecContext(ctx, `UPDATE users SET deleted = true WHERE id = $1`, userID)
+	require.NoError(t, err)
+}
+
 // decryptRawString decodes and decrypts a raw (base64) ciphertext value read
 // directly from the database, for comparison against the original plaintext.
 func decryptRawString(t *testing.T, c dbcrypt.Cipher, raw string) string {
@@ -632,11 +650,12 @@ func TestRotateUserAIProviderKeys(t *testing.T) {
 		// alongside a live user's row purely to confirm Rotate doesn't need
 		// one.
 		liveUser := dbgen.User(t, f.rawDB, database.User{})
-		deletedUser := dbgen.User(t, f.rawDB, database.User{Deleted: true})
+		deletedUser := dbgen.User(t, f.rawDB, database.User{})
 		provider := dbgen.AIProvider(t, f.rawDB, database.AIProvider{})
 
 		liveKey := upsertUserAIProviderKey(f.ctx, t, f.cryptDBA, liveUser.ID, provider.ID, "user-key-live")
 		deletedKey := upsertUserAIProviderKey(f.ctx, t, f.cryptDBA, deletedUser.ID, provider.ID, "user-key-deleted-user")
+		softDeleteUserKeepingRows(f.ctx, t, f.sqlDB, deletedUser.ID)
 
 		f.rotate(t)
 
@@ -1223,11 +1242,12 @@ func TestDecryptUserAIProviderKeys(t *testing.T) {
 		f := newDecryptFixture(t)
 
 		liveUser := dbgen.User(t, f.rawDB, database.User{})
-		deletedUser := dbgen.User(t, f.rawDB, database.User{Deleted: true})
+		deletedUser := dbgen.User(t, f.rawDB, database.User{})
 		provider := dbgen.AIProvider(t, f.rawDB, database.AIProvider{})
 
 		liveKey := upsertUserAIProviderKey(f.ctx, t, f.cryptDBA, liveUser.ID, provider.ID, "user-key-live")
 		deletedKey := upsertUserAIProviderKey(f.ctx, t, f.cryptDBA, deletedUser.ID, provider.ID, "user-key-deleted-user")
+		softDeleteUserKeepingRows(f.ctx, t, f.sqlDB, deletedUser.ID)
 
 		f.decrypt(t)
 
