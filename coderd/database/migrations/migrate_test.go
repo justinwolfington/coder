@@ -3526,3 +3526,104 @@ func TestMigration000583ChatModelOverrideOrgScope(t *testing.T) {
 	_, err = db.ExecContext(ctx, string(upSQL))
 	require.NoError(t, err)
 }
+
+func TestMigration000585LockUserSoftDeleteGuards(t *testing.T) {
+	t.Parallel()
+	if testing.Short() {
+		t.SkipNow()
+	}
+
+	const migrationVersion = 585
+
+	sqlDB := testSQLDB(t)
+
+	// Step up to migrationVersion - 1.
+	next, err := migrations.Stepper(sqlDB)
+	require.NoError(t, err)
+	for {
+		version, more, err := next()
+		require.NoError(t, err)
+		if !more {
+			t.Fatalf("migration %d not found", migrationVersion)
+		}
+		if version == migrationVersion-1 {
+			break
+		}
+	}
+
+	ctx := testutil.Context(t, testutil.WaitLong)
+	now := time.Now().UTC().Truncate(time.Microsecond)
+
+	liveUser := uuid.New()
+	doomedUser := uuid.New()
+	for i, id := range []uuid.UUID{liveUser, doomedUser} {
+		_, err = sqlDB.ExecContext(ctx,
+			`INSERT INTO users (id, username, email, hashed_password, created_at, updated_at, status, rbac_roles, login_type)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+			id, fmt.Sprintf("guards-user-%d", i), fmt.Sprintf("guards-%d@test.com", i), []byte{}, now, now, "active", pq.StringArray{}, "password",
+		)
+		require.NoError(t, err)
+	}
+
+	// One row per guarded table for both users.
+	for _, id := range []uuid.UUID{liveUser, doomedUser} {
+		_, err = sqlDB.ExecContext(ctx,
+			`INSERT INTO api_keys (id, hashed_secret, user_id, last_used, expires_at, created_at, updated_at, login_type, scopes, allow_list)
+			VALUES ($1, 'hash'::bytea, $2, $3, $3, $3, $3, 'password', '{}'::api_key_scope[], ARRAY['*'])`,
+			"key-"+id.String()[:13], id, now,
+		)
+		require.NoError(t, err)
+		_, err = sqlDB.ExecContext(ctx,
+			`INSERT INTO user_links (user_id, login_type, linked_id) VALUES ($1, 'github', $2)`,
+			id, "link-"+id.String(),
+		)
+		require.NoError(t, err)
+		_, err = sqlDB.ExecContext(ctx,
+			`INSERT INTO user_secrets (id, user_id, name, description, value, env_name)
+			VALUES ($1, $2, 'seed-secret', '', 'value', 'SEED_SECRET')`,
+			uuid.New(), id,
+		)
+		require.NoError(t, err)
+		_, err = sqlDB.ExecContext(ctx,
+			`INSERT INTO user_skills (id, user_id, name, description, content)
+			VALUES ($1, $2, 'seed-skill', '', 'content')`,
+			uuid.New(), id,
+		)
+		require.NoError(t, err)
+	}
+
+	// Reproduce the race outcome the migration cleans up: a user that is
+	// soft-deleted while its child rows survive. Disabling the cleanup
+	// trigger simulates the insert committing after the soft-delete.
+	_, err = sqlDB.ExecContext(ctx, `ALTER TABLE users DISABLE TRIGGER trigger_update_users`)
+	require.NoError(t, err)
+	_, err = sqlDB.ExecContext(ctx, `UPDATE users SET deleted = true WHERE id = $1`, doomedUser)
+	require.NoError(t, err)
+	_, err = sqlDB.ExecContext(ctx, `ALTER TABLE users ENABLE TRIGGER trigger_update_users`)
+	require.NoError(t, err)
+
+	countRows := func(table string, userID uuid.UUID) int {
+		var count int
+		//nolint:gosec // The table name comes from the fixed list below.
+		err := sqlDB.QueryRowContext(ctx,
+			`SELECT count(*) FROM `+table+` WHERE user_id = $1`, userID).Scan(&count)
+		require.NoError(t, err)
+		return count
+	}
+	guardedTables := []string{"api_keys", "user_links", "user_secrets", "user_skills"}
+	for _, table := range guardedTables {
+		require.Equal(t, 1, countRows(table, doomedUser), "pre-migration: %s row for the doomed user must exist", table)
+	}
+
+	// Run migration 585.
+	version, more, err := next()
+	require.NoError(t, err)
+	require.True(t, more)
+	require.EqualValues(t, migrationVersion, version)
+
+	// The backfill removes only the soft-deleted user's rows.
+	for _, table := range guardedTables {
+		require.Zero(t, countRows(table, doomedUser), "post-migration: %s rows for the doomed user must be deleted", table)
+		require.Equal(t, 1, countRows(table, liveUser), "post-migration: %s row for the live user must survive", table)
+	}
+}

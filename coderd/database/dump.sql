@@ -1170,12 +1170,18 @@ $$;
 CREATE FUNCTION insert_apikey_fail_if_user_deleted() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
-
 DECLARE
+	user_deleted boolean;
 BEGIN
 	IF (NEW.user_id IS NOT NULL) THEN
-		IF (SELECT deleted FROM users WHERE id = NEW.user_id LIMIT 1) THEN
-			RAISE EXCEPTION 'Cannot create API key for deleted user';
+		SELECT deleted INTO user_deleted
+		FROM users
+		WHERE id = NEW.user_id
+		FOR NO KEY UPDATE;
+		IF (user_deleted) THEN
+			RAISE EXCEPTION 'Cannot create API key for deleted user'
+				USING ERRCODE = 'check_violation',
+					  CONSTRAINT = 'api_key_user_deleted';
 		END IF;
 	END IF;
 	RETURN NEW;
@@ -1229,12 +1235,24 @@ $$;
 CREATE FUNCTION insert_user_links_fail_if_user_deleted() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
-
 DECLARE
+	user_deleted boolean;
 BEGIN
 	IF (NEW.user_id IS NOT NULL) THEN
-		IF (SELECT deleted FROM users WHERE id = NEW.user_id LIMIT 1) THEN
-			RAISE EXCEPTION 'Cannot create user_link for deleted user';
+		IF (TG_OP = 'INSERT') THEN
+			SELECT deleted INTO user_deleted
+			FROM users
+			WHERE id = NEW.user_id
+			FOR NO KEY UPDATE;
+		ELSE
+			SELECT deleted INTO user_deleted
+			FROM users
+			WHERE id = NEW.user_id;
+		END IF;
+		IF (user_deleted) THEN
+			RAISE EXCEPTION 'Cannot create user_link for deleted user'
+				USING ERRCODE = 'check_violation',
+					  CONSTRAINT = 'user_link_user_deleted';
 		END IF;
 	END IF;
 	RETURN NEW;
@@ -1244,12 +1262,24 @@ $$;
 CREATE FUNCTION insert_user_secret_fail_if_user_deleted() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
-
 DECLARE
+	user_deleted boolean;
 BEGIN
 	IF (NEW.user_id IS NOT NULL) THEN
-		IF (SELECT deleted FROM users WHERE id = NEW.user_id LIMIT 1) THEN
-			RAISE EXCEPTION 'Cannot create user_secret for deleted user';
+		IF (TG_OP = 'INSERT') THEN
+			SELECT deleted INTO user_deleted
+			FROM users
+			WHERE id = NEW.user_id
+			FOR NO KEY UPDATE;
+		ELSE
+			SELECT deleted INTO user_deleted
+			FROM users
+			WHERE id = NEW.user_id;
+		END IF;
+		IF (user_deleted) THEN
+			RAISE EXCEPTION 'Cannot create user_secret for deleted user'
+				USING ERRCODE = 'check_violation',
+					  CONSTRAINT = 'user_secret_user_deleted';
 		END IF;
 	END IF;
 	RETURN NEW;
@@ -1259,14 +1289,20 @@ $$;
 CREATE FUNCTION insert_user_skill_fail_if_user_deleted() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
-
+DECLARE
+    user_deleted boolean;
 BEGIN
-    PERFORM 1
-    FROM users
-    WHERE id = NEW.user_id
-      AND deleted = true
-    LIMIT 1;
-    IF FOUND THEN
+    IF (TG_OP = 'INSERT') THEN
+        SELECT deleted INTO user_deleted
+        FROM users
+        WHERE id = NEW.user_id
+        FOR NO KEY UPDATE;
+    ELSE
+        SELECT deleted INTO user_deleted
+        FROM users
+        WHERE id = NEW.user_id;
+    END IF;
+    IF (user_deleted) THEN
         RAISE EXCEPTION 'Cannot create user_skill for deleted user'
             USING ERRCODE = 'check_violation',
                   CONSTRAINT = 'user_skill_user_deleted';
