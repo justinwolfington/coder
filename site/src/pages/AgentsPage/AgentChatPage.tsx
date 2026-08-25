@@ -925,6 +925,10 @@ const AgentChatPage: FC = () => {
 		modelOverridesQuery.data?.overrides,
 		models,
 	);
+	// While the override query is loading or failed the binding trigger is
+	// unknown, so withhold the compact-at hint instead of attributing it to
+	// the wrong source.
+	const isCompactionTriggerKnown = modelOverridesQuery.isSuccess;
 	const chatProviderConfigsQuery = useQuery({
 		...chatProviderConfigs(),
 		enabled: permissions.editDeploymentConfig,
@@ -1368,12 +1372,14 @@ const AgentChatPage: FC = () => {
 			)
 		: undefined;
 
-	const compactionThreshold = resolveCompactionThreshold(
-		chatLastModelConfigID,
-		userThresholdsQuery.data?.thresholds,
-		models,
-		organizationCompactionTrigger,
-	);
+	const compactionThreshold = isCompactionTriggerKnown
+		? resolveCompactionThreshold(
+				chatLastModelConfigID,
+				userThresholdsQuery.data?.thresholds,
+				models,
+				organizationCompactionTrigger,
+			)
+		: undefined;
 	const modelSelectorPlaceholder = getModelSelectorPlaceholder(
 		modelOptions,
 		isModelDataPending,
