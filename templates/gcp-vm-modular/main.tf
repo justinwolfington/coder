@@ -528,7 +528,14 @@ resource "google_compute_instance" "workspace" {
     "block-project-ssh-keys"  = "TRUE"
   }
 
-  metadata_startup_script = coder_agent.main.init_script
+  # coder_scripts run concurrently with the startup script that mounts
+  # /home/<user>, so the mount point must exist before the agent starts or
+  # git-config fails to create .gitconfig and the workspace reports unhealthy.
+  metadata_startup_script = <<-EOT
+    #!/bin/bash
+    mkdir -p /home/${lower(data.coder_workspace_owner.me.name)}
+    ${coder_agent.main.init_script}
+  EOT
 
   labels = {
     "coder-workspace"   = data.coder_workspace.me.id

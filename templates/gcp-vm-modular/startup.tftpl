@@ -77,19 +77,20 @@ if [[ "${gpu_type}" == "nvidia-h100-80gb" ]]; then
     echo "Local NVMe storage ready"
 fi
 
+# The agent, code-server and interactive sessions all run as root with HOME set
+# here and create 0700 root-owned dotfile dirs, which a `su - ${username}` step
+# cannot enter. Provision as root against the same HOME instead.
+export HOME="$HOME_DIR"
+
 # Configure git defaults
-su - "${username}" -c "
-    git config --global init.defaultBranch main
-    git config --global user.name '${username}'
-    git config --global user.email '${useremail}'
-    git lfs install
-"
+git config --global init.defaultBranch main
+git config --global user.name "${username}"
+git config --global user.email "${useremail}"
+git lfs install
 
 # Install Claude Code CLI (continue if it fails)
 echo "Installing Claude Code CLI..."
-su - "${username}" -c "
-    curl -fsSL https://claude.ai/install.sh | bash || echo 'Claude Code installation failed, continuing...'
-" || true
+curl -fsSL https://claude.ai/install.sh | bash || echo "Claude Code installation failed, continuing..."
 
 # Set up environment variables for the coder agent
 echo "export HOME=/home/${username}" >> /etc/environment
