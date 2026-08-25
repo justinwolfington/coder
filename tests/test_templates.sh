@@ -19,7 +19,19 @@ log_ok()    { echo -e "${GREEN}OK:   $1${NC}" >&2; }
 log_warn()  { echo -e "${YELLOW}WARN: $1${NC}" >&2; }
 log_error() { echo -e "${RED}ERROR: $1${NC}" >&2; }
 
-pass() { 
+# set -e aborts before the explicit cleanup on any bare failing command, and an
+# abandoned workspace keeps its GPUs and gets resurrected by autostart, so every
+# exit path has to reap.
+CURRENT_WORKSPACE=""
+reap_workspace() {
+    [[ -n "$CURRENT_WORKSPACE" ]] || return 0
+    log_warn "Reaping $CURRENT_WORKSPACE"
+    coder delete "$CURRENT_WORKSPACE" --yes >&2 || true
+    CURRENT_WORKSPACE=""
+}
+trap reap_workspace EXIT
+
+pass() {
     echo -e "${GREEN}✅ $1${NC}"
     TOTAL_TESTS=$((TOTAL_TESTS + 1))
     PASSED_TESTS=$((PASSED_TESTS + 1))
@@ -242,6 +254,9 @@ run_template_test() {
     cat "$param_file" >&2
 
     log_info "Executing command: coder create ..."
+    # Arm the reaper first: a create that errors part way still leaves a
+    # provisioned workspace behind.
+    CURRENT_WORKSPACE="$workspace_name"
     if echo "" | coder create "$workspace_name" --template="$TEST_TEMPLATE_NAME" --rich-parameter-file="$param_file" --yes; then
         rm -f "$param_file"
         log_ok "Workspace creation command completed."
@@ -249,9 +264,6 @@ run_template_test() {
         local exit_code=$?
         log_error "Workspace creation failed with exit code: $exit_code"
         rm -f "$param_file"
-        # A failed create still leaves a provisioned workspace holding its GPUs,
-        # and autostart keeps resurrecting it, so every later run loses quota.
-        coder delete "$workspace_name" --yes || true
         end_group
         return 1
     fi
@@ -293,6 +305,7 @@ run_template_test() {
     start_group "Cleanup"
     log_info "Deleting workspace $workspace_name..."
     coder delete "$workspace_name" --yes || true
+    CURRENT_WORKSPACE=""
     log_ok "Cleanup complete."
     end_group
 }
