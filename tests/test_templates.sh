@@ -249,6 +249,9 @@ run_template_test() {
         local exit_code=$?
         log_error "Workspace creation failed with exit code: $exit_code"
         rm -f "$param_file"
+        # A failed create still leaves a provisioned workspace holding its GPUs,
+        # and autostart keeps resurrecting it, so every later run loses quota.
+        coder delete "$workspace_name" --yes || true
         end_group
         return 1
     fi
