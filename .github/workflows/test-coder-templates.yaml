@@ -87,11 +87,20 @@ jobs:
             done
           fi
 
+          # GPU scenarios each hold real accelerators for the length of the run and
+          # have produced no passing result in months, so they are opt-in: only a
+          # manual dispatch schedules them.
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            scenario_query='keys[]'
+          else
+            scenario_query='to_entries[] | select(.value.gpu != true) | .key'
+          fi
+
           # Build JSON matrix
           matrix="["
           for template in $templates; do
             [[ ! -f "tests/templates/${template}.json" ]] && continue
-            for scenario in $(jq -r 'keys[]' "tests/templates/${template}.json"); do
+            for scenario in $(jq -r "$scenario_query" "tests/templates/${template}.json"); do
               [[ "$matrix" != "[" ]] && matrix+=","
               matrix+="{\"template\":\"$template\",\"scenario\":\"$scenario\"}"
             done
