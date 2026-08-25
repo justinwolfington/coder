@@ -30,6 +30,7 @@ import { cn } from "#/utils/cn";
 import { pageTitle } from "#/utils/page";
 import { generateUUID } from "#/utils/random";
 import { findWorkspaceAgent } from "#/utils/workspace";
+import type { ResolvedCompactionThreshold } from "./compactionTriggers";
 import {
 	AgentChatInput,
 	type ChatMessageInputRef,
@@ -154,7 +155,7 @@ interface AgentChatPageViewProps {
 	isModelCatalogLoading?: boolean;
 	planModeEnabled?: boolean;
 	onPlanModeToggle?: (enabled: boolean) => void;
-	compressionThreshold: number | undefined;
+	compactionThreshold: ResolvedCompactionThreshold | undefined;
 	isInputDisabled: boolean;
 	isSubmissionPending: boolean;
 	isInterruptPending: boolean;
@@ -352,7 +353,7 @@ export const AgentChatPageView: FC<AgentChatPageViewProps> = ({
 	isModelCatalogLoading = false,
 	planModeEnabled,
 	onPlanModeToggle,
-	compressionThreshold,
+	compactionThreshold,
 	isInputDisabled,
 	isSubmissionPending,
 	isInterruptPending,
@@ -995,7 +996,7 @@ export const AgentChatPageView: FC<AgentChatPageViewProps> = ({
 								organizationId={organizationId}
 								sendShortcut={sendShortcut}
 								store={store}
-								compressionThreshold={compressionThreshold}
+								compactionThreshold={compactionThreshold}
 								onSend={editing.handleSendFromInput}
 								onDeleteQueuedMessage={handleDeleteQueuedMessage}
 								onPromoteQueuedMessage={handlePromoteQueuedMessage}
