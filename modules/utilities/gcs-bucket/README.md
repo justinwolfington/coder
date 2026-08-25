@@ -28,7 +28,7 @@ module "utd_bucket" {
   environment             = var.environment
   supported_environments  = ["production", "staging"]
   workspace_owner_groups  = data.coder_workspace_owner.me.groups
-  required_group          = "UTDACCESS"
+  required_groups         = ["UTDACCESS", "coder-utd-access"]
   bucket_name             = "abridge-client-prod-wk-secure-bucket"
   mount_path              = "/utddata"
   mount_options           = "implicit-dirs,only-dir=decrypt"
@@ -95,7 +95,7 @@ module "phi_bucket" {
   source                  = "git::https://github.com/abridgeai/coder.git//modules/utilities/gcs-bucket?ref=COMMIT_HASH"
   environment             = var.environment
   workspace_owner_groups  = data.coder_workspace_owner.me.groups
-  required_group          = "PHI_ACCESS"
+  required_groups         = ["PHI_ACCESS"]
   bucket_name             = "phi-secure-bucket"
   mount_path              = "/phidata"
   mount_options           = "implicit-dirs"
@@ -109,7 +109,7 @@ module "research_bucket" {
   source                  = "git::https://github.com/abridgeai/coder.git//modules/utilities/gcs-bucket?ref=COMMIT_HASH"
   environment             = var.environment
   workspace_owner_groups  = data.coder_workspace_owner.me.groups
-  required_group          = "RESEARCH_TEAM"
+  required_groups         = ["RESEARCH_TEAM"]
   bucket_name             = "research-data-bucket"
   mount_path              = "/research"
   mount_options           = "implicit-dirs,file-mode=644,dir-mode=755"
@@ -127,7 +127,7 @@ module "research_bucket" {
 | `environment` | string | Current environment (e.g., production, staging) | Required |
 | `supported_environments` | list(string) | List of environments where this bucket can be mounted | `["production"]` |
 | `workspace_owner_groups` | list(string) | List of groups the workspace owner belongs to | Required |
-| `required_group` | string | Group name required for bucket access | Required |
+| `required_groups` | list(string) | Group names granting bucket access; any one is sufficient | Required |
 | `bucket_name` | string | GCS bucket name to mount | Required |
 | `mount_path` | string | Path where the bucket should be mounted | `/data` |
 | `mount_options` | string | GCSFuse mount options | `implicit-dirs` |
@@ -173,7 +173,7 @@ For more options, see [GCSFuse documentation](https://cloud.google.com/kubernete
 
 ## Security Considerations
 
-- **Access Control**: The module only displays the mount option to users in the specified group
+- **Access Control**: The module only displays the mount option to users in one of the specified groups
 - **Environment Restriction**: Can be restricted to specific environments (e.g., production only)
 - **IAM Permissions**: Ensure the Kubernetes service account has minimal required permissions
 - **Audit Logging**: Enable GCS audit logging for compliance requirements

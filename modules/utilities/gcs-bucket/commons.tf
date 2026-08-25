@@ -11,7 +11,7 @@ terraform {
 data "coder_parameter" "gcs_bucket_access" {
   count = (
     contains(var.supported_environments, var.environment) &&
-    contains(var.workspace_owner_groups, var.required_group)
+    length(setintersection(var.workspace_owner_groups, var.required_groups)) > 0
   ) ? 1 : 0
 
   name         = var.parameter_name

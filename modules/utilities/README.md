@@ -40,7 +40,7 @@ module "gcs_bucket" {
   source                  = "git::ref//modules/utilities/gcs-bucket"
   environment             = var.environment
   workspace_owner_groups  = data.coder_workspace_owner.me.groups
-  required_group          = "DATA_ACCESS"
+  required_groups         = ["DATA_ACCESS"]
   bucket_name             = "my-data-bucket"
   mount_path              = "/data"
   mount_options           = "implicit-dirs"

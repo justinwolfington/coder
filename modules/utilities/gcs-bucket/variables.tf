@@ -14,9 +14,9 @@ variable "workspace_owner_groups" {
   description = "List of groups the workspace owner belongs to"
 }
 
-variable "required_group" {
-  type        = string
-  description = "Group name required for bucket access"
+variable "required_groups" {
+  type        = list(string)
+  description = "Group names granting bucket access; membership in any one is sufficient"
 }
 
 variable "bucket_name" {
