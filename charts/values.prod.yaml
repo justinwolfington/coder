@@ -103,22 +103,17 @@ coder:
             name: coder-okta-oidc-app
             key: CODER_OIDC_CLIENT_SECRET
 
-      # Okta group sync. abridge.okta.com uses the org authorization server, so
-      # the groups claim lives on each Coder OIDC app's Sign On tab (OpenID
-      # Connect ID Token -> Groups claim: filter `groups`, starts with
-      # `coder-`). The org server can only put groups in the ID token, which is
-      # what Coder reads. Membership refreshes on login, and once sync is on the
-      # Okta claim is authoritative: manual group edits in Coder are
-      # overwritten the next time the user signs in.
       - name: CODER_OIDC_SCOPES
         value: openid,profile,email,groups
 
       - name: CODER_OIDC_GROUP_FIELD
         value: groups
 
-      # Ignore every Okta group that isn't meant for Coder.
       - name: CODER_OIDC_GROUP_REGEX_FILTER
         value: "^coder-.*$"
+
+      - name: CODER_OIDC_GROUP_AUTO_CREATE
+        value: "true"
 
       # Coder by default writes audit logs to /dev/stderr
       - name: CODER_LOGGING_HUMAN
