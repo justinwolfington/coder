@@ -43,7 +43,7 @@ func TestServerDBCrypt(t *testing.T) {
 
 	// Populate the database with some unencrypted data.
 	t.Log("Generating unencrypted data")
-	users := genData(t, db)
+	users := genData(t, db, sqlDB)
 
 	// Setup an initial cipher A
 	keyA := testutil.MustRandString(t, 32)
@@ -56,7 +56,7 @@ func TestServerDBCrypt(t *testing.T) {
 
 	// Populate the database with some encrypted data using cipher A.
 	t.Log("Generating data encrypted with cipher A")
-	newUsers := genData(t, cryptdb)
+	newUsers := genData(t, cryptdb, sqlDB)
 
 	// Validate that newly created users were encrypted with cipher A
 	for _, usr := range newUsers {
@@ -205,7 +205,7 @@ func TestServerDBCrypt(t *testing.T) {
 	}
 }
 
-func genData(t *testing.T, db database.Store) []database.User {
+func genData(t *testing.T, db database.Store, sqlDB *sql.DB) []database.User {
 	t.Helper()
 	var users []database.User
 	// Make some users
@@ -213,12 +213,17 @@ func genData(t *testing.T, db database.Store) []database.User {
 		for _, loginType := range database.AllLoginTypeValues() {
 			for _, deleted := range []bool{false, true} {
 				randName := testutil.MustRandString(t, 32)
+				// Users in the deleted lane are created live, seeded, and
+				// soft-deleted below with the cleanup trigger suppressed:
+				// the guard triggers (migration 000587) reject inserting
+				// child rows for already-deleted users, and the point of
+				// the deleted lane is encrypting the orphaned rows that
+				// predate them.
 				usr := dbgen.User(t, db, database.User{
 					Username:  randName,
 					Email:     randName + "@notcoder.com",
 					LoginType: loginType,
 					Status:    status,
-					Deleted:   deleted,
 				})
 				_ = dbgen.ExternalAuthLink(t, db, database.ExternalAuthLink{
 					UserID:            usr.ID,
@@ -241,24 +246,22 @@ func genData(t *testing.T, db database.Store) []database.User {
 					PrivateKey: "private-" + usr.ID.String(),
 					PublicKey:  "public-" + usr.ID.String(),
 				})
-				// Deleted users cannot have user_links, user_secrets, or
-				// user AI provider keys: the soft-delete guard triggers
-				// (migration 000587) reject inserts for deleted users.
-				// Orphaned-row rotation coverage lives in
-				// enterprise/dbcrypt/cliutil_test.go, which constructs the
-				// legacy state with the cleanup trigger disabled.
-				if !deleted {
-					now := time.Now()
-					_, err := db.UpsertUserAIProviderKey(context.Background(), database.UpsertUserAIProviderKeyParams{
-						ID:           uuid.New(),
-						UserID:       usr.ID,
-						AIProviderID: provider.ID,
-						APIKey:       "user-ai-provider-key-" + usr.ID.String(),
-						CreatedAt:    now,
-						UpdatedAt:    now,
-					})
-					require.NoError(t, err)
+				// Seeded for every user; the deleted lane keeps this row as
+				// an orphan via the trigger-suppressed soft-delete below,
+				// preserving deleted-user encryption coverage.
+				now := time.Now()
+				_, err := db.UpsertUserAIProviderKey(context.Background(), database.UpsertUserAIProviderKeyParams{
+					ID:           uuid.New(),
+					UserID:       usr.ID,
+					AIProviderID: provider.ID,
+					APIKey:       "user-ai-provider-key-" + usr.ID.String(),
+					CreatedAt:    now,
+					UpdatedAt:    now,
+				})
+				require.NoError(t, err)
 
+				// Deleted users cannot have user_links or user_secrets.
+				if !deleted {
 					// Fun fact: our schema allows _all_ login types to have
 					// a user_link. Even though I'm not sure how it could occur
 					// in practice, making sure to test all combinations here.
@@ -277,11 +280,42 @@ func genData(t *testing.T, db database.Store) []database.User {
 						FilePath: "",
 					})
 				}
+				if deleted {
+					softDeleteUserKeepingRows(t, sqlDB, usr.ID)
+					usr.Deleted = true
+				}
 				users = append(users, usr)
 			}
 		}
 	}
 	return users
+}
+
+// softDeleteUserKeepingRows soft-deletes the user while suppressing the
+// delete_deleted_user_resources cleanup, reconstructing the orphaned child
+// rows that predate migration 000587 (whose guards reject inserting child
+// rows for already-deleted users). One transaction: transactional DDL keeps
+// the disabled trigger invisible to concurrent sessions and rolls the
+// disable back on failure.
+func softDeleteUserKeepingRows(t *testing.T, sqlDB *sql.DB, userID uuid.UUID) {
+	t.Helper()
+	ctx := context.Background()
+	tx, err := sqlDB.BeginTx(ctx, nil)
+	require.NoError(t, err)
+	committed := false
+	defer func() {
+		if !committed {
+			_ = tx.Rollback()
+		}
+	}()
+	_, err = tx.ExecContext(ctx, `ALTER TABLE users DISABLE TRIGGER trigger_update_users`)
+	require.NoError(t, err)
+	_, err = tx.ExecContext(ctx, `UPDATE users SET deleted = true WHERE id = $1`, userID)
+	require.NoError(t, err)
+	_, err = tx.ExecContext(ctx, `ALTER TABLE users ENABLE TRIGGER trigger_update_users`)
+	require.NoError(t, err)
+	require.NoError(t, tx.Commit())
+	committed = true
 }
 
 func requireEncryptedEquals(t *testing.T, c dbcrypt.Cipher, expected, actual string) {
@@ -357,19 +391,11 @@ func requireEncryptedWithCipher(ctx context.Context, t *testing.T, db database.S
 	requireEncryptedEquals(t, c, "provider-key-"+userID.String(), providerKeys[0].APIKey)
 	require.Equal(t, c.HexDigest(), providerKeys[0].ApiKeyKeyID.String)
 
-	usr, err := db.GetUserByID(ctx, userID)
-	require.NoError(t, err, "failed to get user %s", userID)
 	userAIProviderKeys, err := db.GetUserAIProviderKeysByUserID(ctx, userID)
 	require.NoError(t, err, "failed to get user ai provider keys for user %s", userID)
-	if usr.Deleted {
-		// genData seeds no user AI provider keys for deleted users because
-		// the soft-delete guard trigger (migration 000587) rejects them.
-		require.Empty(t, userAIProviderKeys)
-	} else {
-		require.Len(t, userAIProviderKeys, 1)
-		requireEncryptedEquals(t, c, "user-ai-provider-key-"+userID.String(), userAIProviderKeys[0].APIKey)
-		require.Equal(t, c.HexDigest(), userAIProviderKeys[0].ApiKeyKeyID.String)
-	}
+	require.Len(t, userAIProviderKeys, 1)
+	requireEncryptedEquals(t, c, "user-ai-provider-key-"+userID.String(), userAIProviderKeys[0].APIKey)
+	require.Equal(t, c.HexDigest(), userAIProviderKeys[0].ApiKeyKeyID.String)
 }
 
 // TestServerAIProviderKeysEncryptedWithDBCrypt starts a real enterprise server

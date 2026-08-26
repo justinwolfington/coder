@@ -1760,6 +1760,22 @@ func (api *API) oauthLogin(r *http.Request, params *oauthLoginParams) ([]*http.C
 		user = params.User
 		link = params.Link
 
+		if user.ID != uuid.Nil {
+			// This transaction updates user_links and inserts
+			// organization_members (and group_members) for the user, whose
+			// guard trigger locks the users row. Take that lock first so
+			// the lock order (users, then child rows) matches
+			// delete_deleted_user_resources and a login concurrent with the
+			// user's soft-delete deadlocks neither transaction. New signups
+			// skip this: their users row is created inside this transaction
+			// and is invisible to a concurrent soft-delete.
+			// nolint:gocritic // The user is not authenticated yet; the lock runs as the system.
+			_, err = tx.AcquireUserSoftDeleteGuardLock(dbauthz.AsSystemRestricted(ctx), user.ID)
+			if err != nil {
+				return xerrors.Errorf("acquire user soft-delete guard lock: %w", err)
+			}
+		}
+
 		// If you do a convert to OIDC and your email does not match, we need to
 		// catch this and not make a new account.
 		if isMergeStateString(params.State.StateString) {

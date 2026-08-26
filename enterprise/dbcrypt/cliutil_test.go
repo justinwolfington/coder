@@ -123,14 +123,25 @@ func upsertUserAIProviderKey(ctx context.Context, t *testing.T, store database.S
 // must still handle such legacy rows.
 func softDeleteUserKeepingRows(ctx context.Context, t *testing.T, sqlDB *sql.DB, userID uuid.UUID) {
 	t.Helper()
-	_, err := sqlDB.ExecContext(ctx, `ALTER TABLE users DISABLE TRIGGER trigger_update_users`)
+	// One transaction: transactional DDL keeps the disabled trigger
+	// invisible to concurrent sessions (which may share this database under
+	// CODER_PG_CONNECTION_URL) and rolls the disable back on failure.
+	tx, err := sqlDB.BeginTx(ctx, nil)
 	require.NoError(t, err)
+	committed := false
 	defer func() {
-		_, err := sqlDB.ExecContext(ctx, `ALTER TABLE users ENABLE TRIGGER trigger_update_users`)
-		require.NoError(t, err)
+		if !committed {
+			_ = tx.Rollback()
+		}
 	}()
-	_, err = sqlDB.ExecContext(ctx, `UPDATE users SET deleted = true WHERE id = $1`, userID)
+	_, err = tx.ExecContext(ctx, `ALTER TABLE users DISABLE TRIGGER trigger_update_users`)
 	require.NoError(t, err)
+	_, err = tx.ExecContext(ctx, `UPDATE users SET deleted = true WHERE id = $1`, userID)
+	require.NoError(t, err)
+	_, err = tx.ExecContext(ctx, `ALTER TABLE users ENABLE TRIGGER trigger_update_users`)
+	require.NoError(t, err)
+	require.NoError(t, tx.Commit())
+	committed = true
 }
 
 // decryptRawString decodes and decrypts a raw (base64) ciphertext value read

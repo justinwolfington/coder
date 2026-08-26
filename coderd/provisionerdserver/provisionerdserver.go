@@ -3297,6 +3297,13 @@ func WorkspaceSessionTokenName(ownerID, workspaceID uuid.UUID) string {
 }
 
 func (s *server) regenerateSessionToken(ctx context.Context, user database.User, workspace database.Workspace) (string, error) {
+	// The transaction below locks workspace.OwnerID while the deleted and
+	// inserted api_keys rows belong to user.ID; a divergence would take the
+	// soft-delete guard lock on the wrong users row and silently disable
+	// the deadlock fix.
+	if user.ID != workspace.OwnerID {
+		return "", xerrors.Errorf("user %s is not the owner of workspace %s (owner %s)", user.ID, workspace.ID, workspace.OwnerID)
+	}
 	// NOTE(Cian): Once a workspace is claimed, there's no reason for the session token to be valid any longer.
 	// Not generating any session token at all for a system user may unintentionally break existing templates,
 	// which we want to avoid. If there's no session token for the workspace belonging to the prebuilds user,
@@ -3317,7 +3324,17 @@ func (s *server) regenerateSessionToken(ctx context.Context, user database.User,
 	}
 
 	err = s.Database.InTx(func(tx database.Store) error {
-		err := deleteSessionToken(ctx, tx, workspace)
+		// Lock the users row before deleting the previous key so this
+		// transaction's lock order (users, then api_keys) matches the
+		// soft-delete cleanup's and cannot deadlock with a concurrent user
+		// deletion; the InsertAPIKey guard trigger takes the same lock.
+		//nolint:gocritic // Session token rotation runs as the provisioner daemon, not the workspace owner.
+		_, err := tx.AcquireUserSoftDeleteGuardLock(dbauthz.AsSystemRestricted(ctx), workspace.OwnerID)
+		if err != nil {
+			return xerrors.Errorf("acquire user soft-delete guard lock: %w", err)
+		}
+
+		err = deleteSessionToken(ctx, tx, workspace)
 		if err != nil {
 			return xerrors.Errorf("delete session token: %w", err)
 		}

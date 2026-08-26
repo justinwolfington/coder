@@ -1806,13 +1806,16 @@ func (q *querier) AcquireStaleChatDiffStatuses(ctx context.Context, limitVal int
 	return q.db.AcquireStaleChatDiffStatuses(ctx, limitVal)
 }
 
-func (q *querier) AcquireUserSoftDeleteGuardLock(ctx context.Context, userID uuid.UUID) error {
+func (q *querier) AcquireUserSoftDeleteGuardLock(ctx context.Context, userID uuid.UUID) (uuid.UUID, error) {
 	user, err := q.db.GetUserByID(ctx, userID)
 	if err != nil {
-		return err
+		return uuid.Nil, err
 	}
-	if err := q.authorizeContext(ctx, policy.ActionRead, user); err != nil {
-		return err
+	// The lock blocks the user's soft-delete and every guarded child insert
+	// for them until the transaction ends, so it authorizes as a write on
+	// the user, not a read.
+	if err := q.authorizeContext(ctx, policy.ActionUpdate, user); err != nil {
+		return uuid.Nil, err
 	}
 	return q.db.AcquireUserSoftDeleteGuardLock(ctx, userID)
 }

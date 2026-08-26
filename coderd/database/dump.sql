@@ -1068,12 +1068,17 @@ DECLARE
     total_bytes_limit constant bigint := 204800;   -- 200 KiB
     env_bytes_limit   constant bigint := 24576;    -- 24 KiB
 BEGIN
-    -- Serialize cap checks per user so concurrent inserts cannot all
-    -- observe the same pre-insert aggregates and exceed the cap. INSERT
-    -- only: locking on UPDATE deadlocks against the soft-delete cleanup.
-    IF (TG_OP = 'INSERT') THEN
-        PERFORM 1 FROM users WHERE id = NEW.user_id FOR UPDATE;
-    END IF;
+    -- Serialize cap checks per user so concurrent inserts or updates cannot
+    -- all observe the same pre-statement aggregates and exceed the caps.
+    -- The advisory lock avoids the users row entirely:
+    -- delete_deleted_user_resources takes no advisory locks, so no lock
+    -- cycle with a concurrent soft-delete is possible, and inserts into
+    -- other tables referencing users are unaffected. This trigger must
+    -- fire after the soft-delete guard (hence the zz_ trigger name): a
+    -- transaction that held this advisory lock while waiting on the users
+    -- lock could cycle with an UPDATE-path advisory waiter and the
+    -- cleanup.
+    PERFORM pg_advisory_xact_lock(hashtextextended('user_secrets_cap:' || NEW.user_id::text, 0));
 
     -- Sum existing rows excluding the row being updated (so UPDATE statements
     -- don't double-count NEW). On INSERT, no row matches NEW.id, so
@@ -1124,11 +1129,10 @@ DECLARE
     skill_limit constant int := 100;
 BEGIN
     -- Serialize skill-cap checks per user so concurrent inserts cannot all
-    -- observe the same pre-insert count and exceed the hard limit.
-    PERFORM 1
-    FROM users
-    WHERE id = NEW.user_id
-    FOR UPDATE;
+    -- observe the same pre-insert count and exceed the hard limit. See
+    -- enforce_user_secrets_per_user_limits for why this is an advisory
+    -- lock and why the trigger name carries the zz_ prefix.
+    PERFORM pg_advisory_xact_lock(hashtextextended('user_skills_cap:' || NEW.user_id::text, 0));
 
     SELECT count(*) INTO skill_count
     FROM user_skills
@@ -1139,6 +1143,59 @@ BEGIN
                   CONSTRAINT = 'user_skills_per_user_limit';
     END IF;
     RETURN NEW;
+END;
+$$;
+
+CREATE FUNCTION fail_if_user_deleted() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+	user_deleted boolean;
+BEGIN
+	-- Serialize child-table inserts against a concurrent user soft-delete:
+	-- an unlocked insert can read deleted = false, lose the race to the
+	-- soft-delete UPDATE and its cleanup, then commit a resurrected row.
+	-- FOR NO KEY UPDATE conflicts with the soft-delete UPDATE but not with
+	-- the FOR KEY SHARE locks that foreign-key validation takes on the
+	-- users row for other child tables.
+	--
+	-- The lock is INSERT-only: this trigger also fires BEFORE UPDATE on
+	-- user_links, user_secrets, and user_skills, where taking the users
+	-- lock deadlocks against delete_deleted_user_resources (a multi-row
+	-- UPDATE or ON CONFLICT path can hold one child tuple and wait on
+	-- users while the cleanup holds users and waits on a child tuple), and
+	-- would serialize routine child updates on the hot users row. The
+	-- UPDATE path keeps the unlocked read: an existing row is cleaned up
+	-- by the soft-delete either way.
+	--
+	-- The INSERT-path lock imposes an ordering contract on writers: a
+	-- transaction that already holds any lock on a guarded child row (from
+	-- a DELETE or UPDATE) and later inserts a guarded row for the same
+	-- user must call AcquireUserSoftDeleteGuardLock first, so its lock
+	-- order (users, then child rows) matches delete_deleted_user_resources.
+	-- coderd/database/user_soft_delete_guards_test.go pins each known such
+	-- path with a deterministic deadlock-regression test.
+	--
+	-- Safe under any isolation level: READ COMMITTED re-reads the committed
+	-- users.deleted after the lock wait, and a REPEATABLE READ or
+	-- SERIALIZABLE waiter fails with a serialization error (40001) because
+	-- the soft-delete updated the locked row.
+	IF (TG_OP = 'INSERT') THEN
+		SELECT deleted INTO user_deleted
+		FROM users
+		WHERE id = NEW.user_id
+		FOR NO KEY UPDATE;
+	ELSE
+		SELECT deleted INTO user_deleted
+		FROM users
+		WHERE id = NEW.user_id;
+	END IF;
+	IF (user_deleted) THEN
+		RAISE EXCEPTION 'Cannot create % for deleted user', TG_ARGV[0]
+			USING ERRCODE = 'check_violation',
+				  CONSTRAINT = TG_ARGV[1];
+	END IF;
+	RETURN NEW;
 END;
 $$;
 
@@ -1166,46 +1223,6 @@ BEGIN
 		RAISE EXCEPTION 'cannot enqueue message: notification is not enabled';
 	END IF;
 
-	RETURN NEW;
-END;
-$$;
-
-CREATE FUNCTION insert_apikey_fail_if_user_deleted() RETURNS trigger
-    LANGUAGE plpgsql
-    AS $$
-DECLARE
-	user_deleted boolean;
-BEGIN
-	IF (NEW.user_id IS NOT NULL) THEN
-		SELECT deleted INTO user_deleted
-		FROM users
-		WHERE id = NEW.user_id
-		FOR NO KEY UPDATE;
-		IF (user_deleted) THEN
-			RAISE EXCEPTION 'Cannot create API key for deleted user'
-				USING ERRCODE = 'check_violation',
-					  CONSTRAINT = 'api_key_user_deleted';
-		END IF;
-	END IF;
-	RETURN NEW;
-END;
-$$;
-
-CREATE FUNCTION insert_organization_member_fail_if_user_deleted() RETURNS trigger
-    LANGUAGE plpgsql
-    AS $$
-DECLARE
-	user_deleted boolean;
-BEGIN
-	SELECT deleted INTO user_deleted
-	FROM users
-	WHERE id = NEW.user_id
-	FOR NO KEY UPDATE;
-	IF (user_deleted) THEN
-		RAISE EXCEPTION 'Cannot create organization_member for deleted user'
-			USING ERRCODE = 'check_violation',
-				  CONSTRAINT = 'organization_member_user_deleted';
-	END IF;
 	RETURN NEW;
 END;
 $$;
@@ -1250,104 +1267,6 @@ BEGIN
         NOW(),
         NOW()
     );
-    RETURN NEW;
-END;
-$$;
-
-CREATE FUNCTION insert_user_ai_provider_key_fail_if_user_deleted() RETURNS trigger
-    LANGUAGE plpgsql
-    AS $$
-DECLARE
-	user_deleted boolean;
-BEGIN
-	SELECT deleted INTO user_deleted
-	FROM users
-	WHERE id = NEW.user_id
-	FOR NO KEY UPDATE;
-	IF (user_deleted) THEN
-		RAISE EXCEPTION 'Cannot create user_ai_provider_key for deleted user'
-			USING ERRCODE = 'check_violation',
-				  CONSTRAINT = 'user_ai_provider_key_user_deleted';
-	END IF;
-	RETURN NEW;
-END;
-$$;
-
-CREATE FUNCTION insert_user_links_fail_if_user_deleted() RETURNS trigger
-    LANGUAGE plpgsql
-    AS $$
-DECLARE
-	user_deleted boolean;
-BEGIN
-	IF (NEW.user_id IS NOT NULL) THEN
-		IF (TG_OP = 'INSERT') THEN
-			SELECT deleted INTO user_deleted
-			FROM users
-			WHERE id = NEW.user_id
-			FOR NO KEY UPDATE;
-		ELSE
-			SELECT deleted INTO user_deleted
-			FROM users
-			WHERE id = NEW.user_id;
-		END IF;
-		IF (user_deleted) THEN
-			RAISE EXCEPTION 'Cannot create user_link for deleted user'
-				USING ERRCODE = 'check_violation',
-					  CONSTRAINT = 'user_link_user_deleted';
-		END IF;
-	END IF;
-	RETURN NEW;
-END;
-$$;
-
-CREATE FUNCTION insert_user_secret_fail_if_user_deleted() RETURNS trigger
-    LANGUAGE plpgsql
-    AS $$
-DECLARE
-	user_deleted boolean;
-BEGIN
-	IF (NEW.user_id IS NOT NULL) THEN
-		IF (TG_OP = 'INSERT') THEN
-			SELECT deleted INTO user_deleted
-			FROM users
-			WHERE id = NEW.user_id
-			FOR NO KEY UPDATE;
-		ELSE
-			SELECT deleted INTO user_deleted
-			FROM users
-			WHERE id = NEW.user_id;
-		END IF;
-		IF (user_deleted) THEN
-			RAISE EXCEPTION 'Cannot create user_secret for deleted user'
-				USING ERRCODE = 'check_violation',
-					  CONSTRAINT = 'user_secret_user_deleted';
-		END IF;
-	END IF;
-	RETURN NEW;
-END;
-$$;
-
-CREATE FUNCTION insert_user_skill_fail_if_user_deleted() RETURNS trigger
-    LANGUAGE plpgsql
-    AS $$
-DECLARE
-    user_deleted boolean;
-BEGIN
-    IF (TG_OP = 'INSERT') THEN
-        SELECT deleted INTO user_deleted
-        FROM users
-        WHERE id = NEW.user_id
-        FOR NO KEY UPDATE;
-    ELSE
-        SELECT deleted INTO user_deleted
-        FROM users
-        WHERE id = NEW.user_id;
-    END IF;
-    IF (user_deleted) THEN
-        RAISE EXCEPTION 'Cannot create user_skill for deleted user'
-            USING ERRCODE = 'check_violation',
-                  CONSTRAINT = 'user_skill_user_deleted';
-    END IF;
     RETURN NEW;
 END;
 $$;
@@ -5294,13 +5213,13 @@ CREATE TRIGGER trigger_delete_user_ai_budget_overrides_on_org_member_delete BEFO
 
 CREATE TRIGGER trigger_enforce_user_ai_budget_override_membership BEFORE INSERT OR UPDATE ON user_ai_budget_overrides FOR EACH ROW EXECUTE FUNCTION enforce_user_ai_budget_override_membership();
 
-CREATE TRIGGER trigger_insert_apikeys BEFORE INSERT ON api_keys FOR EACH ROW EXECUTE FUNCTION insert_apikey_fail_if_user_deleted();
+CREATE TRIGGER trigger_insert_apikeys BEFORE INSERT ON api_keys FOR EACH ROW EXECUTE FUNCTION fail_if_user_deleted('API key', 'api_key_user_deleted');
 
-CREATE TRIGGER trigger_insert_organization_members BEFORE INSERT ON organization_members FOR EACH ROW EXECUTE FUNCTION insert_organization_member_fail_if_user_deleted();
+CREATE TRIGGER trigger_insert_organization_members BEFORE INSERT ON organization_members FOR EACH ROW EXECUTE FUNCTION fail_if_user_deleted('organization_member', 'organization_member_user_deleted');
 
 CREATE TRIGGER trigger_insert_organization_system_roles AFTER INSERT ON organizations FOR EACH ROW EXECUTE FUNCTION insert_organization_system_roles();
 
-CREATE TRIGGER trigger_insert_user_ai_provider_keys BEFORE INSERT ON user_ai_provider_keys FOR EACH ROW EXECUTE FUNCTION insert_user_ai_provider_key_fail_if_user_deleted();
+CREATE TRIGGER trigger_insert_user_ai_provider_keys BEFORE INSERT ON user_ai_provider_keys FOR EACH ROW EXECUTE FUNCTION fail_if_user_deleted('user_ai_provider_key', 'user_ai_provider_key_user_deleted');
 
 CREATE TRIGGER trigger_nullify_next_start_at_on_workspace_autostart_modificati AFTER UPDATE ON workspaces FOR EACH ROW EXECUTE FUNCTION nullify_next_start_at_on_workspace_autostart_modification();
 
@@ -5316,15 +5235,15 @@ CREATE TRIGGER trigger_update_chat_history_after_message_update AFTER UPDATE ON 
 
 CREATE TRIGGER trigger_update_users AFTER INSERT OR UPDATE ON users FOR EACH ROW WHEN ((new.deleted = true)) EXECUTE FUNCTION delete_deleted_user_resources();
 
-CREATE TRIGGER trigger_upsert_user_links BEFORE INSERT OR UPDATE ON user_links FOR EACH ROW EXECUTE FUNCTION insert_user_links_fail_if_user_deleted();
+CREATE TRIGGER trigger_upsert_user_links BEFORE INSERT OR UPDATE ON user_links FOR EACH ROW EXECUTE FUNCTION fail_if_user_deleted('user_link', 'user_link_user_deleted');
 
-CREATE TRIGGER trigger_upsert_user_secrets BEFORE INSERT OR UPDATE ON user_secrets FOR EACH ROW EXECUTE FUNCTION insert_user_secret_fail_if_user_deleted();
+CREATE TRIGGER trigger_upsert_user_secrets BEFORE INSERT OR UPDATE ON user_secrets FOR EACH ROW EXECUTE FUNCTION fail_if_user_deleted('user_secret', 'user_secret_user_deleted');
 
-CREATE TRIGGER trigger_upsert_user_skills BEFORE INSERT OR UPDATE ON user_skills FOR EACH ROW EXECUTE FUNCTION insert_user_skill_fail_if_user_deleted();
+CREATE TRIGGER trigger_upsert_user_skills BEFORE INSERT OR UPDATE ON user_skills FOR EACH ROW EXECUTE FUNCTION fail_if_user_deleted('user_skill', 'user_skill_user_deleted');
 
-CREATE TRIGGER trigger_user_secrets_per_user_limits BEFORE INSERT OR UPDATE ON user_secrets FOR EACH ROW EXECUTE FUNCTION enforce_user_secrets_per_user_limits();
+CREATE TRIGGER trigger_zz_user_secrets_per_user_limits BEFORE INSERT OR UPDATE ON user_secrets FOR EACH ROW EXECUTE FUNCTION enforce_user_secrets_per_user_limits();
 
-CREATE TRIGGER trigger_user_skills_per_user_limit BEFORE INSERT ON user_skills FOR EACH ROW EXECUTE FUNCTION enforce_user_skills_per_user_limit();
+CREATE TRIGGER trigger_zz_user_skills_per_user_limit BEFORE INSERT ON user_skills FOR EACH ROW EXECUTE FUNCTION enforce_user_skills_per_user_limit();
 
 CREATE TRIGGER update_notification_message_dedupe_hash BEFORE INSERT OR UPDATE ON notification_messages FOR EACH ROW EXECUTE FUNCTION compute_notification_message_dedupe_hash();
 

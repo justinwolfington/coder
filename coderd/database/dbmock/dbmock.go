@@ -119,11 +119,12 @@ func (mr *MockStoreMockRecorder) AcquireStaleChatDiffStatuses(ctx, limitVal any)
 }
 
 // AcquireUserSoftDeleteGuardLock mocks base method.
-func (m *MockStore) AcquireUserSoftDeleteGuardLock(ctx context.Context, userID uuid.UUID) error {
+func (m *MockStore) AcquireUserSoftDeleteGuardLock(ctx context.Context, userID uuid.UUID) (uuid.UUID, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "AcquireUserSoftDeleteGuardLock", ctx, userID)
-	ret0, _ := ret[0].(error)
-	return ret0
+	ret0, _ := ret[0].(uuid.UUID)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // AcquireUserSoftDeleteGuardLock indicates an expected call of AcquireUserSoftDeleteGuardLock.

@@ -22,6 +22,12 @@ import (
 	"github.com/coder/coder/v2/codersdk"
 )
 
+// organizationMemberUserDeletedConstraint is raised by the
+// fail_if_user_deleted guard trigger on organization_members (migration
+// 000587). Trigger-raised constraint names never appear in the generated
+// check_constraint.go, so it is declared beside its handler.
+const organizationMemberUserDeletedConstraint database.CheckConstraint = "organization_member_user_deleted"
+
 // @Summary Add organization member
 // @ID add-organization-member
 // @Security CoderSessionToken
@@ -67,6 +73,13 @@ func (api *API) postOrganizationMember(rw http.ResponseWriter, r *http.Request) 
 		httpapi.Write(ctx, rw, http.StatusBadRequest, codersdk.Response{
 			Message: "User is already an organization member",
 			Detail:  fmt.Sprintf("%s is already a member of %s", user.Username, organization.DisplayName),
+		})
+		return
+	}
+	if database.IsCheckViolation(err, organizationMemberUserDeletedConstraint) {
+		httpapi.Write(ctx, rw, http.StatusBadRequest, codersdk.Response{
+			Message: "Cannot add a deleted user to an organization",
+			Detail:  fmt.Sprintf("%s was deleted while the membership was being created.", user.Username),
 		})
 		return
 	}

@@ -3578,6 +3578,12 @@ func TestMigration000587LockUserSoftDeleteGuards(t *testing.T) {
 		providerID,
 	)
 	require.NoError(t, err)
+	groupID := uuid.New()
+	_, err = sqlDB.ExecContext(ctx,
+		`INSERT INTO groups (id, name, organization_id) VALUES ($1, 'guards-group', $2)`,
+		groupID, orgID,
+	)
+	require.NoError(t, err)
 
 	// One row per guarded table for both users.
 	for _, id := range []uuid.UUID{liveUser, doomedUser} {
@@ -3616,6 +3622,19 @@ func TestMigration000587LockUserSoftDeleteGuards(t *testing.T) {
 			id, orgID, now,
 		)
 		require.NoError(t, err)
+		// Transitively cleaned tables: wiped via the organization_members
+		// BEFORE DELETE triggers plus a direct backfill in the migration.
+		_, err = sqlDB.ExecContext(ctx,
+			`INSERT INTO group_members (user_id, group_id) VALUES ($1, $2)`,
+			id, groupID,
+		)
+		require.NoError(t, err)
+		_, err = sqlDB.ExecContext(ctx,
+			`INSERT INTO user_ai_budget_overrides (user_id, group_id, spend_limit_micros)
+			VALUES ($1, $2, 1000000)`,
+			id, groupID,
+		)
+		require.NoError(t, err)
 	}
 
 	// Reproduce the race outcome the migration cleans up: a user that is
@@ -3636,7 +3655,7 @@ func TestMigration000587LockUserSoftDeleteGuards(t *testing.T) {
 		require.NoError(t, err)
 		return count
 	}
-	guardedTables := []string{"api_keys", "user_links", "user_secrets", "user_skills", "user_ai_provider_keys", "organization_members"}
+	guardedTables := []string{"api_keys", "user_links", "user_secrets", "user_skills", "user_ai_provider_keys", "organization_members", "group_members", "user_ai_budget_overrides"}
 	for _, table := range guardedTables {
 		require.Equal(t, 1, countRows(table, doomedUser), "pre-migration: %s row for the doomed user must exist", table)
 	}

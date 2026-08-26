@@ -578,6 +578,10 @@ WHERE
 -- name: GetAuthorizationUserRoles :one
 -- This function returns roles for authorization purposes. Implied member roles
 -- are included.
+-- Deleted users have no roles: this is the read-side half of the soft-delete
+-- guards, making any child row that survived or was resurrected past
+-- delete_deleted_user_resources (an orphaned api_keys row, a restored
+-- backup, a manual insert) inert as a credential regardless of its source.
 -- Must stay semantically in sync with GetActiveUsersAuthorizationRoles
 -- (implied member roles, org default roles, groups);
 -- TestGetActiveUsersAuthorizationRolesParity enforces this.
@@ -638,7 +642,8 @@ SELECT
 FROM
 	users
 WHERE
-	users.id = @user_id;
+	users.id = @user_id
+	AND users.deleted = false;
 
 -- name: GetActiveUsersAuthorizationRoles :many
 -- Returns the authorization roles (site and org-scoped, including implied
@@ -743,14 +748,19 @@ SELECT *
 FROM users
 WHERE id = @id::uuid;
 
--- Acquires the users-row lock that the *_fail_if_user_deleted guard triggers
--- take on child-table inserts. Transactions that delete a guarded child row
--- and later insert a replacement (for example the OAuth2 token exchange,
--- which replaces api_keys rows) must call this before the delete so their
--- lock order (users first, then the child row) matches
--- delete_deleted_user_resources and cannot deadlock with a concurrent user
--- soft-delete.
--- name: AcquireUserSoftDeleteGuardLock :exec
-SELECT 1 FROM users
+-- Acquires the users-row lock that the fail_if_user_deleted guard triggers
+-- take on child-table inserts. Any transaction that takes a lock on a
+-- guarded child row (via DELETE or UPDATE) and later inserts a guarded row
+-- for the same user (for example the OAuth2 token exchange, which replaces
+-- api_keys rows) must call this first so its lock order (users first, then
+-- child rows) matches delete_deleted_user_resources and cannot deadlock
+-- with a concurrent user soft-delete.
+-- Must run inside the transaction that performs the child writes: outside
+-- one, the lock is released at the implicit statement commit and protects
+-- nothing. Returns sql.ErrNoRows when the user does not exist, so a caller
+-- locking the wrong (or a stale) user id fails loudly instead of
+-- proceeding unserialized.
+-- name: AcquireUserSoftDeleteGuardLock :one
+SELECT id FROM users
 WHERE id = @user_id
 FOR NO KEY UPDATE;

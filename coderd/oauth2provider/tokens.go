@@ -408,7 +408,7 @@ func authorizationCodeGrant(ctx context.Context, db database.Store, app database
 		// transaction's lock order (users, then api_keys) matches the
 		// soft-delete cleanup's and cannot deadlock with a concurrent user
 		// deletion; the InsertAPIKey guard trigger takes the same lock.
-		err = tx.AcquireUserSoftDeleteGuardLock(ctx, dbCode.UserID)
+		_, err = tx.AcquireUserSoftDeleteGuardLock(ctx, dbCode.UserID)
 		if err != nil {
 			return xerrors.Errorf("acquire user soft-delete guard lock: %w", err)
 		}
@@ -555,7 +555,9 @@ func refreshTokenGrant(ctx context.Context, db database.Store, app database.OAut
 		// transaction's lock order (users, then api_keys) matches the
 		// soft-delete cleanup's and cannot deadlock with a concurrent user
 		// deletion; the InsertAPIKey guard trigger takes the same lock.
-		err = tx.AcquireUserSoftDeleteGuardLock(ctx, dbToken.UserID)
+		// prevKey.UserID matches the rows deleted and inserted below; every
+		// other statement in this block derives from prevKey.
+		_, err = tx.AcquireUserSoftDeleteGuardLock(ctx, prevKey.UserID)
 		if err != nil {
 			return xerrors.Errorf("acquire user soft-delete guard lock: %w", err)
 		}

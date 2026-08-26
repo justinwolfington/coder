@@ -1,9 +1,97 @@
--- Restore the unlocked guard function bodies verbatim and drop the newly
--- added guards. The backfill deletes are not restorable.
+-- Restore the original unlocked per-table guard functions and the
+-- users-row-locking cap triggers, and drop the newly added guards. The
+-- backfill deletes are not restorable.
 DROP TRIGGER IF EXISTS trigger_insert_user_ai_provider_keys ON user_ai_provider_keys;
-DROP FUNCTION IF EXISTS insert_user_ai_provider_key_fail_if_user_deleted();
 DROP TRIGGER IF EXISTS trigger_insert_organization_members ON organization_members;
-DROP FUNCTION IF EXISTS insert_organization_member_fail_if_user_deleted();
+DROP TRIGGER IF EXISTS trigger_insert_apikeys ON api_keys;
+DROP TRIGGER IF EXISTS trigger_upsert_user_links ON user_links;
+DROP TRIGGER IF EXISTS trigger_upsert_user_secrets ON user_secrets;
+DROP TRIGGER IF EXISTS trigger_upsert_user_skills ON user_skills;
+DROP FUNCTION IF EXISTS fail_if_user_deleted();
+
+CREATE FUNCTION insert_apikey_fail_if_user_deleted() RETURNS trigger
+	LANGUAGE plpgsql
+AS $$
+
+DECLARE
+BEGIN
+	IF (NEW.user_id IS NOT NULL) THEN
+		IF (SELECT deleted FROM users WHERE id = NEW.user_id LIMIT 1) THEN
+			RAISE EXCEPTION 'Cannot create API key for deleted user';
+		END IF;
+	END IF;
+	RETURN NEW;
+END;
+$$;
+
+CREATE FUNCTION insert_user_links_fail_if_user_deleted() RETURNS trigger
+	LANGUAGE plpgsql
+AS $$
+
+DECLARE
+BEGIN
+	IF (NEW.user_id IS NOT NULL) THEN
+		IF (SELECT deleted FROM users WHERE id = NEW.user_id LIMIT 1) THEN
+			RAISE EXCEPTION 'Cannot create user_link for deleted user';
+		END IF;
+	END IF;
+	RETURN NEW;
+END;
+$$;
+
+CREATE FUNCTION insert_user_secret_fail_if_user_deleted() RETURNS trigger
+	LANGUAGE plpgsql
+AS $$
+
+DECLARE
+BEGIN
+	IF (NEW.user_id IS NOT NULL) THEN
+		IF (SELECT deleted FROM users WHERE id = NEW.user_id LIMIT 1) THEN
+			RAISE EXCEPTION 'Cannot create user_secret for deleted user';
+		END IF;
+	END IF;
+	RETURN NEW;
+END;
+$$;
+
+CREATE FUNCTION insert_user_skill_fail_if_user_deleted() RETURNS trigger
+    LANGUAGE plpgsql
+AS $$
+
+BEGIN
+    PERFORM 1
+    FROM users
+    WHERE id = NEW.user_id
+      AND deleted = true
+    LIMIT 1;
+    IF FOUND THEN
+        RAISE EXCEPTION 'Cannot create user_skill for deleted user'
+            USING ERRCODE = 'check_violation',
+                  CONSTRAINT = 'user_skill_user_deleted';
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER trigger_insert_apikeys
+	BEFORE INSERT ON api_keys
+	FOR EACH ROW
+EXECUTE FUNCTION insert_apikey_fail_if_user_deleted();
+
+CREATE TRIGGER trigger_upsert_user_links
+	BEFORE INSERT OR UPDATE ON user_links
+	FOR EACH ROW
+EXECUTE FUNCTION insert_user_links_fail_if_user_deleted();
+
+CREATE TRIGGER trigger_upsert_user_secrets
+	BEFORE INSERT OR UPDATE ON user_secrets
+	FOR EACH ROW
+EXECUTE FUNCTION insert_user_secret_fail_if_user_deleted();
+
+CREATE TRIGGER trigger_upsert_user_skills
+	BEFORE INSERT OR UPDATE ON user_skills
+	FOR EACH ROW
+EXECUTE FUNCTION insert_user_skill_fail_if_user_deleted();
 
 CREATE OR REPLACE FUNCTION enforce_user_secrets_per_user_limits() RETURNS trigger
     LANGUAGE plpgsql
@@ -65,66 +153,41 @@ BEGIN
     RETURN NEW;
 END;
 $$;
-CREATE OR REPLACE FUNCTION insert_apikey_fail_if_user_deleted() RETURNS trigger
-	LANGUAGE plpgsql
-AS $$
 
-DECLARE
-BEGIN
-	IF (NEW.user_id IS NOT NULL) THEN
-		IF (SELECT deleted FROM users WHERE id = NEW.user_id LIMIT 1) THEN
-			RAISE EXCEPTION 'Cannot create API key for deleted user';
-		END IF;
-	END IF;
-	RETURN NEW;
-END;
-$$;
-
-CREATE OR REPLACE FUNCTION insert_user_links_fail_if_user_deleted() RETURNS trigger
-	LANGUAGE plpgsql
-AS $$
-
-DECLARE
-BEGIN
-	IF (NEW.user_id IS NOT NULL) THEN
-		IF (SELECT deleted FROM users WHERE id = NEW.user_id LIMIT 1) THEN
-			RAISE EXCEPTION 'Cannot create user_link for deleted user';
-		END IF;
-	END IF;
-	RETURN NEW;
-END;
-$$;
-
-CREATE OR REPLACE FUNCTION insert_user_secret_fail_if_user_deleted() RETURNS trigger
-	LANGUAGE plpgsql
-AS $$
-
-DECLARE
-BEGIN
-	IF (NEW.user_id IS NOT NULL) THEN
-		IF (SELECT deleted FROM users WHERE id = NEW.user_id LIMIT 1) THEN
-			RAISE EXCEPTION 'Cannot create user_secret for deleted user';
-		END IF;
-	END IF;
-	RETURN NEW;
-END;
-$$;
-
-CREATE OR REPLACE FUNCTION insert_user_skill_fail_if_user_deleted() RETURNS trigger
+CREATE OR REPLACE FUNCTION enforce_user_skills_per_user_limit() RETURNS trigger
     LANGUAGE plpgsql
-AS $$
-
+    AS $$
+DECLARE
+    skill_count int;
+    skill_limit constant int := 100;
 BEGIN
+    -- Serialize skill-cap checks per user so concurrent inserts cannot all
+    -- observe the same pre-insert count and exceed the hard limit.
     PERFORM 1
     FROM users
     WHERE id = NEW.user_id
-      AND deleted = true
-    LIMIT 1;
-    IF FOUND THEN
-        RAISE EXCEPTION 'Cannot create user_skill for deleted user'
+    FOR UPDATE;
+
+    SELECT count(*) INTO skill_count
+    FROM user_skills
+    WHERE user_id = NEW.user_id;
+    IF skill_count >= skill_limit THEN
+        RAISE EXCEPTION 'user has reached the personal skill limit'
             USING ERRCODE = 'check_violation',
-                  CONSTRAINT = 'user_skill_user_deleted';
+                  CONSTRAINT = 'user_skills_per_user_limit';
     END IF;
     RETURN NEW;
 END;
 $$;
+
+DROP TRIGGER IF EXISTS trigger_zz_user_secrets_per_user_limits ON user_secrets;
+CREATE TRIGGER trigger_user_secrets_per_user_limits
+    BEFORE INSERT OR UPDATE ON user_secrets
+    FOR EACH ROW
+EXECUTE FUNCTION enforce_user_secrets_per_user_limits();
+
+DROP TRIGGER IF EXISTS trigger_zz_user_skills_per_user_limit ON user_skills;
+CREATE TRIGGER trigger_user_skills_per_user_limit
+    BEFORE INSERT ON user_skills
+    FOR EACH ROW
+EXECUTE FUNCTION enforce_user_skills_per_user_limit();
