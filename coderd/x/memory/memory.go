@@ -1,6 +1,6 @@
 // Package memory owns the Go-side constants for the agent memory database
 // schema. TestAgentMemorySchemaConstants walks the trigger caps and check
-// constraints from migration 000586_agent_memories.up.sql against these
+// constraints from migration 000588_agent_memories.up.sql against these
 // values via pg_get_functiondef and pg_get_constraintdef; the content prefix
 // width in the list queries is pinned behaviorally by the ContentPrefixWidth
 // subtests of TestUserMemories and TestChatMemories.
