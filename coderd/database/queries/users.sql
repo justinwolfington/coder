@@ -578,10 +578,6 @@ WHERE
 -- name: GetAuthorizationUserRoles :one
 -- This function returns roles for authorization purposes. Implied member roles
 -- are included.
--- Deleted users have no roles: this is the read-side half of the soft-delete
--- guards, making any child row that survived or was resurrected past
--- delete_deleted_user_resources (an orphaned api_keys row, a restored
--- backup, a manual insert) inert as a credential regardless of its source.
 -- Must stay semantically in sync with GetActiveUsersAuthorizationRoles
 -- (implied member roles, org default roles, groups);
 -- TestGetActiveUsersAuthorizationRolesParity enforces this.
@@ -642,8 +638,7 @@ SELECT
 FROM
 	users
 WHERE
-	users.id = @user_id
-	AND users.deleted = false;
+	users.id = @user_id;
 
 -- name: GetActiveUsersAuthorizationRoles :many
 -- Returns the authorization roles (site and org-scoped, including implied
@@ -749,17 +744,22 @@ FROM users
 WHERE id = @id::uuid;
 
 -- Acquires the users-row lock that the fail_if_user_deleted guard triggers
--- take on child-table inserts. Any transaction that takes a lock on a
--- guarded child row (via DELETE or UPDATE) and later inserts a guarded row
--- for the same user (for example the OAuth2 token exchange, which replaces
--- api_keys rows) must call this first so its lock order (users first, then
--- child rows) matches delete_deleted_user_resources and cannot deadlock
--- with a concurrent user soft-delete.
+-- take on child-table inserts. Any transaction that writes a guarded child
+-- row (INSERT, UPDATE, or DELETE) and later inserts a guarded row for the
+-- same user (for example the OAuth2 token exchange, which replaces api_keys
+-- rows) must call this first so its lock order (users first, then child
+-- rows) matches delete_deleted_user_resources and cannot deadlock with a
+-- concurrent user soft-delete.
 -- Must run inside the transaction that performs the child writes: outside
 -- one, the lock is released at the implicit statement commit and protects
--- nothing. Returns sql.ErrNoRows when the user does not exist, so a caller
--- locking the wrong (or a stale) user id fails loudly instead of
--- proceeding unserialized.
+-- nothing.
+-- The query is dbauthz-authorized as a system primitive: callers must run
+-- it under a system-authorized context (dbauthz.AsSystemRestricted at the
+-- call site when the surrounding request runs as an ordinary user).
+-- Returns sql.ErrNoRows when the user does not exist. It does NOT detect a
+-- wrong id that belongs to some other real user: that row is locked and the
+-- transaction proceeds with the guard defeated, so callers must derive the
+-- id from the same variable the child writes use.
 -- name: AcquireUserSoftDeleteGuardLock :one
 SELECT id FROM users
 WHERE id = @user_id

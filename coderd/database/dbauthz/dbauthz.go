@@ -1807,14 +1807,14 @@ func (q *querier) AcquireStaleChatDiffStatuses(ctx context.Context, limitVal int
 }
 
 func (q *querier) AcquireUserSoftDeleteGuardLock(ctx context.Context, userID uuid.UUID) (uuid.UUID, error) {
-	user, err := q.db.GetUserByID(ctx, userID)
-	if err != nil {
-		return uuid.Nil, err
-	}
-	// The lock blocks the user's soft-delete and every guarded child insert
-	// for them until the transaction ends, so it authorizes as a write on
-	// the user, not a read.
-	if err := q.authorizeContext(ctx, policy.ActionUpdate, user); err != nil {
+	// The lock is a deadlock-avoidance primitive, not a user capability: it
+	// orders a transaction's locks (users first, then child rows), granting
+	// nothing the guard triggers do not already do for free on every insert.
+	// Authorizing it on the target user would be role-dependent (owners
+	// pass, members fail) while protecting nothing, so it authorizes as a
+	// system primitive and call sites on user-scoped paths wrap only this
+	// call in dbauthz.AsSystemRestricted.
+	if err := q.authorizeContext(ctx, policy.ActionUpdate, rbac.ResourceSystem); err != nil {
 		return uuid.Nil, err
 	}
 	return q.db.AcquireUserSoftDeleteGuardLock(ctx, userID)

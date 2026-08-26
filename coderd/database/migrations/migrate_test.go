@@ -3556,7 +3556,13 @@ func TestMigration000587LockUserSoftDeleteGuards(t *testing.T) {
 
 	liveUser := uuid.New()
 	doomedUser := uuid.New()
-	for i, id := range []uuid.UUID{liveUser, doomedUser} {
+	// transitiveDoomedUser has group_members and user_ai_budget_overrides
+	// rows but no organization_members row, so the organization_members
+	// cascade triggers cannot clean its rows: only the migration's direct
+	// backfill statements for those two tables can, which keeps them
+	// non-vacuous.
+	transitiveDoomedUser := uuid.New()
+	for i, id := range []uuid.UUID{liveUser, doomedUser, transitiveDoomedUser} {
 		_, err = sqlDB.ExecContext(ctx,
 			`INSERT INTO users (id, username, email, hashed_password, created_at, updated_at, status, rbac_roles, login_type)
 			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
@@ -3637,15 +3643,27 @@ func TestMigration000587LockUserSoftDeleteGuards(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	// Reproduce the race outcome the migration cleans up: a user that is
-	// soft-deleted while its child rows survive. Disabling the cleanup
+	// Seed only the transitively cleaned tables for transitiveDoomedUser,
+	// mirroring rows resurrected after the user's organization_members rows
+	// were already cleaned up.
+	_, err = sqlDB.ExecContext(ctx,
+		`INSERT INTO group_members (user_id, group_id) VALUES ($1, $2)`,
+		transitiveDoomedUser, groupID,
+	)
+	require.NoError(t, err)
+	_, err = sqlDB.ExecContext(ctx,
+		`INSERT INTO user_ai_budget_overrides (user_id, group_id, spend_limit_micros)
+		VALUES ($1, $2, 1000000)`,
+		transitiveDoomedUser, groupID,
+	)
+	require.NoError(t, err)
+
+	// Reproduce the race outcome the migration cleans up: users that are
+	// soft-deleted while their child rows survive. Suppressing the cleanup
 	// trigger simulates the insert committing after the soft-delete.
-	_, err = sqlDB.ExecContext(ctx, `ALTER TABLE users DISABLE TRIGGER trigger_update_users`)
-	require.NoError(t, err)
-	_, err = sqlDB.ExecContext(ctx, `UPDATE users SET deleted = true WHERE id = $1`, doomedUser)
-	require.NoError(t, err)
-	_, err = sqlDB.ExecContext(ctx, `ALTER TABLE users ENABLE TRIGGER trigger_update_users`)
-	require.NoError(t, err)
+	for _, id := range []uuid.UUID{doomedUser, transitiveDoomedUser} {
+		dbtestutil.SoftDeleteUserKeepingRows(ctx, t, sqlDB, id)
+	}
 
 	countRows := func(table string, userID uuid.UUID) int {
 		var count int
@@ -3655,9 +3673,13 @@ func TestMigration000587LockUserSoftDeleteGuards(t *testing.T) {
 		require.NoError(t, err)
 		return count
 	}
-	guardedTables := []string{"api_keys", "user_links", "user_secrets", "user_skills", "user_ai_provider_keys", "organization_members", "group_members", "user_ai_budget_overrides"}
-	for _, table := range guardedTables {
+	backfilledTables := []string{"api_keys", "user_links", "user_secrets", "user_skills", "user_ai_provider_keys", "organization_members", "group_members", "user_ai_budget_overrides"}
+	transitiveTables := []string{"group_members", "user_ai_budget_overrides"}
+	for _, table := range backfilledTables {
 		require.Equal(t, 1, countRows(table, doomedUser), "pre-migration: %s row for the doomed user must exist", table)
+	}
+	for _, table := range transitiveTables {
+		require.Equal(t, 1, countRows(table, transitiveDoomedUser), "pre-migration: %s row for the transitive doomed user must exist", table)
 	}
 
 	// Run migration 587.
@@ -3666,9 +3688,14 @@ func TestMigration000587LockUserSoftDeleteGuards(t *testing.T) {
 	require.True(t, more)
 	require.EqualValues(t, migrationVersion, version)
 
-	// The backfill removes only the soft-deleted user's rows.
-	for _, table := range guardedTables {
+	// The backfill removes only the soft-deleted users' rows.
+	for _, table := range backfilledTables {
 		require.Zero(t, countRows(table, doomedUser), "post-migration: %s rows for the doomed user must be deleted", table)
 		require.Equal(t, 1, countRows(table, liveUser), "post-migration: %s row for the live user must survive", table)
+	}
+	// With no organization_members row to cascade from, only the direct
+	// backfill statements can have removed these.
+	for _, table := range transitiveTables {
+		require.Zero(t, countRows(table, transitiveDoomedUser), "post-migration: %s rows for the transitive doomed user must be deleted", table)
 	}
 }

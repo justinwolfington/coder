@@ -32,6 +32,20 @@ var (
 	LockIDChatInstructionPlanMode     = GenLockID("agents_chat_plan_mode_instructions")
 )
 
+// Per-user advisory lock key prefixes taken by database triggers, not by Go
+// code. The per-user cap triggers installed by migration 000587 serialize on
+// pg_advisory_xact_lock(hashtextextended('<prefix>' || user_id::text, 0)),
+// a third derivation space (PostgreSQL hashtextextended, not FNV-1a), so
+// the IDs cannot collide with the blocks above. Registered here so every
+// advisory key in the deployment is discoverable in one file; new prefixes
+// must be unique strings.
+const (
+	// LockPrefixUserSecretsCap serializes enforce_user_secrets_per_user_limits.
+	LockPrefixUserSecretsCap = "user_secrets_cap:"
+	// LockPrefixUserSkillsCap serializes enforce_user_skills_per_user_limit.
+	LockPrefixUserSkillsCap = "user_skills_cap:"
+)
+
 // GenLockID generates a unique and consistent lock ID from a given string.
 func GenLockID(name string) int64 {
 	hash := fnv.New64()

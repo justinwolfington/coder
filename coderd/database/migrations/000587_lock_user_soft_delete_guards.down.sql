@@ -3,6 +3,7 @@
 -- backfill deletes are not restorable.
 DROP TRIGGER IF EXISTS trigger_insert_user_ai_provider_keys ON user_ai_provider_keys;
 DROP TRIGGER IF EXISTS trigger_insert_organization_members ON organization_members;
+DROP TRIGGER IF EXISTS trigger_insert_user_ai_budget_overrides ON user_ai_budget_overrides;
 DROP TRIGGER IF EXISTS trigger_insert_apikeys ON api_keys;
 DROP TRIGGER IF EXISTS trigger_upsert_user_links ON user_links;
 DROP TRIGGER IF EXISTS trigger_upsert_user_secrets ON user_secrets;
@@ -191,3 +192,5 @@ CREATE TRIGGER trigger_user_skills_per_user_limit
     BEFORE INSERT ON user_skills
     FOR EACH ROW
 EXECUTE FUNCTION enforce_user_skills_per_user_limit();
+
+DROP FUNCTION IF EXISTS require_read_committed(text, text);

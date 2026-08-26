@@ -1068,16 +1068,33 @@ DECLARE
     total_bytes_limit constant bigint := 204800;   -- 200 KiB
     env_bytes_limit   constant bigint := 24576;    -- 24 KiB
 BEGIN
+    -- Inserts and owner reassignments cross the per-user cap boundary, so
+    -- they require READ COMMITTED (a stale stronger-isolation snapshot can
+    -- miss concurrently committed rows and overshoot). Same-owner updates
+    -- are exempt: dbcrypt rotation legitimately rewrites values under
+    -- REPEATABLE READ (its 40001 on concurrent modification is
+    -- load-bearing), and their stale-snapshot byte-count risk predates this
+    -- migration (the old users-row lock counted under the same snapshot).
+    IF (TG_OP = 'INSERT' OR NEW.user_id IS DISTINCT FROM OLD.user_id) THEN
+        PERFORM require_read_committed('user_secrets caps', 'user_secrets_cap_isolation');
+    END IF;
+
     -- Serialize cap checks per user so concurrent inserts or updates cannot
     -- all observe the same pre-statement aggregates and exceed the caps.
     -- The advisory lock avoids the users row entirely:
     -- delete_deleted_user_resources takes no advisory locks, so no lock
-    -- cycle with a concurrent soft-delete is possible, and inserts into
-    -- other tables referencing users are unaffected. This trigger must
-    -- fire after the soft-delete guard (hence the zz_ trigger name): a
-    -- transaction that held this advisory lock while waiting on the users
-    -- lock could cycle with an UPDATE-path advisory waiter and the
-    -- cleanup.
+    -- cycle involving only single-statement writers and a concurrent
+    -- soft-delete is possible, and inserts into other tables referencing
+    -- users are unaffected. Two ordering rules keep it cycle-free:
+    -- within one statement, the soft-delete guard must take the users lock
+    -- before this advisory lock (hence the zz_ trigger name; BEFORE
+    -- triggers fire in name order); across statements, a transaction that
+    -- writes a guarded child row and later inserts one must take the users
+    -- lock first via AcquireUserSoftDeleteGuardLock, because an
+    -- update-then-insert writer holds this advisory lock with no users
+    -- lock and can cycle with a concurrent insert that holds the users
+    -- lock and waits here. The Go registry for these advisory keys is
+    -- coderd/database/lock.go.
     PERFORM pg_advisory_xact_lock(hashtextextended('user_secrets_cap:' || NEW.user_id::text, 0));
 
     -- Sum existing rows excluding the row being updated (so UPDATE statements
@@ -1128,12 +1145,23 @@ DECLARE
     skill_count int;
     skill_limit constant int := 100;
 BEGIN
+    -- A same-owner update cannot change the per-user count; only inserts
+    -- and owner reassignments (UPDATE ... SET user_id) are counted, so an
+    -- update cannot move a row onto an owner already at the cap.
+    IF (TG_OP = 'UPDATE' AND NEW.user_id IS NOT DISTINCT FROM OLD.user_id) THEN
+        RETURN NEW;
+    END IF;
+
+    PERFORM require_read_committed('user_skills cap', 'user_skills_cap_isolation');
+
     -- Serialize skill-cap checks per user so concurrent inserts cannot all
     -- observe the same pre-insert count and exceed the hard limit. See
     -- enforce_user_secrets_per_user_limits for why this is an advisory
     -- lock and why the trigger name carries the zz_ prefix.
     PERFORM pg_advisory_xact_lock(hashtextextended('user_skills_cap:' || NEW.user_id::text, 0));
 
+    -- On an owner reassignment the moving row still belongs to
+    -- OLD.user_id, so counting NEW.user_id's rows excludes it naturally.
     SELECT count(*) INTO skill_count
     FROM user_skills
     WHERE user_id = NEW.user_id;
@@ -1169,12 +1197,17 @@ BEGIN
 	-- by the soft-delete either way.
 	--
 	-- The INSERT-path lock imposes an ordering contract on writers: a
-	-- transaction that already holds any lock on a guarded child row (from
-	-- a DELETE or UPDATE) and later inserts a guarded row for the same
-	-- user must call AcquireUserSoftDeleteGuardLock first, so its lock
-	-- order (users, then child rows) matches delete_deleted_user_resources.
-	-- coderd/database/user_soft_delete_guards_test.go pins each known such
-	-- path with a deterministic deadlock-regression test.
+	-- transaction that writes a guarded child row (INSERT, UPDATE, or
+	-- DELETE) and later inserts a guarded row for the same user must call
+	-- AcquireUserSoftDeleteGuardLock first, so its lock order (users, then
+	-- child rows) matches delete_deleted_user_resources. The same contract
+	-- covers the cap triggers' advisory locks: without the users lock
+	-- first, an update-then-insert writer can cycle with a concurrent
+	-- insert that holds the users lock and waits on the advisory lock.
+	-- coderd/database/user_soft_delete_guards_test.go replays each known
+	-- such path as a deterministic deadlock regression (hand-written SQL
+	-- mirroring the Go transactions, plus the OAuth2 token exchange driven
+	-- through its real entry point).
 	--
 	-- Safe under any isolation level: READ COMMITTED re-reads the committed
 	-- users.deleted after the lock wait, and a REPEATABLE READ or
@@ -1189,6 +1222,14 @@ BEGIN
 		SELECT deleted INTO user_deleted
 		FROM users
 		WHERE id = NEW.user_id;
+	END IF;
+	IF (NOT FOUND AND TG_NARGS >= 3) THEN
+		-- Fail closed for tables that opt in: an uncommitted or missing
+		-- parent must not pass the guard on the strength of a foreign-key
+		-- check that only runs at end of statement.
+		RAISE EXCEPTION 'Cannot create % for missing user', TG_ARGV[0]
+			USING ERRCODE = 'check_violation',
+				  CONSTRAINT = TG_ARGV[2];
 	END IF;
 	IF (user_deleted) THEN
 		RAISE EXCEPTION 'Cannot create % for deleted user', TG_ARGV[0]
@@ -1455,6 +1496,20 @@ BEGIN
 			organization_members.organization_id = OLD.organization_id;
 	END IF;
 	RETURN OLD;
+END;
+$$;
+
+CREATE FUNCTION require_read_committed(guard_name text, constraint_name text) RETURNS void
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+	IF current_setting('transaction_isolation') NOT IN ('read committed', 'read uncommitted') THEN
+		RAISE EXCEPTION '% requires READ COMMITTED isolation, ran under %',
+			guard_name, current_setting('transaction_isolation')
+			USING ERRCODE = 'check_violation',
+				  CONSTRAINT = constraint_name,
+				  DETAIL = 'A stronger level''s snapshot can survive a lock wait and miss concurrently committed rows, overshooting the cap. If no caller set this level, check default_transaction_isolation on the server, database, role, or pooler.';
+	END IF;
 END;
 $$;
 
@@ -5219,6 +5274,8 @@ CREATE TRIGGER trigger_insert_organization_members BEFORE INSERT ON organization
 
 CREATE TRIGGER trigger_insert_organization_system_roles AFTER INSERT ON organizations FOR EACH ROW EXECUTE FUNCTION insert_organization_system_roles();
 
+CREATE TRIGGER trigger_insert_user_ai_budget_overrides BEFORE INSERT ON user_ai_budget_overrides FOR EACH ROW EXECUTE FUNCTION fail_if_user_deleted('user_ai_budget_override', 'user_ai_budget_override_user_deleted');
+
 CREATE TRIGGER trigger_insert_user_ai_provider_keys BEFORE INSERT ON user_ai_provider_keys FOR EACH ROW EXECUTE FUNCTION fail_if_user_deleted('user_ai_provider_key', 'user_ai_provider_key_user_deleted');
 
 CREATE TRIGGER trigger_nullify_next_start_at_on_workspace_autostart_modificati AFTER UPDATE ON workspaces FOR EACH ROW EXECUTE FUNCTION nullify_next_start_at_on_workspace_autostart_modification();
@@ -5243,7 +5300,7 @@ CREATE TRIGGER trigger_upsert_user_skills BEFORE INSERT OR UPDATE ON user_skills
 
 CREATE TRIGGER trigger_zz_user_secrets_per_user_limits BEFORE INSERT OR UPDATE ON user_secrets FOR EACH ROW EXECUTE FUNCTION enforce_user_secrets_per_user_limits();
 
-CREATE TRIGGER trigger_zz_user_skills_per_user_limit BEFORE INSERT ON user_skills FOR EACH ROW EXECUTE FUNCTION enforce_user_skills_per_user_limit();
+CREATE TRIGGER trigger_zz_user_skills_per_user_limit BEFORE INSERT OR UPDATE ON user_skills FOR EACH ROW EXECUTE FUNCTION enforce_user_skills_per_user_limit();
 
 CREATE TRIGGER update_notification_message_dedupe_hash BEFORE INSERT OR UPDATE ON notification_messages FOR EACH ROW EXECUTE FUNCTION compute_notification_message_dedupe_hash();
 

@@ -6588,12 +6588,6 @@ func (api *API) listUserAIProviderKeyConfigs(rw http.ResponseWriter, r *http.Req
 	httpapi.Write(ctx, rw, http.StatusOK, configs)
 }
 
-// userAIProviderKeyUserDeletedConstraint is raised by the
-// fail_if_user_deleted guard trigger on user_ai_provider_keys (migration
-// 000587). Trigger-raised constraint names never appear in the generated
-// check_constraint.go, so it is declared beside its handler.
-const userAIProviderKeyUserDeletedConstraint database.CheckConstraint = "user_ai_provider_key_user_deleted"
-
 func (api *API) upsertUserAIProviderKey(rw http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	if !api.DeploymentValues.AI.BridgeConfig.AllowBYOK.Value() {
@@ -6657,8 +6651,10 @@ func (api *API) upsertUserAIProviderKey(rw http.ResponseWriter, r *http.Request)
 		CreatedAt:    now,
 		UpdatedAt:    now,
 	})
-	if database.IsCheckViolation(err, userAIProviderKeyUserDeletedConstraint) {
-		httpapi.Write(ctx, rw, http.StatusBadRequest, codersdk.Response{
+	// 409: the request is well-formed and fails on the target's state, and
+	// the sibling deleted-user guard in userskills.go already uses Conflict.
+	if database.IsCheckViolation(err, database.CheckUserAIProviderKeyUserDeleted) {
+		httpapi.Write(ctx, rw, http.StatusConflict, codersdk.Response{
 			Message: "Cannot store an AI provider key for a deleted user.",
 		})
 		return

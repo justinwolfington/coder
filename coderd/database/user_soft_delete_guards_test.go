@@ -15,86 +15,13 @@ import (
 	"github.com/coder/coder/v2/testutil"
 )
 
-// stmt pairs a SQL statement with its bound arguments for runLockRace.
-type stmt struct {
-	sql  string
-	args []any
-}
-
-// waitForBackendBlocked polls pg_stat_activity until the backend identified by
-// pid is waiting on a heavyweight lock, proving the racing statement is
-// blocked on a row lock rather than still executing.
-func waitForBackendBlocked(ctx context.Context, t *testing.T, sqlDB *sql.DB, pid int) {
-	t.Helper()
-	testutil.Eventually(ctx, t, func(ctx context.Context) bool {
-		var lockWaits int
-		err := sqlDB.QueryRowContext(ctx, `
-			SELECT count(*)
-			FROM pg_stat_activity
-			WHERE pid = $1 AND wait_event_type = 'Lock'
-		`, pid).Scan(&lockWaits)
-		return err == nil && lockWaits == 1
-	}, testutil.IntervalFast, "wait for the backend to block on a row lock")
-	require.NoError(t, ctx.Err(), "waiting for the blocked backend")
-}
-
-// runLockRace executes the blocking statements in one transaction, launches
-// racing on a dedicated connection, deterministically waits for it to block
-// on a row lock held by the blocking transaction, executes beforeCommit
-// inside the blocking transaction, commits it, and returns the racing
-// statement's error.
-func runLockRace(ctx context.Context, t *testing.T, sqlDB *sql.DB, blocking []stmt, racing stmt, beforeCommit []stmt) error {
-	t.Helper()
-
-	blockTx, err := sqlDB.BeginTx(ctx, nil)
-	require.NoError(t, err)
-	committed := false
-	t.Cleanup(func() {
-		if !committed {
-			_ = blockTx.Rollback()
-		}
-	})
-	for _, s := range blocking {
-		_, err := blockTx.ExecContext(ctx, s.sql, s.args...)
-		require.NoError(t, err)
-	}
-
-	raceConn, err := sqlDB.Conn(ctx)
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = raceConn.Close() })
-
-	var racePID int
-	require.NoError(t, raceConn.QueryRowContext(ctx, `SELECT pg_backend_pid()`).Scan(&racePID))
-
-	raceResult := make(chan error, 1)
-	go func() {
-		_, err := raceConn.ExecContext(ctx, racing.sql, racing.args...)
-		raceResult <- err
-	}()
-
-	waitForBackendBlocked(ctx, t, sqlDB, racePID)
-
-	for _, s := range beforeCommit {
-		_, err := blockTx.ExecContext(ctx, s.sql, s.args...)
-		require.NoError(t, err)
-	}
-	require.NoError(t, blockTx.Commit())
-	committed = true
-
-	select {
-	case err := <-raceResult:
-		return err
-	case <-ctx.Done():
-		t.Fatalf("racing statement did not finish: %v", ctx.Err())
-		return nil
-	}
-}
-
-// TestSoftDeleteGuardWinsConcurrentInsert verifies that all six soft-delete
+// TestSoftDeleteGuardWinsConcurrentInsert verifies that all seven soft-delete
 // guard triggers serialize against a concurrent user soft-delete via the
 // parent-row lock added in migration 000587: the insert blocks on the locked
 // users row and, once the soft-delete commits, fails with the guard's
-// constraint instead of resurrecting a row for the deleted user.
+// constraint instead of resurrecting a row for the deleted user. Each
+// subtest also pins its database.Check* constant against the live trigger by
+// matching the raised constraint name.
 func TestSoftDeleteGuardWinsConcurrentInsert(t *testing.T) {
 	t.Parallel()
 	if testing.Short() {
@@ -106,17 +33,20 @@ func TestSoftDeleteGuardWinsConcurrentInsert(t *testing.T) {
 	// Shared parents for the FK-bearing tables.
 	org := dbgen.Organization(t, db, database.Organization{})
 	provider := dbgen.AIProvider(t, db, database.AIProvider{})
+	group := dbgen.Group(t, db, database.Group{OrganizationID: org.ID})
 
 	testCases := []struct {
 		name       string
 		table      string
 		constraint database.CheckConstraint
-		insert     func(userID uuid.UUID) stmt
+		// seed prepares rows the insert depends on (memberships etc.).
+		seed   func(ctx context.Context, t *testing.T, userID uuid.UUID)
+		insert func(userID uuid.UUID) stmt
 	}{
 		{
 			name:       "APIKey",
 			table:      "api_keys",
-			constraint: "api_key_user_deleted",
+			constraint: database.CheckAPIKeyUserDeleted,
 			insert: func(userID uuid.UUID) stmt {
 				return stmt{`
 					INSERT INTO api_keys (id, hashed_secret, user_id, last_used, expires_at, created_at, updated_at, login_type, scopes, allow_list)
@@ -127,7 +57,7 @@ func TestSoftDeleteGuardWinsConcurrentInsert(t *testing.T) {
 		{
 			name:       "UserLink",
 			table:      "user_links",
-			constraint: "user_link_user_deleted",
+			constraint: database.CheckUserLinkUserDeleted,
 			insert: func(userID uuid.UUID) stmt {
 				return stmt{`
 					INSERT INTO user_links (user_id, login_type, linked_id)
@@ -138,7 +68,7 @@ func TestSoftDeleteGuardWinsConcurrentInsert(t *testing.T) {
 		{
 			name:       "UserSecret",
 			table:      "user_secrets",
-			constraint: "user_secret_user_deleted",
+			constraint: database.CheckUserSecretUserDeleted,
 			insert: func(userID uuid.UUID) stmt {
 				return stmt{`
 					INSERT INTO user_secrets (id, user_id, name, description, value, env_name)
@@ -149,7 +79,7 @@ func TestSoftDeleteGuardWinsConcurrentInsert(t *testing.T) {
 		{
 			name:       "UserSkill",
 			table:      "user_skills",
-			constraint: "user_skill_user_deleted",
+			constraint: database.CheckUserSkillUserDeleted,
 			insert: func(userID uuid.UUID) stmt {
 				return stmt{`
 					INSERT INTO user_skills (id, user_id, name, description, content)
@@ -160,7 +90,7 @@ func TestSoftDeleteGuardWinsConcurrentInsert(t *testing.T) {
 		{
 			name:       "UserAIProviderKey",
 			table:      "user_ai_provider_keys",
-			constraint: "user_ai_provider_key_user_deleted",
+			constraint: database.CheckUserAIProviderKeyUserDeleted,
 			insert: func(userID uuid.UUID) stmt {
 				return stmt{`
 					INSERT INTO user_ai_provider_keys (id, user_id, ai_provider_id, api_key)
@@ -171,12 +101,38 @@ func TestSoftDeleteGuardWinsConcurrentInsert(t *testing.T) {
 		{
 			name:       "OrganizationMember",
 			table:      "organization_members",
-			constraint: "organization_member_user_deleted",
+			constraint: database.CheckOrganizationMemberUserDeleted,
 			insert: func(userID uuid.UUID) stmt {
 				return stmt{`
 					INSERT INTO organization_members (user_id, organization_id, created_at, updated_at)
 					VALUES ($1, $2, now(), now())
 				`, []any{userID, org.ID}}
+			},
+		},
+		{
+			name:       "UserAIBudgetOverride",
+			table:      "user_ai_budget_overrides",
+			constraint: database.CheckUserAIBudgetOverrideUserDeleted,
+			// The membership trigger on this table fires before the guard
+			// (name order) and rejects non-members outright, so the racing
+			// user must be an org and group member for the insert to reach
+			// the guard's users lock.
+			seed: func(ctx context.Context, t *testing.T, userID uuid.UUID) {
+				_, err := sqlDB.ExecContext(ctx, `
+					INSERT INTO organization_members (user_id, organization_id, created_at, updated_at)
+					VALUES ($1, $2, now(), now())
+				`, userID, org.ID)
+				require.NoError(t, err)
+				_, err = sqlDB.ExecContext(ctx,
+					`INSERT INTO group_members (user_id, group_id) VALUES ($1, $2)`,
+					userID, group.ID)
+				require.NoError(t, err)
+			},
+			insert: func(userID uuid.UUID) stmt {
+				return stmt{`
+					INSERT INTO user_ai_budget_overrides (user_id, group_id, spend_limit_micros)
+					VALUES ($1, $2, 0)
+				`, []any{userID, group.ID}}
 			},
 		},
 	}
@@ -186,10 +142,13 @@ func TestSoftDeleteGuardWinsConcurrentInsert(t *testing.T) {
 			t.Parallel()
 			ctx := testutil.Context(t, testutil.WaitLong)
 			user := dbgen.User(t, db, database.User{})
+			if tc.seed != nil {
+				tc.seed(ctx, t, user.ID)
+			}
 
 			// Hold the same lock the guard trigger takes so the insert
 			// blocks, then soft-delete before releasing it.
-			err := runLockRace(ctx, t, sqlDB,
+			err := runLockRace(ctx, t, sqlDB, sql.LevelDefault,
 				[]stmt{{`SELECT id FROM users WHERE id = $1 FOR NO KEY UPDATE`, []any{user.ID}}},
 				tc.insert(user.ID),
 				[]stmt{{`UPDATE users SET deleted = true WHERE id = $1`, []any{user.ID}}},
@@ -250,19 +209,9 @@ func TestSoftDeleteGuardUpdatePathTakesNoUserLock(t *testing.T) {
 	require.Equal(t, user.ID, lockedUserID)
 
 	// All updates must complete while the users row is locked; blocking
-	// here would mean a trigger locked the parent on the UPDATE path. The
-	// lock_timeout bounds the wait so a blocked update fails the test
-	// instead of waiting for the shared context deadline to roll back
-	// lockTx and release the lock (which would let the update succeed and
-	// mask a missing TG_OP gate).
-	updateConn, err := sqlDB.Conn(ctx)
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = updateConn.Close() })
-	_, err = updateConn.ExecContext(ctx, `SET lock_timeout = '5s'`)
-	require.NoError(t, err)
-	// Reset before the connection returns to the pool; database/sql does
-	// not reset session state. Cleanups run LIFO, so this runs before Close.
-	t.Cleanup(func() { _, _ = updateConn.ExecContext(context.Background(), `RESET lock_timeout`) })
+	// here would mean a trigger locked the parent on the UPDATE path, so
+	// the lock_timeout turns a missing TG_OP gate into a failure.
+	updateConn := lockTimeoutConn(ctx, t, sqlDB, "5s")
 
 	_, err = updateConn.ExecContext(ctx,
 		`UPDATE user_skills SET description = 'edited' WHERE user_id = $1`, user.ID)
@@ -298,15 +247,25 @@ func TestSoftDeleteGuardTriggerOrder(t *testing.T) {
 		{"user_secrets", "trigger_upsert_user_secrets", "trigger_zz_user_secrets_per_user_limits"},
 		{"user_skills", "trigger_upsert_user_skills", "trigger_zz_user_skills_per_user_limit"},
 	} {
-		var present int
-		err := sqlDB.QueryRowContext(ctx, `
-			SELECT count(*) FROM pg_trigger
+		// Fetch the two triggers from the live catalog in firing (name)
+		// order, so the assertion derives from the database rather than
+		// comparing the test's own literals.
+		rows, err := sqlDB.QueryContext(ctx, `
+			SELECT tgname FROM pg_trigger
 			WHERE tgrelid = $1::regclass AND NOT tgisinternal AND tgname IN ($2, $3)
-		`, tc.table, tc.guard, tc.capName).Scan(&present)
+			ORDER BY tgname
+		`, tc.table, tc.guard, tc.capName)
 		require.NoError(t, err)
-		require.Equal(t, 2, present, "%s: both the guard and the cap trigger must exist", tc.table)
-		require.Less(t, tc.guard, tc.capName,
-			"%s: the guard trigger must sort (and therefore fire) before the cap trigger", tc.table)
+		var firingOrder []string
+		for rows.Next() {
+			var name string
+			require.NoError(t, rows.Scan(&name))
+			firingOrder = append(firingOrder, name)
+		}
+		require.NoError(t, rows.Err())
+		require.NoError(t, rows.Close())
+		require.Equal(t, []string{tc.guard, tc.capName}, firingOrder,
+			"%s: both triggers must exist and the guard must sort (and therefore fire) before the cap trigger", tc.table)
 	}
 }
 
@@ -321,10 +280,10 @@ func TestSoftDeleteGuardTriggerOrder(t *testing.T) {
 //  3. The outside lock is released; the app transaction finishes cleanly and
 //     the soft-delete then runs its cleanup.
 //
-// Remove the AcquireUserSoftDeleteGuardLock call from the mirrored Go path
-// (drop the acquireFirst statement here) and the replay deadlocks: the
-// soft-delete's cleanup waits on the child row while the app transaction
-// waits on the users row (SQLSTATE 40P01).
+// Remove the users-lock SELECT at the top of the app transaction below (the
+// statement mirroring AcquireUserSoftDeleteGuardLock) and the replay
+// deadlocks: the soft-delete's cleanup waits on the child row while the app
+// transaction waits on the users row (SQLSTATE 40P01).
 func runGuardedWriteRace(ctx context.Context, t *testing.T, sqlDB *sql.DB, userID uuid.UUID, childLock stmt, appStmts []stmt) {
 	t.Helper()
 
@@ -473,6 +432,48 @@ func TestSoftDeleteGuardLockOrderPaths(t *testing.T) {
 			},
 		)
 	})
+
+	// The advisory-lock leg of the ordering contract: an update-then-insert
+	// user_secrets writer holds the per-user advisory lock (from the
+	// UPDATE-path cap trigger) with no users lock, so a concurrent insert
+	// that holds the users lock and waits on the advisory lock would cycle
+	// with it. Taking the users lock first (as the contract requires)
+	// serializes the two: the concurrent insert queues behind the users
+	// lock and both finish. No Go path does update-then-insert on
+	// user_secrets today; this pins the contract the cap comments state.
+	t.Run("SecretsUpdateThenInsert", func(t *testing.T) {
+		t.Parallel()
+		ctx := testutil.Context(t, testutil.WaitLong)
+		user := dbgen.User(t, db, database.User{})
+		secret := uuid.New()
+		_, err := sqlDB.ExecContext(ctx, `
+			INSERT INTO user_secrets (id, user_id, name, description, value, env_name, file_path)
+			VALUES ($1, $2, 'update-then-insert', '', 'value', '', '/tmp/update-then-insert')
+		`, secret, user.ID)
+		require.NoError(t, err)
+
+		// The contract-following writer: users lock, then UPDATE (advisory
+		// lock), then INSERT. The concurrent insert blocks on the users
+		// lock instead of interleaving into the advisory cycle, and
+		// succeeds once the writer commits.
+		err = runLockRace(ctx, t, sqlDB, sql.LevelDefault,
+			[]stmt{
+				{`SELECT id FROM users WHERE id = $1 FOR NO KEY UPDATE`, []any{user.ID}},
+				{`UPDATE user_secrets SET value = 'edited' WHERE id = $1`, []any{secret}},
+			},
+			stmt{`
+				INSERT INTO user_secrets (id, user_id, name, description, value, env_name, file_path)
+				VALUES ($1, $2, 'concurrent-insert', '', 'value', '', '/tmp/concurrent-insert')
+			`, []any{uuid.New(), user.ID}},
+			[]stmt{
+				{`
+					INSERT INTO user_secrets (id, user_id, name, description, value, env_name, file_path)
+					VALUES ($1, $2, 'writer-insert', '', 'value', '', '/tmp/writer-insert')
+				`, []any{uuid.New(), user.ID}},
+			},
+		)
+		require.NoError(t, err, "with the users lock taken first, neither side may deadlock")
+	})
 }
 
 // TestUserSecretsCapConcurrentUpdates verifies the per-user advisory lock
@@ -551,12 +552,195 @@ func TestUserSecretsCapConcurrentUpdates(t *testing.T) {
 	require.LessOrEqual(t, totalBytes, int64(204800), "the committed total must respect the cap")
 }
 
-// TestDeletedUserHasNoAuthorizationRoles pins the read-side half of the
-// soft-delete guards: GetAuthorizationUserRoles refuses deleted users, so a
-// child row that survived or bypassed delete_deleted_user_resources (an
-// orphaned api_keys row, a restored backup, a manual insert) cannot
-// authenticate regardless of its source.
-func TestDeletedUserHasNoAuthorizationRoles(t *testing.T) {
+// TestSoftDeleteGuardRejectsUpdatesForDeletedUser pins the guard's UPDATE
+// branch (the unlocked deleted-check) on the three upsert tables: a child
+// row that survived cleanup must not keep being updated, or an orphaned
+// user_links row could keep having its OAuth tokens refreshed.
+func TestSoftDeleteGuardRejectsUpdatesForDeletedUser(t *testing.T) {
+	t.Parallel()
+	if testing.Short() {
+		t.SkipNow()
+	}
+
+	db, _, sqlDB := dbtestutil.NewDBWithSQLDB(t)
+
+	testCases := []struct {
+		name       string
+		constraint database.CheckConstraint
+		seed       func(ctx context.Context, t *testing.T, userID uuid.UUID)
+		update     stmt
+	}{
+		{
+			name:       "UserLink",
+			constraint: database.CheckUserLinkUserDeleted,
+			seed: func(ctx context.Context, t *testing.T, userID uuid.UUID) {
+				_, err := sqlDB.ExecContext(ctx, `
+					INSERT INTO user_links (user_id, login_type, linked_id)
+					VALUES ($1, 'oidc', 'update-branch-link')
+				`, userID)
+				require.NoError(t, err)
+			},
+			update: stmt{`UPDATE user_links SET oauth_access_token = 'refreshed' WHERE user_id = $1`, nil},
+		},
+		{
+			name:       "UserSecret",
+			constraint: database.CheckUserSecretUserDeleted,
+			seed: func(ctx context.Context, t *testing.T, userID uuid.UUID) {
+				_, err := sqlDB.ExecContext(ctx, `
+					INSERT INTO user_secrets (id, user_id, name, description, value, env_name, file_path)
+					VALUES ($1, $2, 'update-branch-secret', '', 'value', '', '/tmp/update-branch-secret')
+				`, uuid.New(), userID)
+				require.NoError(t, err)
+			},
+			update: stmt{`UPDATE user_secrets SET value = 'edited' WHERE user_id = $1`, nil},
+		},
+		{
+			name:       "UserSkill",
+			constraint: database.CheckUserSkillUserDeleted,
+			seed: func(ctx context.Context, t *testing.T, userID uuid.UUID) {
+				_, err := sqlDB.ExecContext(ctx, `
+					INSERT INTO user_skills (id, user_id, name, description, content)
+					VALUES ($1, $2, 'update-branch-skill', '', 'content')
+				`, uuid.New(), userID)
+				require.NoError(t, err)
+			},
+			update: stmt{`UPDATE user_skills SET description = 'edited' WHERE user_id = $1`, nil},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			ctx := testutil.Context(t, testutil.WaitLong)
+			user := dbgen.User(t, db, database.User{})
+			tc.seed(ctx, t, user.ID)
+
+			dbtestutil.SoftDeleteUserKeepingRows(ctx, t, sqlDB, user.ID)
+
+			_, err := sqlDB.ExecContext(ctx, tc.update.sql, user.ID)
+			require.Error(t, err, "updating a surviving child row of a deleted user must fail")
+			require.True(t, database.IsCheckViolation(err, tc.constraint),
+				"expected constraint %q, got: %v", tc.constraint, err)
+		})
+	}
+}
+
+// TestUserCapsRequireReadCommitted pins require_read_committed on both cap
+// triggers: the caps count committed sibling rows, so any isolation level
+// whose snapshot can survive a lock wait is rejected, while READ UNCOMMITTED
+// (which PostgreSQL executes with READ COMMITTED semantics) is accepted.
+func TestUserCapsRequireReadCommitted(t *testing.T) {
+	t.Parallel()
+	if testing.Short() {
+		t.SkipNow()
+	}
+
+	db, _, sqlDB := dbtestutil.NewDBWithSQLDB(t)
+
+	insertSecret := func(userID uuid.UUID) stmt {
+		return stmt{`
+			INSERT INTO user_secrets (id, user_id, name, description, value, env_name, file_path)
+			VALUES ($1, $2, 'isolation-secret', '', 'value', '', '/tmp/isolation-secret')
+		`, []any{uuid.New(), userID}}
+	}
+	insertSkill := func(userID uuid.UUID) stmt {
+		return stmt{`
+			INSERT INTO user_skills (id, user_id, name, description, content)
+			VALUES ($1, $2, 'isolation-skill', '', 'content')
+		`, []any{uuid.New(), userID}}
+	}
+
+	t.Run("Rejected", func(t *testing.T) {
+		t.Parallel()
+		for _, level := range []sql.IsolationLevel{sql.LevelRepeatableRead, sql.LevelSerializable} {
+			for _, tc := range []struct {
+				name       string
+				constraint database.CheckConstraint
+				insert     func(userID uuid.UUID) stmt
+			}{
+				{"UserSecret", database.CheckUserSecretsCapIsolation, insertSecret},
+				{"UserSkill", database.CheckUserSkillsCapIsolation, insertSkill},
+			} {
+				t.Run(tc.name+"/"+level.String(), func(t *testing.T) {
+					t.Parallel()
+					ctx := testutil.Context(t, testutil.WaitLong)
+					user := dbgen.User(t, db, database.User{})
+
+					tx, err := sqlDB.BeginTx(ctx, &sql.TxOptions{Isolation: level})
+					require.NoError(t, err)
+					defer tx.Rollback() //nolint:errcheck // rollback after expected failure
+					ins := tc.insert(user.ID)
+					_, err = tx.ExecContext(ctx, ins.sql, ins.args...)
+					require.Error(t, err)
+					require.True(t, database.IsCheckViolation(err, tc.constraint),
+						"expected constraint %q, got: %v", tc.constraint, err)
+				})
+			}
+		}
+	})
+
+	// A same-owner user_secrets update under REPEATABLE READ is exempt from
+	// the isolation gate: dbcrypt rotation rewrites values under RR and its
+	// serialization failure on concurrent modification is load-bearing.
+	t.Run("SameOwnerSecretUpdateAllowedAtRepeatableRead", func(t *testing.T) {
+		t.Parallel()
+		ctx := testutil.Context(t, testutil.WaitLong)
+		user := dbgen.User(t, db, database.User{})
+		secret := uuid.New()
+		_, err := sqlDB.ExecContext(ctx, `
+			INSERT INTO user_secrets (id, user_id, name, description, value, env_name, file_path)
+			VALUES ($1, $2, 'rotate-secret', '', 'value', '', '/tmp/rotate-secret')
+		`, secret, user.ID)
+		require.NoError(t, err)
+
+		tx, err := sqlDB.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelRepeatableRead})
+		require.NoError(t, err)
+		defer tx.Rollback() //nolint:errcheck // no-op after commit
+		_, err = tx.ExecContext(ctx,
+			`UPDATE user_secrets SET value = 'rotated' WHERE id = $1`, secret)
+		require.NoError(t, err, "a same-owner update must not trip the isolation gate")
+		require.NoError(t, tx.Commit())
+	})
+
+	// READ UNCOMMITTED is accepted, and the cap still holds under it: two
+	// racing inserts at the cap serialize on the advisory lock, and the
+	// second recounts the first's committed row because PostgreSQL runs
+	// READ UNCOMMITTED with READ COMMITTED semantics.
+	t.Run("ReadUncommittedCapHolds", func(t *testing.T) {
+		t.Parallel()
+		ctx := testutil.Context(t, testutil.WaitLong)
+		user := dbgen.User(t, db, database.User{})
+
+		// Seed to one under the cap of 100 so exactly one racer fits.
+		_, err := sqlDB.ExecContext(ctx, `
+			INSERT INTO user_skills (id, user_id, name, description, content)
+			SELECT gen_random_uuid(), $1, 'seed-skill-' || g, '', 'content'
+			FROM generate_series(1, 99) AS g
+		`, user.ID)
+		require.NoError(t, err)
+
+		err = runLockRace(ctx, t, sqlDB, sql.LevelReadUncommitted,
+			[]stmt{insertSkill(user.ID)},
+			insertSkill(user.ID),
+			nil,
+		)
+		require.Error(t, err, "the racing insert must recount and fail the cap")
+		require.True(t, database.IsCheckViolation(err, "user_skills_per_user_limit"),
+			"expected the skill cap violation, got: %v", err)
+
+		var count int
+		require.NoError(t, sqlDB.QueryRowContext(ctx,
+			`SELECT count(*) FROM user_skills WHERE user_id = $1`, user.ID,
+		).Scan(&count))
+		require.Equal(t, 100, count, "the cap must hold at exactly 100")
+	})
+}
+
+// TestUserSkillsCapOwnerReassignment pins the UPDATE leg of the skills cap
+// trigger: a same-owner update at the cap succeeds (the count cannot
+// change), while reassigning a row onto an owner already at the cap fails,
+// closing the UPDATE ... SET user_id bypass.
+func TestUserSkillsCapOwnerReassignment(t *testing.T) {
 	t.Parallel()
 	if testing.Short() {
 		t.SkipNow()
@@ -564,37 +748,42 @@ func TestDeletedUserHasNoAuthorizationRoles(t *testing.T) {
 
 	db, _, sqlDB := dbtestutil.NewDBWithSQLDB(t)
 	ctx := testutil.Context(t, testutil.WaitLong)
-	user := dbgen.User(t, db, database.User{})
-	orphanKey, _ := dbgen.APIKey(t, db, database.APIKey{UserID: user.ID})
+	fullUser := dbgen.User(t, db, database.User{})
+	otherUser := dbgen.User(t, db, database.User{})
 
-	// Soft-delete while suppressing the cleanup trigger, reconstructing the
-	// orphaned-credential state the write-side guards exist to prevent. One
-	// transaction: transactional DDL keeps the disabled trigger invisible
-	// to other sessions and re-enables it even on failure via rollback.
-	tx, err := sqlDB.BeginTx(ctx, nil)
+	// Fill fullUser to the cap of 100.
+	_, err := sqlDB.ExecContext(ctx, `
+		INSERT INTO user_skills (id, user_id, name, description, content)
+		SELECT gen_random_uuid(), $1, 'cap-skill-' || g, '', 'content'
+		FROM generate_series(1, 100) AS g
+	`, fullUser.ID)
 	require.NoError(t, err)
-	committed := false
-	t.Cleanup(func() {
-		if !committed {
-			_ = tx.Rollback()
-		}
-	})
-	_, err = tx.ExecContext(ctx, `ALTER TABLE users DISABLE TRIGGER trigger_update_users`)
-	require.NoError(t, err)
-	_, err = tx.ExecContext(ctx, `UPDATE users SET deleted = true WHERE id = $1`, user.ID)
-	require.NoError(t, err)
-	_, err = tx.ExecContext(ctx, `ALTER TABLE users ENABLE TRIGGER trigger_update_users`)
-	require.NoError(t, err)
-	require.NoError(t, tx.Commit())
-	committed = true
 
-	var keyCount int
-	err = sqlDB.QueryRowContext(ctx,
-		`SELECT count(*) FROM api_keys WHERE id = $1`, orphanKey.ID,
-	).Scan(&keyCount)
-	require.NoError(t, err)
-	require.Equal(t, 1, keyCount, "the orphaned key must survive for this test to mean anything")
+	// A same-owner update at the cap must succeed: the trigger returns
+	// early because the count cannot change.
+	_, err = sqlDB.ExecContext(ctx, `
+		UPDATE user_skills SET description = 'edited'
+		WHERE user_id = $1 AND name = 'cap-skill-1'
+	`, fullUser.ID)
+	require.NoError(t, err, "a same-owner update at the cap must not trip the cap")
 
-	_, err = db.GetAuthorizationUserRoles(ctx, user.ID)
-	require.ErrorIs(t, err, sql.ErrNoRows, "a deleted user must have no authorization roles")
+	// Reassigning another user's row onto the full owner must fail.
+	movingSkill := uuid.New()
+	_, err = sqlDB.ExecContext(ctx, `
+		INSERT INTO user_skills (id, user_id, name, description, content)
+		VALUES ($1, $2, 'moving-skill', '', 'content')
+	`, movingSkill, otherUser.ID)
+	require.NoError(t, err)
+	_, err = sqlDB.ExecContext(ctx,
+		`UPDATE user_skills SET user_id = $1 WHERE id = $2`, fullUser.ID, movingSkill)
+	require.Error(t, err, "reassigning onto a full owner must fail the cap")
+	require.True(t, database.IsCheckViolation(err, "user_skills_per_user_limit"),
+		"expected the skill cap violation, got: %v", err)
+
+	// Reassigning onto an owner with room succeeds: the moving row still
+	// belongs to the old owner while counting, so the count is exact.
+	roomUser := dbgen.User(t, db, database.User{})
+	_, err = sqlDB.ExecContext(ctx,
+		`UPDATE user_skills SET user_id = $1 WHERE id = $2`, roomUser.ID, movingSkill)
+	require.NoError(t, err, "reassigning onto an owner with room must succeed")
 }

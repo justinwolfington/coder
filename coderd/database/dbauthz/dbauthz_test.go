@@ -3081,9 +3081,8 @@ func (s *MethodTestSuite) TestUser() {
 	}))
 	s.Run("AcquireUserSoftDeleteGuardLock", s.Mocked(func(dbm *dbmock.MockStore, faker *gofakeit.Faker, check *expects) {
 		u := testutil.Fake(s.T(), faker, database.User{})
-		dbm.EXPECT().GetUserByID(gomock.Any(), u.ID).Return(u, nil).AnyTimes()
 		dbm.EXPECT().AcquireUserSoftDeleteGuardLock(gomock.Any(), u.ID).Return(u.ID, nil).AnyTimes()
-		check.Args(u.ID).Asserts(u, policy.ActionUpdate).Returns(u.ID)
+		check.Args(u.ID).Asserts(rbac.ResourceSystem, policy.ActionUpdate).Returns(u.ID)
 	}))
 	s.Run("GetUsersByIDs", s.Mocked(func(dbm *dbmock.MockStore, faker *gofakeit.Faker, check *expects) {
 		a := testutil.Fake(s.T(), faker, database.User{CreatedAt: dbtime.Now().Add(-time.Hour)})

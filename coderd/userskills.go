@@ -28,11 +28,11 @@ const (
 	// otherwise valid raw skill content.
 	maxPersonalSkillRequestBytes = skills.MaxPersonalSkillSizeBytes*personalSkillJSONEscapeExpansion + personalSkillRequestEnvelopeBytes
 
-	// These names are raised by trigger functions with USING CONSTRAINT.
-	// They are not table CHECK constraints, so dbgen does not emit them in
-	// check_constraint.go.
+	// Raised by the cap trigger function with USING CONSTRAINT; not a table
+	// CHECK constraint, so dbgen does not emit it in check_constraint.go.
+	// The soft-delete guard constraints live in
+	// coderd/database/usersoftdeleteguards.go.
 	userSkillsPerUserLimitConstraint database.CheckConstraint = "user_skills_per_user_limit"
-	userSkillUserDeletedConstraint   database.CheckConstraint = "user_skill_user_deleted"
 )
 
 // @Summary Create a user skill
@@ -84,7 +84,7 @@ func (api *API) postUserSkill(rw http.ResponseWriter, r *http.Request) {
 			httpapi.Forbidden(rw)
 			return
 		}
-		if database.IsCheckViolation(err, userSkillUserDeletedConstraint) {
+		if database.IsCheckViolation(err, database.CheckUserSkillUserDeleted) {
 			writeCannotCreateUserSkillForDeletedUser(ctx, rw)
 			return
 		}
@@ -246,7 +246,7 @@ func (api *API) patchUserSkill(rw http.ResponseWriter, r *http.Request) {
 			httpapi.Forbidden(rw)
 			return
 		}
-		if database.IsCheckViolation(err, userSkillUserDeletedConstraint) {
+		if database.IsCheckViolation(err, database.CheckUserSkillUserDeleted) {
 			writeCannotModifyUserSkillForDeletedUser(ctx, rw)
 			return
 		}

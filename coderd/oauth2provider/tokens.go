@@ -404,11 +404,12 @@ func authorizationCodeGrant(ctx context.Context, db database.Store, app database
 	err = db.InTx(func(tx database.Store) error {
 		ctx := dbauthz.As(ctx, actor)
 
-		// Lock the users row before deleting the previous key so this
-		// transaction's lock order (users, then api_keys) matches the
-		// soft-delete cleanup's and cannot deadlock with a concurrent user
-		// deletion; the InsertAPIKey guard trigger takes the same lock.
-		_, err = tx.AcquireUserSoftDeleteGuardLock(ctx, dbCode.UserID)
+		// Lock order: users before api_keys (deleted and inserted below for
+		// dbCode.UserID). See AcquireUserSoftDeleteGuardLock.
+		// The lock is a system primitive; the surrounding transaction stays
+		// under the end user's own actor.
+		//nolint:gocritic // see above
+		_, err = tx.AcquireUserSoftDeleteGuardLock(dbauthz.AsSystemRestricted(ctx), dbCode.UserID)
 		if err != nil {
 			return xerrors.Errorf("acquire user soft-delete guard lock: %w", err)
 		}
@@ -551,13 +552,13 @@ func refreshTokenGrant(ctx context.Context, db database.Store, app database.OAut
 	err = db.InTx(func(tx database.Store) error {
 		ctx := dbauthz.As(ctx, actor)
 
-		// Lock the users row before deleting the previous key so this
-		// transaction's lock order (users, then api_keys) matches the
-		// soft-delete cleanup's and cannot deadlock with a concurrent user
-		// deletion; the InsertAPIKey guard trigger takes the same lock.
+		// Lock order: users before api_keys. See AcquireUserSoftDeleteGuardLock.
 		// prevKey.UserID matches the rows deleted and inserted below; every
 		// other statement in this block derives from prevKey.
-		_, err = tx.AcquireUserSoftDeleteGuardLock(ctx, prevKey.UserID)
+		// The lock is a system primitive; the surrounding transaction stays
+		// under the end user's own actor.
+		//nolint:gocritic // see above
+		_, err = tx.AcquireUserSoftDeleteGuardLock(dbauthz.AsSystemRestricted(ctx), prevKey.UserID)
 		if err != nil {
 			return xerrors.Errorf("acquire user soft-delete guard lock: %w", err)
 		}

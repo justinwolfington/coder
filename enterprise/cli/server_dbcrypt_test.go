@@ -281,7 +281,9 @@ func genData(t *testing.T, db database.Store, sqlDB *sql.DB) []database.User {
 					})
 				}
 				if deleted {
-					softDeleteUserKeepingRows(t, sqlDB, usr.ID)
+					// Reconstructs orphaned child rows that predate the
+					// migration 000587 guards; rotation must handle them.
+					dbtestutil.SoftDeleteUserKeepingRows(context.Background(), t, sqlDB, usr.ID)
 					usr.Deleted = true
 				}
 				users = append(users, usr)
@@ -289,33 +291,6 @@ func genData(t *testing.T, db database.Store, sqlDB *sql.DB) []database.User {
 		}
 	}
 	return users
-}
-
-// softDeleteUserKeepingRows soft-deletes the user while suppressing the
-// delete_deleted_user_resources cleanup, reconstructing the orphaned child
-// rows that predate migration 000587 (whose guards reject inserting child
-// rows for already-deleted users). One transaction: transactional DDL keeps
-// the disabled trigger invisible to concurrent sessions and rolls the
-// disable back on failure.
-func softDeleteUserKeepingRows(t *testing.T, sqlDB *sql.DB, userID uuid.UUID) {
-	t.Helper()
-	ctx := context.Background()
-	tx, err := sqlDB.BeginTx(ctx, nil)
-	require.NoError(t, err)
-	committed := false
-	defer func() {
-		if !committed {
-			_ = tx.Rollback()
-		}
-	}()
-	_, err = tx.ExecContext(ctx, `ALTER TABLE users DISABLE TRIGGER trigger_update_users`)
-	require.NoError(t, err)
-	_, err = tx.ExecContext(ctx, `UPDATE users SET deleted = true WHERE id = $1`, userID)
-	require.NoError(t, err)
-	_, err = tx.ExecContext(ctx, `ALTER TABLE users ENABLE TRIGGER trigger_update_users`)
-	require.NoError(t, err)
-	require.NoError(t, tx.Commit())
-	committed = true
 }
 
 func requireEncryptedEquals(t *testing.T, c dbcrypt.Cipher, expected, actual string) {

@@ -115,35 +115,6 @@ func upsertUserAIProviderKey(ctx context.Context, t *testing.T, store database.S
 	return key
 }
 
-// softDeleteUserKeepingRows soft-deletes the user while suppressing the
-// delete_deleted_user_resources cleanup, reproducing the orphaned child rows
-// that could exist before migration 000587 closed the insert-vs-soft-delete
-// race (the insert guards now also reject new rows for deleted users, so the
-// orphan state can only be constructed this way). Rotation and decryption
-// must still handle such legacy rows.
-func softDeleteUserKeepingRows(ctx context.Context, t *testing.T, sqlDB *sql.DB, userID uuid.UUID) {
-	t.Helper()
-	// One transaction: transactional DDL keeps the disabled trigger
-	// invisible to concurrent sessions (which may share this database under
-	// CODER_PG_CONNECTION_URL) and rolls the disable back on failure.
-	tx, err := sqlDB.BeginTx(ctx, nil)
-	require.NoError(t, err)
-	committed := false
-	defer func() {
-		if !committed {
-			_ = tx.Rollback()
-		}
-	}()
-	_, err = tx.ExecContext(ctx, `ALTER TABLE users DISABLE TRIGGER trigger_update_users`)
-	require.NoError(t, err)
-	_, err = tx.ExecContext(ctx, `UPDATE users SET deleted = true WHERE id = $1`, userID)
-	require.NoError(t, err)
-	_, err = tx.ExecContext(ctx, `ALTER TABLE users ENABLE TRIGGER trigger_update_users`)
-	require.NoError(t, err)
-	require.NoError(t, tx.Commit())
-	committed = true
-}
-
 // decryptRawString decodes and decrypts a raw (base64) ciphertext value read
 // directly from the database, for comparison against the original plaintext.
 func decryptRawString(t *testing.T, c dbcrypt.Cipher, raw string) string {
@@ -666,7 +637,8 @@ func TestRotateUserAIProviderKeys(t *testing.T) {
 
 		liveKey := upsertUserAIProviderKey(f.ctx, t, f.cryptDBA, liveUser.ID, provider.ID, "user-key-live")
 		deletedKey := upsertUserAIProviderKey(f.ctx, t, f.cryptDBA, deletedUser.ID, provider.ID, "user-key-deleted-user")
-		softDeleteUserKeepingRows(f.ctx, t, f.sqlDB, deletedUser.ID)
+		// Rotation and decryption must still handle legacy orphaned rows.
+		dbtestutil.SoftDeleteUserKeepingRows(f.ctx, t, f.sqlDB, deletedUser.ID)
 
 		f.rotate(t)
 
@@ -1258,7 +1230,8 @@ func TestDecryptUserAIProviderKeys(t *testing.T) {
 
 		liveKey := upsertUserAIProviderKey(f.ctx, t, f.cryptDBA, liveUser.ID, provider.ID, "user-key-live")
 		deletedKey := upsertUserAIProviderKey(f.ctx, t, f.cryptDBA, deletedUser.ID, provider.ID, "user-key-deleted-user")
-		softDeleteUserKeepingRows(f.ctx, t, f.sqlDB, deletedUser.ID)
+		// Rotation and decryption must still handle legacy orphaned rows.
+		dbtestutil.SoftDeleteUserKeepingRows(f.ctx, t, f.sqlDB, deletedUser.ID)
 
 		f.decrypt(t)
 
