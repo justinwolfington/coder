@@ -50,6 +50,38 @@ func TestAgentMemorySchemaConstants(t *testing.T) {
 		))
 	}
 
+	// The trigger-raised constraint names have no pg_constraint row, so the
+	// generated check_constraint.go cannot pin them; the constants in
+	// coderd/x/memory are pinned against the function bodies instead.
+	for trigger, constraints := range map[string][]database.CheckConstraint{
+		"enforce_user_memories_insert_invariants": {
+			memory.UserMemoryInsertIsolationConstraint,
+			memory.UserMemoryUserRequiredConstraint,
+			memory.UserMemoryUserDeletedConstraint,
+			memory.UserMemoriesPerUserLimitConstraint,
+		},
+		"enforce_user_memories_owner_immutable": {
+			memory.UserMemoryOwnerImmutableConstraint,
+		},
+		"enforce_chat_memories_insert_invariants": {
+			memory.ChatMemoryInsertIsolationConstraint,
+			memory.ChatMemoryRootChatRequiredConstraint,
+			memory.ChatMemoriesPerRootChatLimitConstraint,
+		},
+		"enforce_chat_memories_owner_immutable": {
+			memory.ChatMemoryOwnerImmutableConstraint,
+		},
+	} {
+		var triggerDef string
+		err := sqlDB.QueryRowContext(ctx,
+			`SELECT pg_get_functiondef($1::regproc)`, trigger,
+		).Scan(&triggerDef)
+		require.NoError(t, err)
+		for _, constraint := range constraints {
+			require.Contains(t, triggerDef, fmt.Sprintf("CONSTRAINT = '%s'", constraint))
+		}
+	}
+
 	pathFormat := `^[a-zA-Z0-9_.-]+(/[a-zA-Z0-9_.-]+)*\.md$`
 	pathSize := fmt.Sprintf("octet_length(path) <= %d", memory.MaxMemoryPathBytes)
 	contentSize := fmt.Sprintf("octet_length(content) <= %d", memory.MaxMemoryContentBytes)
@@ -185,26 +217,55 @@ func TestUserMemories(t *testing.T) {
 		require.True(t, strings.HasPrefix(content, prefixed[0].ContentPrefix))
 	})
 
-	t.Run("RepeatableReadRejected", func(t *testing.T) {
+	t.Run("NonReadCommittedRejected", func(t *testing.T) {
 		t.Parallel()
-		ctx := testutil.Context(t, testutil.WaitLong)
-		user := dbgen.User(t, db, database.User{})
 
-		// The count cap would silently overshoot under REPEATABLE READ (the
-		// snapshot survives the parent-row lock wait), so the trigger fails
-		// loudly instead.
-		tx, err := sqlDB.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelRepeatableRead})
-		require.NoError(t, err)
-		defer func() { _ = tx.Rollback() }()
-		_, err = tx.ExecContext(ctx, `
-			INSERT INTO user_memories (id, user_id, path, content)
-			VALUES ($1, $2, 'isolation.md', 'content')
-		`, uuid.New(), user.ID)
-		require.Error(t, err)
-		require.True(t, database.IsCheckViolation(err, database.CheckConstraint("user_memory_insert_isolation")), "got: %v", err)
+		// The count cap is race-free only under READ COMMITTED, which
+		// re-reads committed state after the parent-row lock wait. Every
+		// other level keeps its snapshot across the wait, and SSI does not
+		// track a READ COMMITTED writer against a SERIALIZABLE reader, so
+		// both non-default levels can silently overshoot the cap in mixed
+		// pairings; the trigger rejects them loudly instead.
+		for name, level := range map[string]sql.IsolationLevel{
+			"RepeatableRead": sql.LevelRepeatableRead,
+			"Serializable":   sql.LevelSerializable,
+		} {
+			t.Run(name, func(t *testing.T) {
+				t.Parallel()
+				ctx := testutil.Context(t, testutil.WaitLong)
+				user := dbgen.User(t, db, database.User{})
+
+				tx, err := sqlDB.BeginTx(ctx, &sql.TxOptions{Isolation: level})
+				require.NoError(t, err)
+				defer func() { _ = tx.Rollback() }()
+				_, err = tx.ExecContext(ctx, `
+					INSERT INTO user_memories (id, user_id, path, content)
+					VALUES ($1, $2, 'isolation.md', 'content')
+				`, uuid.New(), user.ID)
+				require.Error(t, err)
+				require.True(t, database.IsCheckViolation(err, memory.UserMemoryInsertIsolationConstraint), "got: %v", err)
+			})
+		}
 	})
 
-	t.Run("UpdatePathTakesNoUserLock", func(t *testing.T) {
+	t.Run("OwnerImmutable", func(t *testing.T) {
+		t.Parallel()
+		ctx := testutil.Context(t, testutil.WaitLong)
+		owner := dbgen.User(t, db, database.User{})
+		other := dbgen.User(t, db, database.User{})
+		_, err := insertMemory(ctx, owner.ID, "owned.md")
+		require.NoError(t, err)
+
+		// The insert invariants fire BEFORE INSERT only, so a reassignable
+		// owner column would bypass the soft-delete and cap checks; the
+		// owner is immutable instead.
+		_, err = sqlDB.ExecContext(ctx,
+			`UPDATE user_memories SET user_id = $1 WHERE user_id = $2`, other.ID, owner.ID)
+		require.Error(t, err)
+		require.True(t, database.IsCheckViolation(err, memory.UserMemoryOwnerImmutableConstraint), "got: %v", err)
+	})
+
+	t.Run("UpdateTakesNoUserLock", func(t *testing.T) {
 		t.Parallel()
 		ctx := testutil.Context(t, testutil.WaitLong)
 		user := dbgen.User(t, db, database.User{})
@@ -230,74 +291,14 @@ func TestUserMemories(t *testing.T) {
 		t.Cleanup(func() { _ = updateConn.Close() })
 		_, err = updateConn.ExecContext(ctx, `SET lock_timeout = '2s'`)
 		require.NoError(t, err)
+		// Reset before the connection returns to the pool; database/sql
+		// does not reset session state, so the timeout would leak into
+		// whichever parallel sibling draws this connection next. Cleanups
+		// run LIFO, so this runs before Close.
+		t.Cleanup(func() { _, _ = updateConn.ExecContext(context.Background(), `RESET lock_timeout`) })
 		_, err = updateConn.ExecContext(ctx,
 			`UPDATE user_memories SET content = 'edited' WHERE user_id = $1`, user.ID)
 		require.NoError(t, err, "memory updates must not wait on the users row")
-	})
-
-	t.Run("SerializableCapHolds", func(t *testing.T) {
-		t.Parallel()
-		ctx := testutil.Context(t, testutil.WaitLong)
-		limited := dbgen.User(t, db, database.User{})
-		for i := range memory.MaxUserMemoriesPerUser - 1 {
-			_, err := insertMemory(ctx, limited.ID, fmt.Sprintf("memory-%03d.md", i))
-			require.NoError(t, err)
-		}
-
-		// Two SERIALIZABLE transactions race for the last slot. SSI detects
-		// the read/write dependency between their cap counts and aborts the
-		// second with a serialization error, so the cap holds even though
-		// the second count ran against a pre-commit snapshot.
-		tx1, err := sqlDB.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelSerializable})
-		require.NoError(t, err)
-		committed := false
-		t.Cleanup(func() {
-			if !committed {
-				_ = tx1.Rollback()
-			}
-		})
-		_, err = tx1.ExecContext(ctx, `
-			INSERT INTO user_memories (id, user_id, path, content)
-			VALUES ($1, $2, 'memory-099.md', 'content')
-		`, uuid.New(), limited.ID)
-		require.NoError(t, err)
-
-		raceConn, err := sqlDB.Conn(ctx)
-		require.NoError(t, err)
-		t.Cleanup(func() { _ = raceConn.Close() })
-		var racePID int
-		require.NoError(t, raceConn.QueryRowContext(ctx, `SELECT pg_backend_pid()`).Scan(&racePID))
-		tx2, err := raceConn.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelSerializable})
-		require.NoError(t, err)
-		t.Cleanup(func() { _ = tx2.Rollback() })
-
-		raceResult := make(chan error, 1)
-		go func() {
-			_, err := tx2.ExecContext(ctx, `
-				INSERT INTO user_memories (id, user_id, path, content)
-				VALUES ($1, $2, 'one-too-many.md', 'content')
-			`, uuid.New(), limited.ID)
-			if err == nil {
-				err = tx2.Commit()
-			}
-			raceResult <- err
-		}()
-
-		waitForBackendBlocked(ctx, t, sqlDB, racePID)
-		require.NoError(t, tx1.Commit())
-		committed = true
-
-		select {
-		case err := <-raceResult:
-			require.Error(t, err)
-			require.True(t, database.IsSerializedError(err), "expected a serialization failure, got: %v", err)
-		case <-ctx.Done():
-			require.Failf(t, "racing insert did not finish", "context ended: %v", ctx.Err())
-		}
-
-		list, err := db.ListUserMemoriesByUserID(ctx, limited.ID)
-		require.NoError(t, err)
-		require.Len(t, list, memory.MaxUserMemoriesPerUser)
 	})
 
 	t.Run("GetAndList", func(t *testing.T) {
@@ -457,7 +458,7 @@ func TestUserMemories(t *testing.T) {
 		// let the insert skip the soft-delete and cap checks entirely.
 		_, err := insertMemory(ctx, uuid.New(), "orphan.md")
 		require.Error(t, err)
-		require.True(t, database.IsCheckViolation(err, database.CheckConstraint("user_memory_user_required")), "got: %v", err)
+		require.True(t, database.IsCheckViolation(err, memory.UserMemoryUserRequiredConstraint), "got: %v", err)
 	})
 
 	t.Run("SoftDeletedUserRejected", func(t *testing.T) {
@@ -466,7 +467,7 @@ func TestUserMemories(t *testing.T) {
 		deletedUser := dbgen.User(t, db, database.User{Deleted: true})
 		_, err := insertMemory(ctx, deletedUser.ID, "rejected.md")
 		require.Error(t, err)
-		require.True(t, database.IsCheckViolation(err, database.CheckConstraint("user_memory_user_deleted")), "got: %v", err)
+		require.True(t, database.IsCheckViolation(err, memory.UserMemoryUserDeletedConstraint), "got: %v", err)
 	})
 
 	t.Run("SoftDeleteWinsConcurrentInsert", func(t *testing.T) {
@@ -476,7 +477,7 @@ func TestUserMemories(t *testing.T) {
 
 		// Hold the lock the trigger takes, soft-delete while the insert is
 		// blocked, and expect the insert to observe the deletion.
-		err := runLockRace(ctx, t, sqlDB,
+		err := runLockRace(ctx, t, sqlDB, sql.LevelDefault,
 			[]stmt{{`SELECT id FROM users WHERE id = $1 FOR NO KEY UPDATE`, []any{user.ID}}},
 			stmt{`
 				INSERT INTO user_memories (id, user_id, path, content)
@@ -485,7 +486,7 @@ func TestUserMemories(t *testing.T) {
 			[]stmt{{`UPDATE users SET deleted = true WHERE id = $1`, []any{user.ID}}},
 		)
 		require.Error(t, err)
-		require.True(t, database.IsCheckViolation(err, database.CheckConstraint("user_memory_user_deleted")), "got: %v", err)
+		require.True(t, database.IsCheckViolation(err, memory.UserMemoryUserDeletedConstraint), "got: %v", err)
 
 		list, err := db.ListUserMemoriesByUserID(ctx, user.ID)
 		require.NoError(t, err)
@@ -517,7 +518,7 @@ func TestUserMemories(t *testing.T) {
 		}
 		_, err := insertMemory(ctx, limited.ID, "one-too-many.md")
 		require.Error(t, err)
-		require.True(t, database.IsCheckViolation(err, database.CheckConstraint("user_memories_per_user_limit")), "got: %v", err)
+		require.True(t, database.IsCheckViolation(err, memory.UserMemoriesPerUserLimitConstraint), "got: %v", err)
 	})
 
 	t.Run("ConcurrentInsertPerUserLimit", func(t *testing.T) {
@@ -531,7 +532,7 @@ func TestUserMemories(t *testing.T) {
 
 		// The insert filling the cap holds the parent-row lock; the racing
 		// insert must re-count after the commit and hit the cap.
-		err := runLockRace(ctx, t, sqlDB,
+		err := runLockRace(ctx, t, sqlDB, sql.LevelDefault,
 			[]stmt{{`
 				INSERT INTO user_memories (id, user_id, path, content)
 				VALUES ($1, $2, 'memory-099.md', 'content')
@@ -543,7 +544,7 @@ func TestUserMemories(t *testing.T) {
 			nil,
 		)
 		require.Error(t, err)
-		require.True(t, database.IsCheckViolation(err, database.CheckConstraint("user_memories_per_user_limit")), "got: %v", err)
+		require.True(t, database.IsCheckViolation(err, memory.UserMemoriesPerUserLimitConstraint), "got: %v", err)
 
 		list, err := db.ListUserMemoriesByUserID(ctx, limited.ID)
 		require.NoError(t, err)
@@ -657,44 +658,49 @@ func TestChatMemories(t *testing.T) {
 		// let a memory land under an unvalidated, possibly subagent, chat.
 		_, err := insertMemory(ctx, uuid.New(), "orphan.md")
 		require.Error(t, err)
-		require.True(t, database.IsCheckViolation(err, database.CheckConstraint("chat_memory_root_chat_required")), "got: %v", err)
+		require.True(t, database.IsCheckViolation(err, memory.ChatMemoryRootChatRequiredConstraint), "got: %v", err)
 	})
 
 	t.Run("SubagentChatRejected", func(t *testing.T) {
 		t.Parallel()
-		ctx := testutil.Context(t, testutil.WaitLong)
-		root := insertTestChat(t, db)
-		child := dbgen.Chat(t, db, database.Chat{
-			OrganizationID:    root.OrganizationID,
-			OwnerID:           root.OwnerID,
-			LastModelConfigID: root.LastModelConfigID,
-			ParentChatID:      uuid.NullUUID{UUID: root.ID, Valid: true},
-			RootChatID:        uuid.NullUUID{UUID: root.ID, Valid: true},
-		})
 
-		_, err := insertMemory(ctx, child.ID, "rejected.md")
-		require.Error(t, err)
-		require.True(t, database.IsCheckViolation(err, database.CheckConstraint("chat_memory_root_chat_required")), "got: %v", err)
-	})
+		// The guard checks parent_chat_id and root_chat_id independently
+		// because the ON DELETE SET NULL hierarchy FKs can null either one
+		// on its own: hard-deleting an intermediate subagent chat nulls a
+		// grandchild's parent_chat_id (RootOnly), and purging a root chat
+		// nulls a grandchild's root_chat_id while parent_chat_id still
+		// points at the surviving intermediate (ParentOnly). Every shape
+		// with either column set must be rejected.
+		for _, tc := range []struct {
+			name               string
+			parentSet, rootSet bool
+		}{
+			{name: "ParentAndRoot", parentSet: true, rootSet: true},
+			{name: "RootOnly", parentSet: false, rootSet: true},
+			{name: "ParentOnly", parentSet: true, rootSet: false},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				t.Parallel()
+				ctx := testutil.Context(t, testutil.WaitLong)
+				root := insertTestChat(t, db)
+				seed := database.Chat{
+					OrganizationID:    root.OrganizationID,
+					OwnerID:           root.OwnerID,
+					LastModelConfigID: root.LastModelConfigID,
+				}
+				if tc.parentSet {
+					seed.ParentChatID = uuid.NullUUID{UUID: root.ID, Valid: true}
+				}
+				if tc.rootSet {
+					seed.RootChatID = uuid.NullUUID{UUID: root.ID, Valid: true}
+				}
+				child := dbgen.Chat(t, db, seed)
 
-	t.Run("OrphanedSubagentChatRejected", func(t *testing.T) {
-		t.Parallel()
-		ctx := testutil.Context(t, testutil.WaitLong)
-		root := insertTestChat(t, db)
-		// parent_chat_id NULL with root_chat_id set is production-reachable:
-		// the ON DELETE SET NULL FK nulls parent_chat_id when an intermediate
-		// subagent chat is hard-deleted while root_chat_id still points at
-		// the real root. The guard's second leg must reject it on its own.
-		child := dbgen.Chat(t, db, database.Chat{
-			OrganizationID:    root.OrganizationID,
-			OwnerID:           root.OwnerID,
-			LastModelConfigID: root.LastModelConfigID,
-			RootChatID:        uuid.NullUUID{UUID: root.ID, Valid: true},
-		})
-
-		_, err := insertMemory(ctx, child.ID, "rejected.md")
-		require.Error(t, err)
-		require.True(t, database.IsCheckViolation(err, database.CheckConstraint("chat_memory_root_chat_required")), "got: %v", err)
+				_, err := insertMemory(ctx, child.ID, "rejected.md")
+				require.Error(t, err)
+				require.True(t, database.IsCheckViolation(err, memory.ChatMemoryRootChatRequiredConstraint), "got: %v", err)
+			})
+		}
 	})
 
 	t.Run("DuplicatePathRejected", func(t *testing.T) {
@@ -866,26 +872,51 @@ func TestChatMemories(t *testing.T) {
 		require.Empty(t, list)
 	})
 
-	t.Run("RepeatableReadRejected", func(t *testing.T) {
+	t.Run("NonReadCommittedRejected", func(t *testing.T) {
 		t.Parallel()
-		ctx := testutil.Context(t, testutil.WaitLong)
-		chat := insertTestChat(t, db)
 
-		// The count cap would silently overshoot under REPEATABLE READ (the
-		// snapshot survives the parent-row lock wait), so the trigger fails
-		// loudly instead.
-		tx, err := sqlDB.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelRepeatableRead})
-		require.NoError(t, err)
-		defer func() { _ = tx.Rollback() }()
-		_, err = tx.ExecContext(ctx, `
-			INSERT INTO chat_memories (id, root_chat_id, path, content)
-			VALUES ($1, $2, 'isolation.md', 'content')
-		`, uuid.New(), chat.ID)
-		require.Error(t, err)
-		require.True(t, database.IsCheckViolation(err, database.CheckConstraint("chat_memory_insert_isolation")), "got: %v", err)
+		// See the user-side twin: the cap is race-free only under READ
+		// COMMITTED, so every other isolation level is rejected loudly.
+		for name, level := range map[string]sql.IsolationLevel{
+			"RepeatableRead": sql.LevelRepeatableRead,
+			"Serializable":   sql.LevelSerializable,
+		} {
+			t.Run(name, func(t *testing.T) {
+				t.Parallel()
+				ctx := testutil.Context(t, testutil.WaitLong)
+				chat := insertTestChat(t, db)
+
+				tx, err := sqlDB.BeginTx(ctx, &sql.TxOptions{Isolation: level})
+				require.NoError(t, err)
+				defer func() { _ = tx.Rollback() }()
+				_, err = tx.ExecContext(ctx, `
+					INSERT INTO chat_memories (id, root_chat_id, path, content)
+					VALUES ($1, $2, 'isolation.md', 'content')
+				`, uuid.New(), chat.ID)
+				require.Error(t, err)
+				require.True(t, database.IsCheckViolation(err, memory.ChatMemoryInsertIsolationConstraint), "got: %v", err)
+			})
+		}
 	})
 
-	t.Run("UpdatePathTakesNoChatLock", func(t *testing.T) {
+	t.Run("OwnerImmutable", func(t *testing.T) {
+		t.Parallel()
+		ctx := testutil.Context(t, testutil.WaitLong)
+		owner := insertTestChat(t, db)
+		other := insertTestChat(t, db)
+		_, err := insertMemory(ctx, owner.ID, "owned.md")
+		require.NoError(t, err)
+
+		// The insert invariants fire BEFORE INSERT only, so a reassignable
+		// owner column would bypass the root-chat and cap checks; the owner
+		// is immutable instead.
+		_, err = sqlDB.ExecContext(ctx,
+			`UPDATE chat_memories SET root_chat_id = $1 WHERE root_chat_id = $2`, other.ID, owner.ID)
+		require.Error(t, err)
+		require.True(t, database.IsCheckViolation(err, memory.ChatMemoryOwnerImmutableConstraint), "got: %v", err)
+	})
+
+	t.Run("UpdateTakesNoChatLock", func(t *testing.T) {
 		t.Parallel()
 		ctx := testutil.Context(t, testutil.WaitLong)
 		chat := insertTestChat(t, db)
@@ -911,74 +942,14 @@ func TestChatMemories(t *testing.T) {
 		t.Cleanup(func() { _ = updateConn.Close() })
 		_, err = updateConn.ExecContext(ctx, `SET lock_timeout = '2s'`)
 		require.NoError(t, err)
+		// Reset before the connection returns to the pool; database/sql
+		// does not reset session state, so the timeout would leak into
+		// whichever parallel sibling draws this connection next. Cleanups
+		// run LIFO, so this runs before Close.
+		t.Cleanup(func() { _, _ = updateConn.ExecContext(context.Background(), `RESET lock_timeout`) })
 		_, err = updateConn.ExecContext(ctx,
 			`UPDATE chat_memories SET content = 'edited' WHERE root_chat_id = $1`, chat.ID)
 		require.NoError(t, err, "memory updates must not wait on the chats row")
-	})
-
-	t.Run("SerializableCapHolds", func(t *testing.T) {
-		t.Parallel()
-		ctx := testutil.Context(t, testutil.WaitLong)
-		limited := insertTestChat(t, db)
-		for i := range memory.MaxChatMemoriesPerRootChat - 1 {
-			_, err := insertMemory(ctx, limited.ID, fmt.Sprintf("memory-%03d.md", i))
-			require.NoError(t, err)
-		}
-
-		// Two SERIALIZABLE transactions race for the last slot. SSI detects
-		// the read/write dependency between their cap counts and aborts the
-		// second with a serialization error, so the cap holds even though
-		// the second count ran against a pre-commit snapshot.
-		tx1, err := sqlDB.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelSerializable})
-		require.NoError(t, err)
-		committed := false
-		t.Cleanup(func() {
-			if !committed {
-				_ = tx1.Rollback()
-			}
-		})
-		_, err = tx1.ExecContext(ctx, `
-			INSERT INTO chat_memories (id, root_chat_id, path, content)
-			VALUES ($1, $2, 'memory-099.md', 'content')
-		`, uuid.New(), limited.ID)
-		require.NoError(t, err)
-
-		raceConn, err := sqlDB.Conn(ctx)
-		require.NoError(t, err)
-		t.Cleanup(func() { _ = raceConn.Close() })
-		var racePID int
-		require.NoError(t, raceConn.QueryRowContext(ctx, `SELECT pg_backend_pid()`).Scan(&racePID))
-		tx2, err := raceConn.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelSerializable})
-		require.NoError(t, err)
-		t.Cleanup(func() { _ = tx2.Rollback() })
-
-		raceResult := make(chan error, 1)
-		go func() {
-			_, err := tx2.ExecContext(ctx, `
-				INSERT INTO chat_memories (id, root_chat_id, path, content)
-				VALUES ($1, $2, 'one-too-many.md', 'content')
-			`, uuid.New(), limited.ID)
-			if err == nil {
-				err = tx2.Commit()
-			}
-			raceResult <- err
-		}()
-
-		waitForBackendBlocked(ctx, t, sqlDB, racePID)
-		require.NoError(t, tx1.Commit())
-		committed = true
-
-		select {
-		case err := <-raceResult:
-			require.Error(t, err)
-			require.True(t, database.IsSerializedError(err), "expected a serialization failure, got: %v", err)
-		case <-ctx.Done():
-			require.Failf(t, "racing insert did not finish", "context ended: %v", ctx.Err())
-		}
-
-		list, err := db.ListChatMemoriesByRootChatID(ctx, limited.ID)
-		require.NoError(t, err)
-		require.Len(t, list, memory.MaxChatMemoriesPerRootChat)
 	})
 
 	t.Run("PerRootChatLimit", func(t *testing.T) {
@@ -991,7 +962,7 @@ func TestChatMemories(t *testing.T) {
 		}
 		_, err := insertMemory(ctx, limited.ID, "one-too-many.md")
 		require.Error(t, err)
-		require.True(t, database.IsCheckViolation(err, database.CheckConstraint("chat_memories_per_root_chat_limit")), "got: %v", err)
+		require.True(t, database.IsCheckViolation(err, memory.ChatMemoriesPerRootChatLimitConstraint), "got: %v", err)
 	})
 
 	t.Run("ConcurrentInsertPerRootChatLimit", func(t *testing.T) {
@@ -1005,7 +976,7 @@ func TestChatMemories(t *testing.T) {
 
 		// The insert filling the cap holds the parent-row lock; the racing
 		// insert must re-count after the commit and hit the cap.
-		err := runLockRace(ctx, t, sqlDB,
+		err := runLockRace(ctx, t, sqlDB, sql.LevelDefault,
 			[]stmt{{`
 				INSERT INTO chat_memories (id, root_chat_id, path, content)
 				VALUES ($1, $2, 'memory-099.md', 'content')
@@ -1017,7 +988,7 @@ func TestChatMemories(t *testing.T) {
 			nil,
 		)
 		require.Error(t, err)
-		require.True(t, database.IsCheckViolation(err, database.CheckConstraint("chat_memories_per_root_chat_limit")), "got: %v", err)
+		require.True(t, database.IsCheckViolation(err, memory.ChatMemoriesPerRootChatLimitConstraint), "got: %v", err)
 
 		list, err := db.ListChatMemoriesByRootChatID(ctx, limited.ID)
 		require.NoError(t, err)

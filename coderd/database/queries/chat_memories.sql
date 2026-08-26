@@ -7,15 +7,18 @@
 -- must not clobber an existing document, so callers use Insert (fails on
 -- duplicate path) and Update (fails on missing path) explicitly.
 --
--- Memory inserts require READ COMMITTED; the insert trigger rejects
--- REPEATABLE READ, so callers must not wrap them in database.ReadModifyUpdate.
+-- Memory inserts require READ COMMITTED; the insert trigger rejects every
+-- other isolation level, so callers must not wrap them in
+-- database.ReadModifyUpdate.
 --
 -- The insert trigger also locks the parent chats row, so a transaction that
--- updates or deletes an existing memory row and then inserts another for
+-- holds a lock on any chat-owned child row and then inserts a memory for
 -- the same root chat inverts the lock order against the retention purge
 -- cascade and deadlocks (40P01, which coderd does not retry). Take the
--- parent lock first, or do not mix an insert with prior memory-row writes
--- in one transaction.
+-- chats row lock first: GetChatByIDForUpdate, or ChatMachine.Update, which
+-- opens with LockChatAndBumpSnapshotVersion (LockChatByID is system-scoped
+-- and not callable as the user). Or do not mix the insert with prior
+-- child-row writes in one transaction.
 -- name: InsertChatMemory :one
 INSERT INTO chat_memories (id, root_chat_id, path, content)
 VALUES (@id::uuid, @root_chat_id::uuid, @path::text, @content::text)

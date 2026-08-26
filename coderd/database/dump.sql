@@ -1058,10 +1058,11 @@ DECLARE
     memory_count int;
     memory_limit constant int := 100;
 BEGIN
-    IF current_setting('transaction_isolation') = 'repeatable read' THEN
+    IF current_setting('transaction_isolation') <> 'read committed' THEN
         RAISE EXCEPTION 'chat_memories inserts require READ COMMITTED isolation'
             USING ERRCODE = 'check_violation',
-                  CONSTRAINT = 'chat_memory_insert_isolation';
+                  CONSTRAINT = 'chat_memory_insert_isolation',
+                  DETAIL = format('transaction_isolation is %s; if the caller did not set it, check default_transaction_isolation on the deployment', current_setting('transaction_isolation'));
     END IF;
 
     SELECT parent_chat_id, root_chat_id
@@ -1110,6 +1111,19 @@ BEGIN
 END;
 $$;
 
+CREATE FUNCTION enforce_chat_memories_owner_immutable() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    IF NEW.root_chat_id <> OLD.root_chat_id THEN
+        RAISE EXCEPTION 'chat_memories.root_chat_id is immutable'
+            USING ERRCODE = 'check_violation',
+                  CONSTRAINT = 'chat_memory_owner_immutable';
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
 CREATE FUNCTION enforce_user_ai_budget_override_membership() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
@@ -1134,10 +1148,11 @@ DECLARE
     memory_count int;
     memory_limit constant int := 100;
 BEGIN
-    IF current_setting('transaction_isolation') = 'repeatable read' THEN
+    IF current_setting('transaction_isolation') <> 'read committed' THEN
         RAISE EXCEPTION 'user_memories inserts require READ COMMITTED isolation'
             USING ERRCODE = 'check_violation',
-                  CONSTRAINT = 'user_memory_insert_isolation';
+                  CONSTRAINT = 'user_memory_insert_isolation',
+                  DETAIL = format('transaction_isolation is %s; if the caller did not set it, check default_transaction_isolation on the deployment', current_setting('transaction_isolation'));
     END IF;
 
     SELECT deleted INTO user_deleted
@@ -1170,6 +1185,19 @@ BEGIN
             NEW.user_id, memory_limit, memory_count
             USING ERRCODE = 'check_violation',
                   CONSTRAINT = 'user_memories_per_user_limit';
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+CREATE FUNCTION enforce_user_memories_owner_immutable() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    IF NEW.user_id <> OLD.user_id THEN
+        RAISE EXCEPTION 'user_memories.user_id is immutable'
+            USING ERRCODE = 'check_violation',
+                  CONSTRAINT = 'user_memory_owner_immutable';
     END IF;
     RETURN NEW;
 END;
@@ -5366,6 +5394,8 @@ CREATE TRIGGER trigger_bump_chat_queue_version_on_queued_message_update AFTER UP
 
 CREATE TRIGGER trigger_chat_memories_insert_invariants BEFORE INSERT ON chat_memories FOR EACH ROW EXECUTE FUNCTION enforce_chat_memories_insert_invariants();
 
+CREATE TRIGGER trigger_chat_memories_owner_immutable BEFORE UPDATE ON chat_memories FOR EACH ROW EXECUTE FUNCTION enforce_chat_memories_owner_immutable();
+
 CREATE TRIGGER trigger_delete_group_members_on_org_member_delete BEFORE DELETE ON organization_members FOR EACH ROW EXECUTE FUNCTION delete_group_members_on_org_member_delete();
 
 CREATE TRIGGER trigger_delete_oauth2_provider_app_token AFTER DELETE ON oauth2_provider_app_tokens FOR EACH ROW EXECUTE FUNCTION delete_deleted_oauth2_provider_app_token_api_key();
@@ -5405,6 +5435,8 @@ CREATE TRIGGER trigger_upsert_user_secrets BEFORE INSERT OR UPDATE ON user_secre
 CREATE TRIGGER trigger_upsert_user_skills BEFORE INSERT OR UPDATE ON user_skills FOR EACH ROW EXECUTE FUNCTION fail_if_user_deleted('user_skill', 'user_skill_user_deleted');
 
 CREATE TRIGGER trigger_user_memories_insert_invariants BEFORE INSERT ON user_memories FOR EACH ROW EXECUTE FUNCTION enforce_user_memories_insert_invariants();
+
+CREATE TRIGGER trigger_user_memories_owner_immutable BEFORE UPDATE ON user_memories FOR EACH ROW EXECUTE FUNCTION enforce_user_memories_owner_immutable();
 
 CREATE TRIGGER trigger_zz_user_secrets_per_user_limits BEFORE INSERT OR UPDATE ON user_secrets FOR EACH ROW EXECUTE FUNCTION enforce_user_secrets_per_user_limits();
 

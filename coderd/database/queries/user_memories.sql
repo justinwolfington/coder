@@ -2,15 +2,18 @@
 -- must not clobber an existing document, so callers use Insert (fails on
 -- duplicate path) and Update (fails on missing path) explicitly.
 --
--- Memory inserts require READ COMMITTED; the insert trigger rejects
--- REPEATABLE READ, so callers must not wrap them in database.ReadModifyUpdate.
+-- Memory inserts require READ COMMITTED; the insert trigger rejects every
+-- other isolation level, so callers must not wrap them in
+-- database.ReadModifyUpdate.
 --
 -- The insert trigger also locks the parent users row, so a transaction that
--- updates or deletes an existing memory row and then inserts another for
--- the same user inverts the lock order against the soft-delete cleanup and
--- deadlocks (40P01, which coderd does not retry). Take the parent lock
--- first, or do not mix an insert with prior memory-row writes in one
--- transaction.
+-- holds a lock on any row that delete_deleted_user_resources deletes
+-- (api_keys, user_links, user_secrets, user_skills, user_ai_provider_keys,
+-- organization_members, or a user_memories row) and then inserts a memory
+-- for the same user inverts the lock order against that cleanup and
+-- deadlocks with a concurrent soft-delete (40P01, which coderd does not
+-- retry). Call AcquireUserSoftDeleteGuardLock first, or do not mix the
+-- insert with prior child-row writes in one transaction.
 -- name: InsertUserMemory :one
 INSERT INTO user_memories (id, user_id, path, content)
 VALUES (@id::uuid, @user_id::uuid, @path::text, @content::text)

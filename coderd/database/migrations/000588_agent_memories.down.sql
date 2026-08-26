@@ -50,7 +50,11 @@ $$;
 
 DROP TRIGGER IF EXISTS trigger_user_memories_insert_invariants ON user_memories;
 DROP FUNCTION IF EXISTS enforce_user_memories_insert_invariants();
+DROP TRIGGER IF EXISTS trigger_user_memories_owner_immutable ON user_memories;
+DROP FUNCTION IF EXISTS enforce_user_memories_owner_immutable();
 DROP TRIGGER IF EXISTS trigger_chat_memories_insert_invariants ON chat_memories;
 DROP FUNCTION IF EXISTS enforce_chat_memories_insert_invariants();
+DROP TRIGGER IF EXISTS trigger_chat_memories_owner_immutable ON chat_memories;
+DROP FUNCTION IF EXISTS enforce_chat_memories_owner_immutable();
 DROP TABLE user_memories;
 DROP TABLE chat_memories;

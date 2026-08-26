@@ -15,80 +15,8 @@ import (
 	"github.com/coder/coder/v2/testutil"
 )
 
-// stmt pairs a SQL statement with its bound arguments for runLockRace.
-type stmt struct {
-	sql  string
-	args []any
-}
-
-// waitForBackendBlocked polls pg_stat_activity until the backend identified by
-// pid is waiting on a heavyweight lock, proving the racing statement is
-// blocked on a row lock rather than still executing.
-func waitForBackendBlocked(ctx context.Context, t *testing.T, sqlDB *sql.DB, pid int) {
-	t.Helper()
-	testutil.Eventually(ctx, t, func(ctx context.Context) bool {
-		var lockWaits int
-		err := sqlDB.QueryRowContext(ctx, `
-			SELECT count(*)
-			FROM pg_stat_activity
-			WHERE pid = $1 AND wait_event_type = 'Lock'
-		`, pid).Scan(&lockWaits)
-		return err == nil && lockWaits == 1
-	}, testutil.IntervalFast, "wait for the backend to block on a row lock")
-	require.NoError(t, ctx.Err(), "waiting for the blocked backend")
-}
-
-// runLockRace executes the blocking statements in one transaction, launches
-// racing on a dedicated connection, deterministically waits for it to block
-// on a row lock held by the blocking transaction, executes beforeCommit
-// inside the blocking transaction, commits it, and returns the racing
-// statement's error.
-func runLockRace(ctx context.Context, t *testing.T, sqlDB *sql.DB, blocking []stmt, racing stmt, beforeCommit []stmt) error {
-	t.Helper()
-
-	blockTx, err := sqlDB.BeginTx(ctx, nil)
-	require.NoError(t, err)
-	committed := false
-	t.Cleanup(func() {
-		if !committed {
-			_ = blockTx.Rollback()
-		}
-	})
-	for _, s := range blocking {
-		_, err := blockTx.ExecContext(ctx, s.sql, s.args...)
-		require.NoError(t, err)
-	}
-
-	raceConn, err := sqlDB.Conn(ctx)
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = raceConn.Close() })
-
-	var racePID int
-	require.NoError(t, raceConn.QueryRowContext(ctx, `SELECT pg_backend_pid()`).Scan(&racePID))
-
-	raceResult := make(chan error, 1)
-	go func() {
-		_, err := raceConn.ExecContext(ctx, racing.sql, racing.args...)
-		raceResult <- err
-	}()
-
-	waitForBackendBlocked(ctx, t, sqlDB, racePID)
-
-	for _, s := range beforeCommit {
-		_, err := blockTx.ExecContext(ctx, s.sql, s.args...)
-		require.NoError(t, err)
-	}
-	require.NoError(t, blockTx.Commit())
-	committed = true
-
-	select {
-	case err := <-raceResult:
-		return err
-	case <-ctx.Done():
-		t.Fatalf("racing statement did not finish: %v", ctx.Err())
-		return nil
-	}
-}
+// The stmt/waitForBackendBlocked/runLockRace harness lives in
+// lockrace_test.go, shared with the agent memory tests.
 
 // TestSoftDeleteGuardWinsConcurrentInsert verifies that all six soft-delete
 // guard triggers serialize against a concurrent user soft-delete via the
@@ -189,7 +117,7 @@ func TestSoftDeleteGuardWinsConcurrentInsert(t *testing.T) {
 
 			// Hold the same lock the guard trigger takes so the insert
 			// blocks, then soft-delete before releasing it.
-			err := runLockRace(ctx, t, sqlDB,
+			err := runLockRace(ctx, t, sqlDB, sql.LevelDefault,
 				[]stmt{{`SELECT id FROM users WHERE id = $1 FOR NO KEY UPDATE`, []any{user.ID}}},
 				tc.insert(user.ID),
 				[]stmt{{`UPDATE users SET deleted = true WHERE id = $1`, []any{user.ID}}},

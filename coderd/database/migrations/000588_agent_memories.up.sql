@@ -47,25 +47,30 @@ CREATE UNIQUE INDEX chat_memories_root_chat_id_path_idx ON chat_memories (root_c
 
 -- Locking the user row serializes the count check and user soft deletion
 -- without conflicting with foreign key validation on other child tables.
+-- It does conflict with ordinary UPDATE statements on the same users row
+-- (for example UpdateUserLastSeenAt, written roughly once per minute per
+-- active session by the API key middleware); both sides are single short
+-- statements, so the cost is accepted.
 --
--- The count cap is only race-free under READ COMMITTED: REPEATABLE READ
--- keeps the transaction snapshot across the lock wait, so a concurrent
--- committed insert stays invisible to count(*) and the cap can be silently
--- exceeded. The trigger therefore rejects REPEATABLE READ outright.
--- SERIALIZABLE stays allowed because SSI detects the read/write dependency
--- between two concurrent cap counts and aborts one transaction. The
--- soft-delete check needs no isolation guard at all: a concurrent
--- soft-delete updates the locked users row, so a waiting SERIALIZABLE
--- transaction fails with a serialization error (40001) instead of reading
--- stale state.
+-- The count cap is only race-free under READ COMMITTED, which re-reads
+-- committed state after the lock wait. Any other isolation level keeps its
+-- transaction snapshot across the lock wait, and SSI tracks read/write
+-- antidependencies only among SERIALIZABLE participants, so a REPEATABLE
+-- READ or SERIALIZABLE inserter racing a READ COMMITTED one recounts at a
+-- stale snapshot and silently exceeds the cap. The trigger therefore
+-- allows READ COMMITTED only; coderd retries serialization failures, so an
+-- accidental non-default-isolation caller fails loudly here instead of
+-- corrupting the invariant.
 --
--- The lock also imposes an ordering contract on callers (see the query file
--- headers): a transaction that updates or deletes an existing memory row
--- and then inserts another for the same user inverts the lock order against
--- delete_deleted_user_resources (child tuple first, users second) and
--- deadlocks with a concurrent soft-delete (40P01, which coderd does not
--- retry). Take the parent lock first, or do not mix an insert with prior
--- memory-row writes in one transaction.
+-- The lock also imposes an ordering contract on callers: a transaction
+-- that holds a lock on any row that delete_deleted_user_resources deletes
+-- (api_keys, user_links, user_secrets, user_skills, user_ai_provider_keys,
+-- organization_members, or a user_memories row) and then inserts a memory
+-- for the same user inverts the lock order against that cleanup (child
+-- tuple first, users second) and deadlocks with a concurrent soft-delete
+-- (40P01, which coderd does not retry). Call AcquireUserSoftDeleteGuardLock
+-- first, or do not mix the insert with prior child-row writes in one
+-- transaction.
 CREATE FUNCTION enforce_user_memories_insert_invariants() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
@@ -74,10 +79,11 @@ DECLARE
     memory_count int;
     memory_limit constant int := 100;
 BEGIN
-    IF current_setting('transaction_isolation') = 'repeatable read' THEN
+    IF current_setting('transaction_isolation') <> 'read committed' THEN
         RAISE EXCEPTION 'user_memories inserts require READ COMMITTED isolation'
             USING ERRCODE = 'check_violation',
-                  CONSTRAINT = 'user_memory_insert_isolation';
+                  CONSTRAINT = 'user_memory_insert_isolation',
+                  DETAIL = format('transaction_isolation is %s; if the caller did not set it, check default_transaction_isolation on the deployment', current_setting('transaction_isolation'));
     END IF;
 
     SELECT deleted INTO user_deleted
@@ -120,6 +126,28 @@ BEFORE INSERT ON user_memories
 FOR EACH ROW
 EXECUTE PROCEDURE enforce_user_memories_insert_invariants();
 
+-- The insert invariants fire BEFORE INSERT only; an UPDATE that reassigns
+-- the owner column would bypass all of them (soft-delete and cap checks).
+-- The owner column is immutable instead, with no parent lock so the UPDATE
+-- path cannot deadlock against the soft-delete cleanup.
+CREATE FUNCTION enforce_user_memories_owner_immutable() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    IF NEW.user_id <> OLD.user_id THEN
+        RAISE EXCEPTION 'user_memories.user_id is immutable'
+            USING ERRCODE = 'check_violation',
+                  CONSTRAINT = 'user_memory_owner_immutable';
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER trigger_user_memories_owner_immutable
+BEFORE UPDATE ON user_memories
+FOR EACH ROW
+EXECUTE PROCEDURE enforce_user_memories_owner_immutable();
+
 -- Locking the chat row serializes the count check without conflicting with
 -- foreign key validation on other child tables. The lock does contend with
 -- ordinary UPDATE statements on the same chats row (title changes, archived flips,
@@ -127,16 +155,18 @@ EXECUTE PROCEDURE enforce_user_memories_insert_invariants();
 -- low-frequency and capped.
 --
 -- The count cap is only race-free under READ COMMITTED (see the isolation
--- note on enforce_user_memories_insert_invariants, including why
--- SERIALIZABLE stays allowed); REPEATABLE READ is rejected.
+-- note on enforce_user_memories_insert_invariants); only READ COMMITTED is
+-- allowed.
 --
--- The lock also imposes an ordering contract on callers (see the query file
--- headers): a transaction that updates or deletes an existing memory row
--- and then inserts another for the same root chat inverts the lock order
--- against hard chat deletion (child tuple first, chats second; the
--- retention purge cascade takes chats first) and deadlocks (40P01, which
--- coderd does not retry). Take the parent lock first, or do not mix an
--- insert with prior memory-row writes in one transaction.
+-- The lock also imposes an ordering contract on callers: a transaction
+-- that holds a lock on any chat-owned child row and then inserts a memory
+-- for the same root chat inverts the lock order against hard chat deletion
+-- (child tuple first, chats second; the retention purge cascade takes
+-- chats first) and deadlocks (40P01, which coderd does not retry). Take
+-- the chats row lock first: GetChatByIDForUpdate, or ChatMachine.Update,
+-- which opens with LockChatAndBumpSnapshotVersion (LockChatByID is
+-- system-scoped and not callable as the user). Or do not mix the insert
+-- with prior child-row writes in one transaction.
 CREATE FUNCTION enforce_chat_memories_insert_invariants() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
@@ -146,10 +176,11 @@ DECLARE
     memory_count int;
     memory_limit constant int := 100;
 BEGIN
-    IF current_setting('transaction_isolation') = 'repeatable read' THEN
+    IF current_setting('transaction_isolation') <> 'read committed' THEN
         RAISE EXCEPTION 'chat_memories inserts require READ COMMITTED isolation'
             USING ERRCODE = 'check_violation',
-                  CONSTRAINT = 'chat_memory_insert_isolation';
+                  CONSTRAINT = 'chat_memory_insert_isolation',
+                  DETAIL = format('transaction_isolation is %s; if the caller did not set it, check default_transaction_isolation on the deployment', current_setting('transaction_isolation'));
     END IF;
 
     SELECT parent_chat_id, root_chat_id
@@ -202,6 +233,28 @@ CREATE TRIGGER trigger_chat_memories_insert_invariants
 BEFORE INSERT ON chat_memories
 FOR EACH ROW
 EXECUTE PROCEDURE enforce_chat_memories_insert_invariants();
+
+-- The insert invariants fire BEFORE INSERT only; an UPDATE that reassigns
+-- the owner column would bypass all of them (root-chat and cap checks).
+-- The owner column is immutable instead, with no parent lock so the UPDATE
+-- path cannot deadlock against hard chat deletion.
+CREATE FUNCTION enforce_chat_memories_owner_immutable() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    IF NEW.root_chat_id <> OLD.root_chat_id THEN
+        RAISE EXCEPTION 'chat_memories.root_chat_id is immutable'
+            USING ERRCODE = 'check_violation',
+                  CONSTRAINT = 'chat_memory_owner_immutable';
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER trigger_chat_memories_owner_immutable
+BEFORE UPDATE ON chat_memories
+FOR EACH ROW
+EXECUTE PROCEDURE enforce_chat_memories_owner_immutable();
 
 -- Extend the soft-delete cleanup trigger to also wipe user_memories.
 -- user_memories.user_id has ON DELETE CASCADE, but Coder soft-deletes
