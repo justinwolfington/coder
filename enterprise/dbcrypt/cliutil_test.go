@@ -117,7 +117,7 @@ func upsertUserAIProviderKey(ctx context.Context, t *testing.T, store database.S
 
 // softDeleteUserKeepingRows soft-deletes the user while suppressing the
 // delete_deleted_user_resources cleanup, reproducing the orphaned child rows
-// that could exist before migration 000585 closed the insert-vs-soft-delete
+// that could exist before migration 000587 closed the insert-vs-soft-delete
 // race (the insert guards now also reject new rows for deleted users, so the
 // orphan state can only be constructed this way). Rotation and decryption
 // must still handle such legacy rows.

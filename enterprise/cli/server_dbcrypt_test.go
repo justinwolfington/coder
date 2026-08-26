@@ -241,19 +241,24 @@ func genData(t *testing.T, db database.Store) []database.User {
 					PrivateKey: "private-" + usr.ID.String(),
 					PublicKey:  "public-" + usr.ID.String(),
 				})
-				now := time.Now()
-				_, err := db.UpsertUserAIProviderKey(context.Background(), database.UpsertUserAIProviderKeyParams{
-					ID:           uuid.New(),
-					UserID:       usr.ID,
-					AIProviderID: provider.ID,
-					APIKey:       "user-ai-provider-key-" + usr.ID.String(),
-					CreatedAt:    now,
-					UpdatedAt:    now,
-				})
-				require.NoError(t, err)
-
-				// Deleted users cannot have user_links or user_secrets.
+				// Deleted users cannot have user_links, user_secrets, or
+				// user AI provider keys: the soft-delete guard triggers
+				// (migration 000587) reject inserts for deleted users.
+				// Orphaned-row rotation coverage lives in
+				// enterprise/dbcrypt/cliutil_test.go, which constructs the
+				// legacy state with the cleanup trigger disabled.
 				if !deleted {
+					now := time.Now()
+					_, err := db.UpsertUserAIProviderKey(context.Background(), database.UpsertUserAIProviderKeyParams{
+						ID:           uuid.New(),
+						UserID:       usr.ID,
+						AIProviderID: provider.ID,
+						APIKey:       "user-ai-provider-key-" + usr.ID.String(),
+						CreatedAt:    now,
+						UpdatedAt:    now,
+					})
+					require.NoError(t, err)
+
 					// Fun fact: our schema allows _all_ login types to have
 					// a user_link. Even though I'm not sure how it could occur
 					// in practice, making sure to test all combinations here.
@@ -352,11 +357,19 @@ func requireEncryptedWithCipher(ctx context.Context, t *testing.T, db database.S
 	requireEncryptedEquals(t, c, "provider-key-"+userID.String(), providerKeys[0].APIKey)
 	require.Equal(t, c.HexDigest(), providerKeys[0].ApiKeyKeyID.String)
 
+	usr, err := db.GetUserByID(ctx, userID)
+	require.NoError(t, err, "failed to get user %s", userID)
 	userAIProviderKeys, err := db.GetUserAIProviderKeysByUserID(ctx, userID)
 	require.NoError(t, err, "failed to get user ai provider keys for user %s", userID)
-	require.Len(t, userAIProviderKeys, 1)
-	requireEncryptedEquals(t, c, "user-ai-provider-key-"+userID.String(), userAIProviderKeys[0].APIKey)
-	require.Equal(t, c.HexDigest(), userAIProviderKeys[0].ApiKeyKeyID.String)
+	if usr.Deleted {
+		// genData seeds no user AI provider keys for deleted users because
+		// the soft-delete guard trigger (migration 000587) rejects them.
+		require.Empty(t, userAIProviderKeys)
+	} else {
+		require.Len(t, userAIProviderKeys, 1)
+		requireEncryptedEquals(t, c, "user-ai-provider-key-"+userID.String(), userAIProviderKeys[0].APIKey)
+		require.Equal(t, c.HexDigest(), userAIProviderKeys[0].ApiKeyKeyID.String)
+	}
 }
 
 // TestServerAIProviderKeysEncryptedWithDBCrypt starts a real enterprise server

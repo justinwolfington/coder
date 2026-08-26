@@ -91,7 +91,7 @@ func runLockRace(ctx context.Context, t *testing.T, sqlDB *sql.DB, blocking []st
 
 // TestSoftDeleteGuardWinsConcurrentInsert verifies that all six soft-delete
 // guard triggers serialize against a concurrent user soft-delete via the
-// parent-row lock added in migration 000585: the insert blocks on the locked
+// parent-row lock added in migration 000587: the insert blocks on the locked
 // users row and, once the soft-delete commits, fails with the guard's
 // constraint instead of resurrecting a row for the deleted user.
 func TestSoftDeleteGuardWinsConcurrentInsert(t *testing.T) {

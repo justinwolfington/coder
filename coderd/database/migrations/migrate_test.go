@@ -3527,13 +3527,13 @@ func TestMigration000583ChatModelOverrideOrgScope(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestMigration000585LockUserSoftDeleteGuards(t *testing.T) {
+func TestMigration000587LockUserSoftDeleteGuards(t *testing.T) {
 	t.Parallel()
 	if testing.Short() {
 		t.SkipNow()
 	}
 
-	const migrationVersion = 585
+	const migrationVersion = 587
 
 	sqlDB := testSQLDB(t)
 
@@ -3641,7 +3641,7 @@ func TestMigration000585LockUserSoftDeleteGuards(t *testing.T) {
 		require.Equal(t, 1, countRows(table, doomedUser), "pre-migration: %s row for the doomed user must exist", table)
 	}
 
-	// Run migration 585.
+	// Run migration 587.
 	version, more, err := next()
 	require.NoError(t, err)
 	require.True(t, more)
