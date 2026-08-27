@@ -8,6 +8,10 @@ coder:
       - coder.abridge.love
 
   coder:
+    image:
+      repo: us-central1-docker.pkg.dev/abridge-artifact-registry/coder/coder-server@sha256
+      tag: b8990953e425f26e3c5417c4a6eb9f7586115f82287bf0f1b022147e9e3f682a
+
     # Staging-specific configuration
     env:
       - name: DB_USER
