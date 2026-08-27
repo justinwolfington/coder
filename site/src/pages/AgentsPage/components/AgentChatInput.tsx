@@ -73,6 +73,7 @@ import {
 	chatAttachmentAcceptAttribute,
 	isChatAttachmentFile,
 } from "../utils/chatAttachments";
+import { chatWidthClass } from "../utils/chatWidth";
 import type { ChatSlashCommand } from "../utils/slashCommands";
 import { AgentSetupNotice } from "./AgentSetupNotice";
 import {
@@ -1063,7 +1064,7 @@ export const AgentChatInput: FC<AgentChatInputProps> = ({
 		<div
 			className={cn(
 				"mx-auto w-full pb-0 sm:pb-4",
-				chatFullWidth ? "max-w-full" : "max-w-3xl",
+				chatWidthClass(chatFullWidth),
 				isEditingHistoryMessage && "pt-1",
 			)}
 		>
@@ -1190,6 +1191,7 @@ export const AgentChatInput: FC<AgentChatInputProps> = ({
 				{onAttach && (
 					<input
 						ref={fileInputRef}
+						data-testid="attachment-file-input"
 						type="file"
 						multiple
 						accept={chatAttachmentAcceptAttribute}
