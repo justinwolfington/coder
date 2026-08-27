@@ -134,6 +134,9 @@ coder:
       - name: TF_VAR_langsmith_endpoint
         value: "http://langsmith-proxy.coder.svc.cluster.local:8080/api/v1"
 
+      - name: TF_VAR_langsmith_annotation_endpoint
+        value: "http://langsmith-annotation-proxy.coder.svc.cluster.local:8080/api/v1"
+
       # Dedicated bucket-only identity for UTD-enabled PHI workspaces; the
       # LangSmith proxy rejects the shared coder identity.
       - name: TF_VAR_phi_workspace_utd_service_account
@@ -280,6 +283,17 @@ langsmithProxy:
   serviceAccount:
     gcpServiceAccount: coder-langsmith-proxy@abridge-client-prod.iam.gserviceaccount.com
 
+
+langsmithAnnotationProxy:
+  enabled: false
+  networkPolicy:
+    nodeCIDR: "10.6.0.0/16"
+  image:
+    tag: ""
+  upstreamUrl: https://langsmith-live.abridge.services/annotation-broker
+  brokerAudience: https://langsmith-live.abridge.services/annotation-broker
+  serviceAccount:
+    gcpServiceAccount: coder-annotation-proxy@abridge-client-prod.iam.gserviceaccount.com
 # Enable PHI Istio egress controls in production
 phiIstio:
   enabled: true

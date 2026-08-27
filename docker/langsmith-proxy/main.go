@@ -23,6 +23,7 @@ import (
 	"net/url"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -30,6 +31,8 @@ import (
 
 const (
 	listenAddr = ":8080"
+
+	defaultMaxBodyBytes = 1 << 20
 
 	saTokenPath     = "/var/run/secrets/kubernetes.io/serviceaccount/token"
 	saCAPath        = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
@@ -46,23 +49,29 @@ const (
 	metadataIdentityURL = "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/identity"
 )
 
-// postAllowlist: read-style LangSmith endpoints that use POST. Everything else
-// non-GET/HEAD is denied so the key can only be used to pull traces, not
-// write or administer.
-var postAllowlist = map[string]bool{
-	"/api/v1/runs/query":      true,
-	"/api/v1/datasets/search": true,
+// defaultRouteAllowlist is the read-only surface used by SDK workflows in PHI
+// workspaces. Unknown and future API resources fail closed. ROUTE_ALLOWLIST
+// replaces it wholesale; a write-capable instance must stay narrower than the
+// LangSmith role its broker mints keys for.
+var defaultRouteAllowlist = []string{
+	"GET /api/v1/info/**",
+	"GET /api/v1/runs/**",
+	"GET /api/v1/sessions/**",
+	"GET /api/v1/datasets/**",
+	"GET /api/v1/examples/**",
+	"POST /api/v1/runs/query",
+	"POST /api/v1/datasets/search",
 }
 
-// getAllowlist contains the LangSmith resources used by the read-only SDK
-// workflows in PHI workspaces. Unknown and future API resources fail closed.
-var getAllowlist = []string{
-	"/api/v1/info",
-	"/api/v1/runs",
-	"/api/v1/sessions",
-	"/api/v1/datasets",
-	"/api/v1/examples",
+var allowedMethods = map[string]bool{
+	http.MethodGet:    true,
+	http.MethodPost:   true,
+	http.MethodPatch:  true,
+	http.MethodPut:    true,
+	http.MethodDelete: true,
 }
+
+var literalSegment = regexp.MustCompile(`^[A-Za-z0-9._-]+$`)
 
 var workspaceServiceAccountPattern = regexp.MustCompile(
 	`^coder-phi-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`,
@@ -210,44 +219,164 @@ func callerFromServiceAccount(serviceAccount string, metadata serviceAccountMeta
 	}, true
 }
 
-func matchesResourcePath(path, resource string) bool {
-	return path == resource || strings.HasPrefix(path, resource+"/")
+func pathSegments(path string) []string {
+	segments := make([]string, 0, 8)
+	for _, segment := range strings.Split(path, "/") {
+		if segment != "" {
+			segments = append(segments, segment)
+		}
+	}
+	return segments
+}
+
+// hasDotSegment guards the gap between an allowlisted pattern and the path the
+// upstream resolves: "/api/v1/runs/../orgs/current" matches a runs pattern here
+// and normalizes into an unlisted path there.
+func hasDotSegment(path string) bool {
+	for _, segment := range pathSegments(path) {
+		if segment == "." || segment == ".." {
+			return true
+		}
+	}
+	return false
+}
+
+type routePattern struct {
+	method    string
+	segments  []string
+	anySuffix bool
+}
+
+func (p routePattern) matches(path string) bool {
+	segments := pathSegments(path)
+	if p.anySuffix {
+		if len(segments) < len(p.segments) {
+			return false
+		}
+	} else if len(segments) != len(p.segments) {
+		return false
+	}
+	for index, pattern := range p.segments {
+		if pattern != "*" && pattern != segments[index] {
+			return false
+		}
+	}
+	return true
+}
+
+func (p routePattern) isLiteral() bool {
+	if p.anySuffix {
+		return false
+	}
+	for _, segment := range p.segments {
+		if segment == "*" {
+			return false
+		}
+	}
+	return true
+}
+
+func (p routePattern) label(path string) string {
+	parts := make([]string, 0, len(p.segments)+1)
+	for _, pattern := range p.segments {
+		if pattern == "*" {
+			parts = append(parts, ":resource")
+			continue
+		}
+		parts = append(parts, pattern)
+	}
+	if p.anySuffix && len(pathSegments(path)) > len(p.segments) {
+		parts = append(parts, ":resource")
+	}
+	return "/" + strings.Join(parts, "/")
+}
+
+type routeAllowlist []routePattern
+
+func parseRouteAllowlist(raw string) (routeAllowlist, error) {
+	entries := defaultRouteAllowlist
+	if strings.TrimSpace(raw) != "" {
+		// Unmarshalling into entries directly would reuse, and overwrite, the
+		// backing array of defaultRouteAllowlist.
+		var configured []string
+		if err := json.Unmarshal([]byte(raw), &configured); err != nil {
+			return nil, fmt.Errorf("parse ROUTE_ALLOWLIST: %w", err)
+		}
+		entries = configured
+	}
+	if len(entries) == 0 {
+		return nil, fmt.Errorf("ROUTE_ALLOWLIST must not be empty")
+	}
+	allowlist := make(routeAllowlist, 0, len(entries))
+	for _, entry := range entries {
+		method, path, found := strings.Cut(entry, " ")
+		if !found || !allowedMethods[method] || !strings.HasPrefix(path, "/") {
+			return nil, fmt.Errorf("invalid ROUTE_ALLOWLIST entry %q", entry)
+		}
+		segments := pathSegments(path)
+		if len(segments) == 0 {
+			return nil, fmt.Errorf("ROUTE_ALLOWLIST entry %q must not be the root path", entry)
+		}
+		pattern := routePattern{method: method}
+		for index, segment := range segments {
+			switch {
+			case segment == "**":
+				if index != len(segments)-1 {
+					return nil, fmt.Errorf("ROUTE_ALLOWLIST entry %q may only end with **", entry)
+				}
+				pattern.anySuffix = true
+			case segment == "*" || literalSegment.MatchString(segment):
+				if segment == "." || segment == ".." {
+					return nil, fmt.Errorf("ROUTE_ALLOWLIST entry %q has a dot segment", entry)
+				}
+				pattern.segments = append(pattern.segments, segment)
+			default:
+				return nil, fmt.Errorf("ROUTE_ALLOWLIST entry %q has a non-literal segment", entry)
+			}
+		}
+		allowlist = append(allowlist, pattern)
+	}
+	return allowlist, nil
+}
+
+func parseMaxBodyBytes(raw string) (int64, error) {
+	if strings.TrimSpace(raw) == "" {
+		return defaultMaxBodyBytes, nil
+	}
+	value, err := strconv.ParseInt(strings.TrimSpace(raw), 10, 64)
+	if err != nil || value <= 0 {
+		return 0, fmt.Errorf("MAX_BODY_BYTES must be a positive integer, got %q", raw)
+	}
+	return value, nil
 }
 
 // authorize returns a denial reason, or "" if allowed. User authorization is
 // evaluated by the broker against the current Teleport grant snapshot.
-func authorize(method, path string) string {
-	switch method {
-	case http.MethodGet, http.MethodHead:
-		for _, resource := range getAllowlist {
-			if matchesResourcePath(path, resource) {
-				return ""
-			}
-		}
-		return "GET path not in read allowlist"
-	case http.MethodPost:
-		if postAllowlist[strings.TrimSuffix(path, "/")] {
+func (a routeAllowlist) authorize(method, path string) string {
+	effective := method
+	if method == http.MethodHead {
+		effective = http.MethodGet
+	}
+	for _, pattern := range a {
+		if pattern.method == effective && pattern.matches(path) {
 			return ""
 		}
-		return "POST path not in read allowlist"
-	default:
-		return "method not allowed (read-only proxy)"
 	}
+	return method + " path not in route allowlist"
 }
 
-// auditRoute returns a bounded route label without logging caller-controlled
-// path segments, which may contain identifiers or PHI.
-func auditRoute(path string) string {
-	trimmed := strings.TrimSuffix(path, "/")
-	if postAllowlist[trimmed] {
-		return trimmed
-	}
-	for _, resource := range getAllowlist {
-		if path == resource || path == resource+"/" {
-			return resource
-		}
-		if strings.HasPrefix(path, resource+"/") {
-			return resource + "/:resource"
+// label returns a bounded route label without logging caller-controlled path
+// segments, which may contain identifiers or PHI. Literal patterns win so a
+// wildcard entry cannot collapse an exact route's label.
+func (a routeAllowlist) label(path string) string {
+	for _, literalOnly := range []bool{true, false} {
+		for _, pattern := range a {
+			if literalOnly && !pattern.isLiteral() {
+				continue
+			}
+			if pattern.matches(path) {
+				return pattern.label(path)
+			}
 		}
 	}
 	if strings.HasPrefix(path, "/api/") {
@@ -447,6 +576,15 @@ func main() {
 		log.Fatal("BROKER_AUDIENCE must be an HTTPS URL without credentials, query, or fragment")
 	}
 
+	allowlist, err := parseRouteAllowlist(os.Getenv("ROUTE_ALLOWLIST"))
+	if err != nil {
+		log.Fatalf("route allowlist: %v", err)
+	}
+	maxBodyBytes, err := parseMaxBodyBytes(os.Getenv("MAX_BODY_BYTES"))
+	if err != nil {
+		log.Fatalf("max body bytes: %v", err)
+	}
+
 	resolver, err := newServiceAccountResolver()
 	if err != nil {
 		log.Fatalf("init serviceaccount resolver: %v", err)
@@ -466,7 +604,7 @@ func main() {
 		)
 		c := caller{serviceAccount: serviceAccount}
 		deny := func(status int, msg, reason string) {
-			logRequest(c, r.Method, auditRoute(r.URL.Path), status, time.Since(start), reason)
+			logRequest(c, r.Method, allowlist.label(r.URL.Path), status, time.Since(start), reason)
 			http.Error(w, msg, status)
 		}
 		if !validIdentity || identityNamespace != resolver.namespace ||
@@ -488,11 +626,11 @@ func main() {
 
 		// authorize() sees the decoded path but the proxy forwards the raw
 		// one; reject any escaping so the two can never disagree.
-		if r.URL.RawPath != "" && r.URL.RawPath != r.URL.Path {
+		if (r.URL.RawPath != "" && r.URL.RawPath != r.URL.Path) || hasDotSegment(r.URL.Path) {
 			deny(http.StatusForbidden, "forbidden", "escaped characters in path")
 			return
 		}
-		if reason := authorize(r.Method, r.URL.Path); reason != "" {
+		if reason := allowlist.authorize(r.Method, r.URL.Path); reason != "" {
 			deny(http.StatusForbidden, "forbidden: "+reason, reason)
 			return
 		}
@@ -503,10 +641,10 @@ func main() {
 			return
 		}
 
-		r.Body = http.MaxBytesReader(w, r.Body, 1<<20) // query payloads are small JSON
+		r.Body = http.MaxBytesReader(w, r.Body, maxBodyBytes)
 		rec := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
 		proxy.ServeHTTP(rec, withBrokerRequest(r, c, token))
-		logRequest(c, r.Method, auditRoute(r.URL.Path), rec.status, time.Since(start), "")
+		logRequest(c, r.Method, allowlist.label(r.URL.Path), rec.status, time.Since(start), "")
 	})
 
 	log.Printf("langsmith-proxy listening on %s, broker upstream %s", listenAddr, upstream.Host)

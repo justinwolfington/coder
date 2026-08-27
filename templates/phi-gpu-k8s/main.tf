@@ -472,6 +472,17 @@ resource "kubernetes_deployment_v1" "main" {
             }
           }
 
+          # SECPRIV-14015: write path into the PHI annotation workspace. Reaching
+          # it still requires an approved Teleport request for the annotation
+          # admin role; the endpoint alone grants nothing.
+          dynamic "env" {
+            for_each = !local.utd_bucket_enabled && var.langsmith_annotation_endpoint != "" ? [1] : []
+            content {
+              name  = "LANGSMITH_ANNOTATION_ENDPOINT"
+              value = var.langsmith_annotation_endpoint
+            }
+          }
+
           # NOTEGEN-354: notegen team's read-only LaunchDarkly Reader token,
           # injected from the coder-notegen-launchdarkly-secrets k8s secret
           # (external-secrets, present in every env). optional = true so

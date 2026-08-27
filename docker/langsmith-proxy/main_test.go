@@ -37,14 +37,97 @@ func TestAuthorize(t *testing.T) {
 		{"lookalike resource", "GET", "/api/v1/runs-admin", false},
 		{"non-api path", "GET", "/health", false},
 	}
+	allowlist, err := parseRouteAllowlist("")
+	if err != nil {
+		t.Fatalf("parseRouteAllowlist: %v", err)
+	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			reason := authorize(tc.method, tc.path)
+			reason := allowlist.authorize(tc.method, tc.path)
 			if got := reason == ""; got != tc.wantOK {
 				t.Errorf("authorize(%q, %q) = %q, want allowed=%v",
 					tc.method, tc.path, reason, tc.wantOK)
 			}
 		})
+	}
+}
+
+func TestWriteAllowlistScopesMethodsAndWildcards(t *testing.T) {
+	allowlist, err := parseRouteAllowlist(`["POST /api/v1/datasets",` +
+		`"PATCH /api/v1/examples/bulk",` +
+		`"POST /api/v1/annotation-queues/*/runs",` +
+		`"DELETE /api/v1/datasets/*"]`)
+	if err != nil {
+		t.Fatalf("parseRouteAllowlist: %v", err)
+	}
+	cases := []struct {
+		method string
+		path   string
+		wantOK bool
+	}{
+		{"POST", "/api/v1/datasets", true},
+		{"PATCH", "/api/v1/examples/bulk", true},
+		{"POST", "/api/v1/annotation-queues/queue-id/runs", true},
+		{"DELETE", "/api/v1/datasets/dataset-id", true},
+		{"POST", "/api/v1/annotation-queues/a/b/runs", false},
+		{"DELETE", "/api/v1/datasets/dataset-id/examples", false},
+		{"GET", "/api/v1/datasets", false},
+		{"POST", "/api/v1/runs/query", false},
+	}
+	for _, tc := range cases {
+		reason := allowlist.authorize(tc.method, tc.path)
+		if got := reason == ""; got != tc.wantOK {
+			t.Errorf("authorize(%q, %q) = %q, want allowed=%v",
+				tc.method, tc.path, reason, tc.wantOK)
+		}
+	}
+	want := "/api/v1/annotation-queues/:resource/runs"
+	if got := allowlist.label("/api/v1/annotation-queues/queue-id/runs"); got != want {
+		t.Errorf("label = %q, want %q", got, want)
+	}
+}
+
+func TestParseRouteAllowlistRejectsMalformedEntries(t *testing.T) {
+	for _, raw := range []string{
+		`["/api/v1/datasets"]`,
+		`["OPTIONS /api/v1/datasets"]`,
+		`["POST api/v1/datasets"]`,
+		`["POST /"]`,
+		`["POST /api/**/runs"]`,
+		`["POST /api/v1/datasets/../orgs"]`,
+		`[]`,
+		`not-json`,
+	} {
+		if _, err := parseRouteAllowlist(raw); err == nil {
+			t.Errorf("parseRouteAllowlist(%q) accepted a malformed allowlist", raw)
+		}
+	}
+}
+
+func TestHasDotSegment(t *testing.T) {
+	for path, want := range map[string]bool{
+		"/api/v1/runs/../orgs/current": true,
+		"/api/v1/runs/./abc":           true,
+		"/api/v1/runs/abc":             false,
+		"/api/v1/runs/..abc":           false,
+	} {
+		if got := hasDotSegment(path); got != want {
+			t.Errorf("hasDotSegment(%q) = %v, want %v", path, got, want)
+		}
+	}
+}
+
+func TestParseMaxBodyBytes(t *testing.T) {
+	if got, err := parseMaxBodyBytes(""); err != nil || got != defaultMaxBodyBytes {
+		t.Errorf("parseMaxBodyBytes(\"\") = %d, %v", got, err)
+	}
+	if got, err := parseMaxBodyBytes("33554432"); err != nil || got != 33554432 {
+		t.Errorf("parseMaxBodyBytes(33554432) = %d, %v", got, err)
+	}
+	for _, raw := range []string{"0", "-1", "abc"} {
+		if _, err := parseMaxBodyBytes(raw); err == nil {
+			t.Errorf("parseMaxBodyBytes(%q) accepted an invalid cap", raw)
+		}
 	}
 }
 
@@ -238,9 +321,13 @@ func TestAuditRoute(t *testing.T) {
 		"/api/v1/orgs/sensitive-organization": "/api/:unrecognized",
 		"/sensitive-non-api-path":             "/:non-api",
 	}
+	allowlist, err := parseRouteAllowlist("")
+	if err != nil {
+		t.Fatalf("parseRouteAllowlist: %v", err)
+	}
 	for path, want := range cases {
-		if got := auditRoute(path); got != want {
-			t.Errorf("auditRoute(%q) = %q, want %q", path, got, want)
+		if got := allowlist.label(path); got != want {
+			t.Errorf("label(%q) = %q, want %q", path, got, want)
 		}
 	}
 }

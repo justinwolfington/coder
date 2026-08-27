@@ -134,6 +134,9 @@ coder:
       - name: TF_VAR_langsmith_endpoint
         value: "http://langsmith-proxy.coder.svc.cluster.local:8080/api/v1"
 
+      - name: TF_VAR_langsmith_annotation_endpoint
+        value: "http://langsmith-annotation-proxy.coder.svc.cluster.local:8080/api/v1"
+
     # mount the git secrets to enable coder to pull modules from coder repo
     # the following secrets have read only access to the coder repo
     volumes:
@@ -220,13 +223,25 @@ langsmithProxy:
   networkPolicy:
     nodeCIDR: "10.6.0.0/16"
   image:
-    digest: "sha256:92c8f961027acf6067be621f68c1ef3115005d1cab54afc1504a8be5a1ce3e38"
+    digest: "sha256:cd4ac114bf5d4c60988fd8f6d03af9a9712634be56aaca589c86649f82d5b520"
   upstreamUrl: "https://langsmith.abridge.coffee/coder-broker"
   brokerAudience: "https://langsmith.abridge.coffee/coder-broker"
   serviceAccount:
     gcpServiceAccount: "coder-langsmith-proxy@client-dev-e301d.iam.gserviceaccount.com"
 
 # Enable Kubernetes event streaming for development environment
+
+langsmithAnnotationProxy:
+  enabled: true
+  networkPolicy:
+    nodeCIDR: "10.6.0.0/16"
+  image:
+    digest: "sha256:cd4ac114bf5d4c60988fd8f6d03af9a9712634be56aaca589c86649f82d5b520"
+  upstreamUrl: "https://langsmith.abridge.coffee/annotation-broker"
+  brokerAudience: "https://langsmith.abridge.coffee/annotation-broker"
+  serviceAccount:
+    gcpServiceAccount: "coder-annotation-proxy@client-dev-e301d.iam.gserviceaccount.com"
+
 coder-logstream-kube:
   enabled: false
   url: https://coder.abridge.coffee # Must match CODER_ACCESS_URL above

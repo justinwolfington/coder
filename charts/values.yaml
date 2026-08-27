@@ -35,7 +35,55 @@ langsmithProxy:
   brokerAudience: ""
   serviceAccount:
     gcpServiceAccount: ""
+  routeAllowlist: []
+  maxBodyBytes: ""
 
+
+langsmithAnnotationProxy:
+  enabled: false
+  networkPolicy:
+    enabled: true
+    nodeCIDR: ""
+  image:
+    repository: us-central1-docker.pkg.dev/abridge-artifact-registry/coder/langsmith-proxy
+    tag: ""
+    digest: ""
+  upstreamUrl: ""
+  brokerAudience: ""
+  serviceAccount:
+    gcpServiceAccount: ""
+  maxBodyBytes: "33554432"
+  routeAllowlist:
+    - "GET /api/v1/info/**"
+    - "GET /api/v1/sessions/**"
+    - "GET /api/v1/runs/**"
+    - "GET /api/v1/datasets/**"
+    - "GET /api/v1/examples/**"
+    - "GET /api/v1/annotation-queues/**"
+    - "POST /api/v1/runs/query"
+    - "POST /api/v1/datasets/search"
+    - "POST /api/v1/sessions"
+    - "POST /api/v1/runs"
+    - "POST /api/v1/runs/batch"
+    - "POST /api/v1/runs/multipart"
+    - "POST /api/v1/datasets"
+    - "POST /api/v1/examples"
+    - "POST /api/v1/examples/bulk"
+    - "PATCH /api/v1/examples/bulk"
+    - "POST /api/v1/examples/upload/*"
+    - "POST /api/v1/annotation-queues"
+    - "PATCH /api/v1/annotation-queues/*"
+    - "POST /api/v1/annotation-queues/*/runs"
+    - "POST /api/v1/annotation-queues/populate"
+    - "POST /api/v1/feedback"
+    - "POST /api/v1/feedback/batch"
+    - "POST /api/v1/runs/delete"
+    - "POST /api/v1/runs/delete/traces"
+    - "POST /api/v1/annotation-queues/*/runs/delete"
+    - "DELETE /api/v1/sessions/*"
+    - "DELETE /api/v1/datasets/*"
+    - "DELETE /api/v1/examples/*"
+    - "DELETE /api/v1/annotation-queues/*"
 # Istio egress controls for PHI workspaces
 phiIstio:
   enabled: false

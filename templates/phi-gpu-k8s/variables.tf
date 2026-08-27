@@ -26,6 +26,12 @@ variable "langsmith_endpoint" {
   default     = ""
 }
 
+variable "langsmith_annotation_endpoint" {
+  type        = string
+  description = "LangSmith API endpoint for the PHI annotation workspace, via the annotation access proxy (SECPRIV-14015); empty omits the env var."
+  default     = ""
+}
+
 variable "phi_workspace_utd_service_account" {
   type        = string
   description = "No-RBAC Kubernetes service account mapped to the bucket-only UTD GCP identity. Empty preserves the legacy Coder KSA fallback."
