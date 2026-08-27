@@ -1,0 +1,251 @@
+name: Build Coder Server
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/build-coder-server.yaml"
+      - "server-build/**"
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/build-coder-server.yaml"
+      - "server-build/**"
+
+permissions: {}
+
+jobs:
+  verify:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - name: Check out build configuration
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c # v6.1.0
+        with:
+          go-version: "1.26.5"
+          check-latest: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "22.19.0"
+          check-latest: false
+
+      - name: Free disposable runner disk
+        run: |
+          set -euo pipefail
+          [[ "${GITHUB_ACTIONS:-}" == "true" ]]
+          df -h /
+          sudo rm -rf -- \
+            /usr/local/lib/android \
+            /usr/share/dotnet \
+            /opt/ghc \
+            /usr/local/.ghcup
+          sudo docker image prune --all --force
+          df -h /
+
+      - name: Build the locked source
+        run: |
+          set -euo pipefail
+          context_dir="${RUNNER_TEMP}/coder-image-context"
+          mkdir -p "${context_dir}"
+          ./server-build/verify-and-build.sh \
+            --source-dir "${RUNNER_TEMP}/coder-source" \
+            --binary-output "${context_dir}/coder"
+
+      - name: Set up digest-pinned BuildKit
+        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
+        with:
+          driver-opts: |
+            image=moby/buildkit@sha256:b2498ea62630c147e98f96145c2988a74720700b250e4cf7a4328e14f5b99fc3
+
+      - name: Verify the container package without publishing
+        run: |
+          set -euo pipefail
+          target_platform="$(./server-build/lock.sh TARGET_PLATFORM)"
+          upstream_image="$(./server-build/lock.sh UPSTREAM_IMAGE)"
+          source_mirror_commit="$(./server-build/lock.sh SOURCE_MIRROR_COMMIT)"
+          docker buildx build \
+            --platform "${target_platform}" \
+            --build-arg "UPSTREAM_IMAGE=${upstream_image}" \
+            --build-arg "SOURCE_MIRROR_COMMIT=${source_mirror_commit}" \
+            --file server-build/Dockerfile \
+            --load \
+            --tag local/coder-server:verify \
+            "${RUNNER_TEMP}/coder-image-context"
+          docker image inspect local/coder-server:verify --format '{{.Id}}'
+
+  build:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    outputs:
+      binary_sha256: ${{ steps.binary.outputs.sha256 }}
+    steps:
+      - name: Check out build configuration
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c # v6.1.0
+        with:
+          go-version: "1.26.5"
+          check-latest: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "22.19.0"
+          check-latest: false
+
+      - name: Free disposable runner disk
+        run: |
+          set -euo pipefail
+          [[ "${GITHUB_ACTIONS:-}" == "true" ]]
+          df -h /
+          sudo rm -rf -- \
+            /usr/local/lib/android \
+            /usr/share/dotnet \
+            /opt/ghc \
+            /usr/local/.ghcup
+          sudo docker image prune --all --force
+          df -h /
+
+      - name: Build the locked source
+        run: |
+          set -euo pipefail
+          context_dir="${RUNNER_TEMP}/coder-image-context"
+          mkdir -p "${context_dir}"
+          ./server-build/verify-and-build.sh \
+            --source-dir "${RUNNER_TEMP}/coder-source" \
+            --binary-output "${context_dir}/coder"
+
+      - name: Record binary digest
+        id: binary
+        run: |
+          set -euo pipefail
+          sha256="$(sha256sum "${RUNNER_TEMP}/coder-image-context/coder" | awk '{print $1}')"
+          [[ "${sha256}" =~ ^[a-f0-9]{64}$ ]]
+          printf 'sha256=%s\n' "${sha256}" >> "${GITHUB_OUTPUT}"
+
+      - name: Upload server binary
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: coder-server-binary
+          path: ${{ runner.temp }}/coder-image-context/coder
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      id-token: write
+    outputs:
+      image: ${{ steps.image.outputs.image }}
+      manifest_digest: ${{ steps.image.outputs.manifest_digest }}
+    steps:
+      - name: Check out build configuration
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+
+      - name: Download server binary
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: coder-server-binary
+          path: ${{ runner.temp }}/coder-image-context
+
+      - name: Verify server binary digest
+        env:
+          EXPECTED_BINARY_SHA256: ${{ needs.build.outputs.binary_sha256 }}
+        run: |
+          set -euo pipefail
+          [[ "${EXPECTED_BINARY_SHA256}" =~ ^[a-f0-9]{64}$ ]]
+          actual_binary_sha256="$(sha256sum "${RUNNER_TEMP}/coder-image-context/coder" | awk '{print $1}')"
+          [[ "${actual_binary_sha256}" == "${EXPECTED_BINARY_SHA256}" ]]
+
+      - name: Set up digest-pinned BuildKit
+        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
+        with:
+          driver-opts: |
+            image=moby/buildkit@sha256:b2498ea62630c147e98f96145c2988a74720700b250e4cf7a4328e14f5b99fc3
+
+      - name: Authenticate to Google Cloud
+        id: auth
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER_CODER_SERVER_PUBLISHER }}
+          service_account: ${{ vars.GCP_SA_EMAIL_CODER_SERVER_PUBLISHER }}
+          token_format: access_token
+          access_token_lifetime: 900s
+
+      - name: Authenticate Docker to Artifact Registry
+        env:
+          REGISTRY_TOKEN: ${{ steps.auth.outputs.access_token }}
+        run: |
+          set -euo pipefail
+          printf '%s' "${REGISTRY_TOKEN}" | docker login \
+            --username oauth2accesstoken \
+            --password-stdin \
+            us-central1-docker.pkg.dev
+
+      - name: Build, attest, and publish the server image
+        id: image
+        run: |
+          set -euo pipefail
+          repository="us-central1-docker.pkg.dev/abridge-artifact-registry/coder/coder-server"
+          target_platform="$(./server-build/lock.sh TARGET_PLATFORM)"
+          upstream_image="$(./server-build/lock.sh UPSTREAM_IMAGE)"
+          source_mirror_commit="$(./server-build/lock.sh SOURCE_MIRROR_COMMIT)"
+          image_reference="${repository}:${source_mirror_commit}"
+          metadata_file="${RUNNER_TEMP}/coder-server-metadata.json"
+          docker buildx build \
+            --platform "${target_platform}" \
+            --build-arg "UPSTREAM_IMAGE=${upstream_image}" \
+            --build-arg "SOURCE_MIRROR_COMMIT=${source_mirror_commit}" \
+            --file server-build/Dockerfile \
+            --metadata-file "${metadata_file}" \
+            --provenance=mode=max \
+            --sbom=true \
+            --push \
+            --tag "${image_reference}" \
+            "${RUNNER_TEMP}/coder-image-context"
+          manifest_digest="$(jq -r '."containerimage.digest" // empty' "${metadata_file}")"
+          [[ "${manifest_digest}" =~ ^sha256:[a-f0-9]{64}$ ]]
+          printf 'image=%s@%s\n' "${repository}" "${manifest_digest}" >> "${GITHUB_OUTPUT}"
+          printf 'manifest_digest=%s\n' "${manifest_digest}" >> "${GITHUB_OUTPUT}"
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@d7543c93d881b35a8faa02e8e3605f69b7a1ce62 # v3.10.0
+
+      - name: Sign the published manifest
+        env:
+          IMAGE: ${{ steps.image.outputs.image }}
+        run: |
+          set -euo pipefail
+          cosign sign --yes "${IMAGE}"
+
+      - name: Record published image
+        env:
+          IMAGE: ${{ steps.image.outputs.image }}
+        run: |
+          set -euo pipefail
+          printf 'Published Coder server image: %s\n' "${IMAGE}" >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Clear local Artifact Registry credentials
+        if: always()
+        run: docker logout us-central1-docker.pkg.dev
