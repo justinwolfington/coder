@@ -43,7 +43,8 @@ export type StorageKeyHandle<T> = {
 	 * matching localStorage semantics where absence is the null state.
 	 */
 	set: (value: T) => PersistResult;
-	remove: () => void;
+	/** Remove the persisted value; like set, reports whether it took effect. */
+	remove: () => PersistResult;
 	/** Subscribe to same-tab and cross-tab changes of this key. */
 	subscribe: (listener: () => void) => () => void;
 	/**
@@ -77,8 +78,14 @@ export const booleanCodec: StorageCodec<boolean> = {
 
 export const integerCodec: StorageCodec<number> = {
 	decode: (raw) => {
-		const parsed = Number.parseInt(raw, 10);
-		return Number.isNaN(parsed) ? undefined : parsed;
+		// parseInt would accept partial matches like "12px" and huge
+		// digit strings overflow to Infinity; require a plain safe
+		// integer so corrupt input falls back to the default.
+		if (!/^-?\d+$/.test(raw)) {
+			return undefined;
+		}
+		const parsed = Number(raw);
+		return Number.isSafeInteger(parsed) ? parsed : undefined;
 	},
 	encode: (value) => String(value),
 };
@@ -185,9 +192,6 @@ const cacheKeyFor = (area: StorageArea, key: string): string =>
 
 const keyListeners = new Map<string, Set<() => void>>();
 
-type SnapshotCacheEntry = { raw: string | null; value: unknown };
-const snapshotCache = new Map<string, SnapshotCacheEntry>();
-
 const notifyKey = (cacheKey: string): void => {
 	const listeners = keyListeners.get(cacheKey);
 	if (!listeners) {
@@ -198,10 +202,8 @@ const notifyKey = (cacheKey: string): void => {
 	}
 };
 
-const invalidateAndNotify = (area: StorageArea, key: string): void => {
-	const cacheKey = cacheKeyFor(area, key);
-	snapshotCache.delete(cacheKey);
-	notifyKey(cacheKey);
+const notifyKeyChanged = (area: StorageArea, key: string): void => {
+	notifyKey(cacheKeyFor(area, key));
 };
 
 addEventListener("storage", (event: StorageEvent) => {
@@ -218,11 +220,6 @@ addEventListener("storage", (event: StorageEvent) => {
 	}
 	if (event.key === null) {
 		// localStorage.clear() in another tab.
-		for (const cacheKey of snapshotCache.keys()) {
-			if (cacheKey.startsWith("local:")) {
-				snapshotCache.delete(cacheKey);
-			}
-		}
 		for (const [cacheKey, listeners] of keyListeners) {
 			if (cacheKey.startsWith("local:")) {
 				for (const listener of listeners) {
@@ -232,7 +229,7 @@ addEventListener("storage", (event: StorageEvent) => {
 		}
 		return;
 	}
-	invalidateAndNotify("local", event.key);
+	notifyKeyChanged("local", event.key);
 });
 
 // -- Key handles ------------------------------------------------------------
@@ -245,6 +242,10 @@ const createHandle = <T>(
 ): StorageKeyHandle<T> => {
 	const cacheKey = cacheKeyFor(area, key);
 
+	// Last decode, scoped to this handle so another handle on the same
+	// key never sees values produced by a foreign codec or default.
+	let cached: { raw: string | null; value: T } | undefined;
+
 	const decodeRaw = (raw: string | null): T => {
 		if (raw === null) {
 			return defaultValue;
@@ -255,31 +256,39 @@ const createHandle = <T>(
 
 	const getSnapshot = (): T => {
 		const raw = readRaw(area, key);
-		const cached = snapshotCache.get(cacheKey);
 		if (cached && cached.raw === raw) {
-			// The cache is shared across keys, but each key has a single
-			// handle, so this entry was decoded by this handle's codec.
-			return cached.value as T;
+			return cached.value;
 		}
 		const value = decodeRaw(raw);
-		snapshotCache.set(cacheKey, { raw, value });
+		cached = { raw, value };
 		return value;
 	};
 
-	const remove = (): void => {
-		// Skip the write and listener notification when there is
-		// nothing to remove.
-		if (readRaw(area, key) === null) {
-			return;
+	const remove = (): PersistResult => {
+		try {
+			const storage = getAreaStorage(area);
+			if (!storage) {
+				return { ok: false, reason: "unavailable" };
+			}
+			// Skip the write and listener notification when there is
+			// nothing to remove.
+			if (storage.getItem(key) === null) {
+				return { ok: true };
+			}
+			storage.removeItem(key);
+		} catch (error) {
+			return {
+				ok: false,
+				reason: isQuotaError(error) ? "quota" : "unavailable",
+			};
 		}
-		removeRaw(area, key);
-		invalidateAndNotify(area, key);
+		notifyKey(cacheKey);
+		return { ok: true };
 	};
 
 	const set = (value: T): PersistResult => {
 		if (value === null || value === undefined) {
-			remove();
-			return { ok: true };
+			return remove();
 		}
 		const raw = codec.encode(value);
 		const result = writeRaw(area, key, raw);
@@ -290,7 +299,7 @@ const createHandle = <T>(
 		}
 		// Cache the caller's value directly so getSnapshot hands the
 		// exact same reference back.
-		snapshotCache.set(cacheKey, { raw, value });
+		cached = { raw, value };
 		notifyKey(cacheKey);
 		return result;
 	};
@@ -387,7 +396,7 @@ export function defineEntityStorageKey<T>(options: {
 			);
 			for (const key of ownedKeys) {
 				removeRaw("local", key);
-				invalidateAndNotify("local", key);
+				notifyKeyChanged("local", key);
 			}
 		},
 	};
