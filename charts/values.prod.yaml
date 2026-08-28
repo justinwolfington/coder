@@ -289,11 +289,11 @@ langsmithProxy:
 
 
 langsmithAnnotationProxy:
-  enabled: false
+  enabled: true
   networkPolicy:
     nodeCIDR: "10.6.0.0/16"
   image:
-    tag: ""
+    digest: "sha256:cd4ac114bf5d4c60988fd8f6d03af9a9712634be56aaca589c86649f82d5b520"
   upstreamUrl: https://langsmith-live.abridge.services/annotation-broker
   brokerAudience: https://langsmith-live.abridge.services/annotation-broker
   serviceAccount:
