@@ -63,7 +63,7 @@ locals {
       description  = "GCP VM workspace with GPU support and Docker. Features ML development tools for ML Ops and Scientists."
       icon         = "/icon/gcp.png"
       directory    = "./gcp-vm-modular"
-      environments = ["development", "staging", "production"]
+      environments = ["development", "staging"]
     }, local.gpu_timings)
 
     "phi-gpu-k8s" = merge({
