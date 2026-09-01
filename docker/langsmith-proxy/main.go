@@ -479,7 +479,14 @@ func (s *statusRecorder) WriteHeader(code int) {
 	s.ResponseWriter.WriteHeader(code)
 }
 
+// auditEvent discriminates these lines in a shared log index, matching the
+// annotation broker's "event": "langsmith_broker_request".
+const auditEvent = "langsmith_proxy_request"
+
+var auditOut io.Writer = os.Stdout
+
 type auditLine struct {
+	Event          string `json:"event"`
 	Time           string `json:"time"`
 	UserID         string `json:"user_id"`
 	WorkspaceID    string `json:"workspace_id"`
@@ -492,7 +499,8 @@ type auditLine struct {
 }
 
 func logRequest(c caller, method, route string, status int, d time.Duration, denyReason string) {
-	_ = json.NewEncoder(os.Stdout).Encode(auditLine{
+	_ = json.NewEncoder(auditOut).Encode(auditLine{
+		Event:          auditEvent,
 		Time:           time.Now().UTC().Format(time.RFC3339),
 		UserID:         c.userID,
 		WorkspaceID:    c.workspaceID,

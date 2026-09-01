@@ -1,8 +1,10 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -453,5 +455,31 @@ func TestJWTExpiryRejectsMalformedToken(t *testing.T) {
 	payload := base64.RawURLEncoding.EncodeToString([]byte(`{"no_exp":true}`))
 	if _, ok := jwtExpiry(strings.Join([]string{"header", payload, "signature"}, ".")); ok {
 		t.Fatal("token without exp unexpectedly had an expiry")
+	}
+}
+
+func TestAuditLineCarriesEventDiscriminator(t *testing.T) {
+	var buf bytes.Buffer
+	saved := auditOut
+	auditOut = &buf
+	defer func() { auditOut = saved }()
+
+	logRequest(
+		caller{userID: "u1", workspaceID: "w1", serviceAccount: "sa1"},
+		"GET", "/api/v1/feedback", http.StatusForbidden, time.Second, "route not allowed",
+	)
+
+	var line auditLine
+	if err := json.Unmarshal(buf.Bytes(), &line); err != nil {
+		t.Fatalf("audit line is not valid JSON: %v", err)
+	}
+	if line.Event != "langsmith_proxy_request" {
+		t.Errorf("event = %q, want langsmith_proxy_request", line.Event)
+	}
+	if line.DenyReason != "route not allowed" || line.Status != http.StatusForbidden {
+		t.Errorf("denial not recorded: %+v", line)
+	}
+	if line.UserID != "u1" || line.WorkspaceID != "w1" {
+		t.Errorf("caller identity not recorded: %+v", line)
 	}
 }
