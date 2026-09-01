@@ -6,6 +6,11 @@
 
 set -euo pipefail
 
+if [ $# -ne 1 ]; then
+  echo "Usage: $0 <CODER_URL>" >&2
+  exit 1
+fi
+
 CODER_URL=$1
 USERNAME="gh-coder"
 EMAIL="gh-coder@abridge-artifact-registry.iam.gserviceaccount.com"
@@ -22,9 +27,15 @@ coder users create \
   --login-type none || echo "User may already exist, continuing..."
 
 echo "Upgrading access level of user to template-admin"
-coder users edit-roles $USERNAME --roles template-admin
+coder users edit-roles "$USERNAME" --roles template-admin
 
 echo "Creating long-lived token..."
-TOKEN=$(coder tokens create --user "$USERNAME" --lifetime "$TOKEN_LIFETIME" --url "$CODER_URL" | tail -n 1)
+TOKEN_FILE="$(mktemp -t coder-token)"
+chmod 600 "$TOKEN_FILE"
+coder tokens create --user "$USERNAME" --lifetime "$TOKEN_LIFETIME" --url "$CODER_URL" |
+  tail -n 1 >"$TOKEN_FILE"
 
-echo "Token generated: $TOKEN"
+# Printing the token would put a year-long template-admin credential into
+# terminal scrollback, shell history and any CI log capturing this script.
+echo "Token written to $TOKEN_FILE (mode 600)."
+echo "Store it in the secret manager, then: shred -u $TOKEN_FILE"

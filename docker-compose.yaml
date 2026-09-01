@@ -4,7 +4,7 @@ services:
         # Pin to a real version; override with CODER_VERSION when needed.
         image: ghcr.io/coder/coder:${CODER_VERSION:-2.35.4}
         ports:
-            - 7080:7080
+            - 127.0.0.1:7080:7080
         environment:
             CODER_PG_CONNECTION_URL: >-
                 postgresql://${POSTGRES_USER:-username}:${POSTGRES_PASSWORD:-password}@database/${POSTGRES_DB:-coder}?sslmode=disable
@@ -17,6 +17,9 @@ services:
             CODER_ACCESS_URL: ${CODER_ACCESS_URL:-http://localhost:7080}
 
         volumes:
+            # Mounting the host Docker socket into a root container is host root
+            # for anything that reaches it. Kept because the local Docker
+            # provisioner needs it; do not copy this into a deployed manifest.
             - /var/run/docker.sock:/var/run/docker.sock
             - coder_home:/home/coder
         depends_on:
@@ -26,7 +29,7 @@ services:
     database:
         image: postgres:16
         ports:
-            - 5432:5432
+            - 127.0.0.1:5432:5432
         environment:
             POSTGRES_USER: ${POSTGRES_USER:-username}
             POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
