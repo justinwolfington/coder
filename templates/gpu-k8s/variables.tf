@@ -15,3 +15,9 @@ variable "environment" {
   description = "Environment (e.g., production, staging, development)"
   default     = "production"
 }
+
+variable "gpu_workspace_utd_service_account" {
+  type        = string
+  description = "No-RBAC Kubernetes service account mapped to the bucket-only UTD GCP identity. Required when the UTD bucket mount is enabled."
+  default     = ""
+}

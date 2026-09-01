@@ -188,7 +188,7 @@ coder:
       - name: cloud-sql-proxy
         restartPolicy: Always
         # It is recommended to use the latest version of the Cloud SQL Auth Proxy!
-        image: gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.22.0
+        image: gcr.io/cloud-sql-connectors/cloud-sql-proxy@sha256:fa4c7308245407157c5e9c4e16f1c0f1113899d6f29dc8f8be3e30efae86467f # 2.22.0
         args:
           # Connect over private IP in VPC-native GKE cluster
           - --private-ip
@@ -281,7 +281,7 @@ langsmithProxy:
   networkPolicy:
     nodeCIDR: "10.6.0.0/16"
   image:
-    tag: "7cb6f2d" # short SHA from build-and-promote-artifacts (coder #226)
+    digest: "sha256:2d11c4180671737f51710d442e49a41c4ac5fcc777a1d514b8cb91a20419cc59" # 6141531
   upstreamUrl: https://langsmith-live.abridge.services/coder-broker
   brokerAudience: https://langsmith-live.abridge.services/coder-broker
   serviceAccount:
@@ -293,7 +293,7 @@ langsmithAnnotationProxy:
   networkPolicy:
     nodeCIDR: "10.6.0.0/16"
   image:
-    digest: "sha256:cd4ac114bf5d4c60988fd8f6d03af9a9712634be56aaca589c86649f82d5b520"
+    digest: "sha256:2d11c4180671737f51710d442e49a41c4ac5fcc777a1d514b8cb91a20419cc59" # 6141531
   upstreamUrl: https://langsmith-live.abridge.services/annotation-broker
   brokerAudience: https://langsmith-live.abridge.services/annotation-broker
   serviceAccount:
@@ -325,6 +325,11 @@ phiIstio:
 coder-logstream-kube:
   enabled: true
   url: https://coder.abridge.services # Must match CODER_ACCESS_URL above
+  # Digest-pinned via the repo@sha256 + tag split the subchart's template
+  # concatenates, same idiom as coder.image above.
+  image:
+    repo: ghcr.io/coder/coder-logstream-kube@sha256
+    tag: 10ae596d296e420789a812c2ed5731218d650cadff1073f8ab69cbbebe0c977d # v0.0.15
 
 # Okta OIDC login for the coder.abridge.services deployment
 oidcAuth:

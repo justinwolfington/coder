@@ -184,8 +184,16 @@ locals {
   cuda13          = data.coder_parameter.cuda_version.value == "13.0"
   image_suffix    = local.cuda13 ? "-cuda13" : ""
   base_image_repo = "us-central1-docker.pkg.dev/abridge-artifact-registry/coder/phi${local.image_suffix}"
-  base_image_tag  = "latest"
-  base_image      = "${local.base_image_repo}:${local.base_image_tag}"
+
+  # Digest-pinned. ":latest" plus image_pull_policy Always meant any registry
+  # write landed in running workspaces with no template change and no review.
+  # Bump these when promoting a new image; the tag in the comment is the
+  # build-and-promote short SHA the digest came from.
+  base_image_digests = {
+    ""        = "sha256:7c52f5e596cfd6f199b7b051b42046b7a04fd34a93437477163377d54d925998" # 7b3ccd8
+    "-cuda13" = "sha256:ffa47e1faac96897084cb51be3a3f6910f1d50a373996d6881be779b99ad4f62" # 7b3ccd8
+  }
+  base_image = "${local.base_image_repo}@${local.base_image_digests[local.image_suffix]}"
 
   # Repository configuration - simplified
   repo_url     = data.coder_parameter.repository_url.value
@@ -365,6 +373,11 @@ resource "kubernetes_deployment_v1" "main" {
       condition     = !(data.coder_parameter.gpu_accelerator.value == "nvidia-l4" && local.cuda13)
       error_message = "CUDA 13.0 is not supported on NVIDIA L4 (nodes run driver R535). Select H100, RTX PRO 6000, or switch CUDA Version back to 12.9."
     }
+
+    precondition {
+      condition     = !local.utd_bucket_enabled || var.phi_workspace_utd_service_account != ""
+      error_message = "UTD bucket access requires phi_workspace_utd_service_account. Set TF_VAR_phi_workspace_utd_service_account to this environment's bucket-only workspace identity."
+    }
   }
 
   metadata {
@@ -398,7 +411,7 @@ resource "kubernetes_deployment_v1" "main" {
         # account, because UTD workspaces use the shared UTD service account.
         automount_service_account_token = false
         service_account_name = local.utd_bucket_enabled ? (
-          var.phi_workspace_utd_service_account != "" ? var.phi_workspace_utd_service_account : "coder"
+          var.phi_workspace_utd_service_account
           ) : (
           kubernetes_service_account_v1.workspace[0].metadata[0].name
         )
@@ -413,9 +426,11 @@ resource "kubernetes_deployment_v1" "main" {
         }
 
         container {
-          name              = "dev"
-          image             = local.base_image
-          image_pull_policy = "Always"
+          name  = "dev"
+          image = local.base_image
+          # Digest references are content-addressed, so Always only costs a
+          # registry round-trip on every pod start.
+          image_pull_policy = "IfNotPresent"
           command           = ["sh", "-c", coder_agent.main.init_script]
 
           security_context {

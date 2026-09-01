@@ -179,7 +179,7 @@ coder:
       - name: cloud-sql-proxy
         restartPolicy: Always
         # It is recommended to use the latest version of the Cloud SQL Auth Proxy!
-        image: gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.22.0
+        image: gcr.io/cloud-sql-connectors/cloud-sql-proxy@sha256:fa4c7308245407157c5e9c4e16f1c0f1113899d6f29dc8f8be3e30efae86467f # 2.22.0
         args:
           # Connect over private IP in VPC-native GKE cluster
           - --private-ip
@@ -223,7 +223,7 @@ langsmithProxy:
   networkPolicy:
     nodeCIDR: "10.6.0.0/16"
   image:
-    digest: "sha256:cd4ac114bf5d4c60988fd8f6d03af9a9712634be56aaca589c86649f82d5b520"
+    digest: "sha256:2d11c4180671737f51710d442e49a41c4ac5fcc777a1d514b8cb91a20419cc59" # 6141531
   upstreamUrl: "https://langsmith.abridge.coffee/coder-broker"
   brokerAudience: "https://langsmith.abridge.coffee/coder-broker"
   serviceAccount:
@@ -236,7 +236,7 @@ langsmithAnnotationProxy:
   networkPolicy:
     nodeCIDR: "10.6.0.0/16"
   image:
-    digest: "sha256:cd4ac114bf5d4c60988fd8f6d03af9a9712634be56aaca589c86649f82d5b520"
+    digest: "sha256:2d11c4180671737f51710d442e49a41c4ac5fcc777a1d514b8cb91a20419cc59" # 6141531
   upstreamUrl: "https://langsmith.abridge.coffee/annotation-broker"
   brokerAudience: "https://langsmith.abridge.coffee/annotation-broker"
   serviceAccount:

@@ -1,7 +1,7 @@
 # CUDA 13 variant of the PHI base image - Last checked: 2026-06-10
 # Only schedulable on R580+ driver nodes (h100-coder-class, rtx6000-class).
 # NVIDIA L4 coder nodes run driver R535 and must use the CUDA 12.9 image (phi.Dockerfile).
-FROM nvcr.io/nvidia/cuda:13.0.3-cudnn-devel-ubuntu24.04
+FROM nvcr.io/nvidia/cuda:13.0.3-cudnn-devel-ubuntu24.04@sha256:0230b7f243483cb15969fa3cc724a9459599604427052fc2a0d4291c7c0647dd
 
 # Label to track last verification date (forces rebuild when updated)
 LABEL last_verified="2026-06-10"
@@ -16,11 +16,11 @@ ENV UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy
 
 # Copy UV binary from official image and set up
-COPY --from=ghcr.io/astral-sh/uv:0.11.17 /uv /bin/uv
+COPY --from=ghcr.io/astral-sh/uv:0.12.7@sha256:95f2aa1fe59274951cfe9b0cbc7972e879ff1004bc8945d130a32eb0dbd85945 /uv /bin/uv
 
 # Copy Node.js from official image
-COPY --from=node:24 /usr/local/bin/node /usr/local/bin/node
-COPY --from=node:24 /usr/local/lib/node_modules /usr/local/lib/node_modules
+COPY --from=node:24@sha256:be23f54a88d34e8824c741b19b91064094f92c1c97b194144bfc8b50d67258e2 /usr/local/bin/node /usr/local/bin/node
+COPY --from=node:24@sha256:be23f54a88d34e8824c741b19b91064094f92c1c97b194144bfc8b50d67258e2 /usr/local/lib/node_modules /usr/local/lib/node_modules
 RUN ln -s /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm && \
     ln -s /usr/local/lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx
 

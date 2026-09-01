@@ -88,10 +88,19 @@ locals {
   # Directory configuration
   home_dir = "/home/vscode"
 
+  # Each workspace receives a distinct identity with no Kubernetes RBAC and no
+  # cloud identity annotation, rather than the namespace default account.
+  workspace_service_account_name = "coder-cpu-${data.coder_workspace.me.id}"
+
   # Image and environment configuration
   base_image_repo = "us-central1-docker.pkg.dev/abridge-artifact-registry/coder/base"
-  base_image_tag  = "latest"
-  base_image      = "${local.base_image_repo}:${local.base_image_tag}"
+
+  # Digest-pinned. ":latest" plus image_pull_policy Always meant any registry
+  # write landed in running workspaces with no template change and no review.
+  # Bump these when promoting a new image; the tag in the comment is the
+  # build-and-promote short SHA the digest came from.
+  base_image_digest = "sha256:e7254717ab9e0eab8a6e9697e37ddb968d712f4720898d989c296bba26426f07" # f24a73d
+  base_image        = "${local.base_image_repo}@${local.base_image_digest}"
 
 
   # Repository configuration - simplified
@@ -184,6 +193,17 @@ resource "coder_app" "code-server" {
 
 # --- Kubernetes Resources ---
 
+resource "kubernetes_service_account_v1" "workspace" {
+  metadata {
+    name        = local.workspace_service_account_name
+    namespace   = var.namespace
+    labels      = local.labels
+    annotations = local.annotations
+  }
+
+  automount_service_account_token = false
+}
+
 # NOTE: deliberately NOT renamed to kubernetes_persistent_volume_claim_v1.
 # The kubernetes provider implements no cross-type state move, so a `moved` block
 # errors at plan time and a bare rename destroys the PVC, wiping every workspace's
@@ -244,6 +264,11 @@ resource "kubernetes_deployment_v1" "main" {
         })
       }
       spec {
+        # Dedicated no-RBAC identity; the namespace default account is still a
+        # cluster credential a workspace has no reason to hold.
+        automount_service_account_token = false
+        service_account_name            = kubernetes_service_account_v1.workspace.metadata[0].name
+
         node_selector = {
           "cloud.google.com/compute-class" = "cpu-coder-class"
         }
@@ -280,9 +305,11 @@ resource "kubernetes_deployment_v1" "main" {
         }
 
         container {
-          name              = "dev"
-          image             = local.base_image
-          image_pull_policy = "Always"
+          name  = "dev"
+          image = local.base_image
+          # Digest references are content-addressed, so Always only costs a
+          # registry round-trip on every pod start.
+          image_pull_policy = "IfNotPresent"
           command           = ["sh", "-c", "${local.logger_script}\n\n${coder_agent.main.init_script}"]
 
           security_context {

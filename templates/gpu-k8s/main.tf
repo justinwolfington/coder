@@ -178,13 +178,25 @@ locals {
   # UTD bucket access configuration
   utd_bucket_enabled = module.utd_bucket.bucket_enabled
 
+  # Each non-UTD workspace receives a distinct identity with no Kubernetes RBAC
+  # and no cloud identity annotation.
+  workspace_service_account_name = "coder-gpu-${data.coder_workspace.me.id}"
+
   # Image and environment configuration
   # CUDA 13.0 selects the "-cuda13" image variant; CUDA 12.9 uses the default image.
   cuda13          = data.coder_parameter.cuda_version.value == "13.0"
   image_suffix    = local.cuda13 ? "-cuda13" : ""
   base_image_repo = "us-central1-docker.pkg.dev/abridge-artifact-registry/coder/gpu${local.image_suffix}"
-  base_image_tag  = "latest"
-  base_image      = "${local.base_image_repo}:${local.base_image_tag}"
+
+  # Digest-pinned. ":latest" plus image_pull_policy Always meant any registry
+  # write landed in running workspaces with no template change and no review.
+  # Bump these when promoting a new image; the tag in the comment is the
+  # build-and-promote short SHA the digest came from.
+  base_image_digests = {
+    ""        = "sha256:3b213117ded2ca9d8768cc1f9b0ec091111bf94cfc40a091c6cae26fe0be41f1" # f24a73d
+    "-cuda13" = "sha256:a7230bc9e8777a3bdbae2dc447d723a8f8eae1079140b1655a7f844cce858f88" # f24a73d
+  }
+  base_image = "${local.base_image_repo}@${local.base_image_digests[local.image_suffix]}"
 
   # Repository configuration - simplified
   repo_url     = data.coder_parameter.repository_url.value
@@ -307,6 +319,19 @@ resource "coder_app" "code-server" {
 
 # --- Kubernetes Resources ---
 
+resource "kubernetes_service_account_v1" "workspace" {
+  count = local.utd_bucket_enabled ? 0 : 1
+
+  metadata {
+    name        = local.workspace_service_account_name
+    namespace   = var.namespace
+    labels      = local.labels
+    annotations = local.annotations
+  }
+
+  automount_service_account_token = false
+}
+
 # NOTE: deliberately NOT renamed to kubernetes_persistent_volume_claim_v1.
 # The kubernetes provider implements no cross-type state move, so a `moved` block
 # errors at plan time and a bare rename destroys the PVC, wiping every workspace's
@@ -341,6 +366,11 @@ resource "kubernetes_deployment_v1" "main" {
       condition     = !(data.coder_parameter.gpu_accelerator.value == "nvidia-l4" && local.cuda13)
       error_message = "CUDA 13.0 is not supported on NVIDIA L4 (nodes run driver R535). Select H100, RTX PRO 6000, or switch CUDA Version back to 12.9."
     }
+
+    precondition {
+      condition     = !local.utd_bucket_enabled || var.gpu_workspace_utd_service_account != ""
+      error_message = "UTD bucket access requires gpu_workspace_utd_service_account. Set TF_VAR_gpu_workspace_utd_service_account to this environment's bucket-only workspace identity."
+    }
   }
 
   metadata {
@@ -370,8 +400,15 @@ resource "kubernetes_deployment_v1" "main" {
         })
       }
       spec {
-        service_account_name = local.utd_bucket_enabled ? "coder" : null
-        node_selector        = local.node_selector
+        # Never the Coder provisioner identity ("coder"): it carries namespace
+        # RBAC and a Workload Identity binding a workspace must not inherit.
+        automount_service_account_token = false
+        service_account_name = local.utd_bucket_enabled ? (
+          var.gpu_workspace_utd_service_account
+          ) : (
+          kubernetes_service_account_v1.workspace[0].metadata[0].name
+        )
+        node_selector = local.node_selector
 
         security_context {
           # Run as root for unrestricted access
@@ -405,9 +442,11 @@ resource "kubernetes_deployment_v1" "main" {
         }
 
         container {
-          name              = "dev"
-          image             = local.base_image
-          image_pull_policy = "Always"
+          name  = "dev"
+          image = local.base_image
+          # Digest references are content-addressed, so Always only costs a
+          # registry round-trip on every pod start.
+          image_pull_policy = "IfNotPresent"
           command           = ["sh", "-c", "${local.logger_script}\n\n${coder_agent.main.init_script}"]
 
           security_context {

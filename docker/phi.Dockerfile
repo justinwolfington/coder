@@ -1,8 +1,8 @@
-# Base image - Last checked: 2026-05-29
-FROM nvcr.io/nvidia/cuda:12.9.1-cudnn-devel-ubuntu22.04
+# Base image - Last checked: 2026-08-31
+FROM nvcr.io/nvidia/cuda:12.9.1-cudnn-devel-ubuntu22.04@sha256:827e01ba745d5488e8f199bb9331ca006da97542909af4076b89754cbf5a5a55
 
 # Label to track last verification date (forces rebuild when updated)
-LABEL last_verified="2026-05-29"
+LABEL last_verified="2026-08-31"
 
 # Set up environment variables
 ENV PYTHONUNBUFFERED=1 \
@@ -14,11 +14,11 @@ ENV UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy
 
 # Copy UV binary from official image and set up
-COPY --from=ghcr.io/astral-sh/uv:0.11.17 /uv /bin/uv
+COPY --from=ghcr.io/astral-sh/uv:0.12.7@sha256:95f2aa1fe59274951cfe9b0cbc7972e879ff1004bc8945d130a32eb0dbd85945 /uv /bin/uv
 
 # Copy Node.js from official image
-COPY --from=node:24 /usr/local/bin/node /usr/local/bin/node
-COPY --from=node:24 /usr/local/lib/node_modules /usr/local/lib/node_modules
+COPY --from=node:24@sha256:be23f54a88d34e8824c741b19b91064094f92c1c97b194144bfc8b50d67258e2 /usr/local/bin/node /usr/local/bin/node
+COPY --from=node:24@sha256:be23f54a88d34e8824c741b19b91064094f92c1c97b194144bfc8b50d67258e2 /usr/local/lib/node_modules /usr/local/lib/node_modules
 RUN ln -s /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm && \
     ln -s /usr/local/lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx
 

@@ -1,7 +1,7 @@
 # CUDA 13 variant of the GPU base image - Last checked: 2026-06-10
 # Only schedulable on R580+ driver nodes (h100-coder-class, rtx6000-class).
 # NVIDIA L4 coder nodes run driver R535 and must use the CUDA 12.9 image (gpu.Dockerfile).
-FROM nvcr.io/nvidia/cuda:13.0.3-cudnn-devel-ubuntu24.04
+FROM nvcr.io/nvidia/cuda:13.0.3-cudnn-devel-ubuntu24.04@sha256:0230b7f243483cb15969fa3cc724a9459599604427052fc2a0d4291c7c0647dd
 
 # Label to track last verification date (forces rebuild when updated)
 LABEL last_verified="2026-06-10"
@@ -16,7 +16,7 @@ ENV UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy
 
 # Copy UV binary from official image and set up
-COPY --from=ghcr.io/astral-sh/uv:0.11.17 /uv /bin/uv
+COPY --from=ghcr.io/astral-sh/uv:0.12.7@sha256:95f2aa1fe59274951cfe9b0cbc7972e879ff1004bc8945d130a32eb0dbd85945 /uv /bin/uv
 
 # Install build dependencies and system packages
 RUN apt-get update && \
