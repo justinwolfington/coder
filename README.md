@@ -25,7 +25,6 @@ coder/
 │       ├── git/                  # Git configuration
 │       └── ide/                  # IDE configuration
 └── templates/                    # Workspace templates
-    ├── clinician-k8s/            # CPU-based workspace template
     ├── cpu-k8s/                  # Lightweight CPU-based workspace template
     ├── gpu-k8s/                  # GPU-based workspace template
     ├── phi-gpu-k8s/              # PHI-compliant secure GPU workspace template
@@ -36,15 +35,6 @@ coder/
 
 ## Available Templates
 
-### Clinician K8s Template
-
-- **Purpose**: CPU-based development workspaces with integrated Arize Phoenix tracing and monitoring
-- **Features**: VS Code, Cursor IDE, Arize Phoenix dashboard, Git integration, Python & Jupyter support, OTLP tracing pre-configured
-- **Resources**: 8-16 CPU cores, 16-32GB RAM, 64-1024GB storage
-- **Phoenix Sidecar**: 500m-1000m CPU, 512Mi-1Gi RAM for tracing
-- **Base Image**: `us-central1-docker.pkg.dev/abridge-artifact-registry/coder/base:latest`
-- **Phoenix Image**: `us-central1-docker.pkg.dev/abridge-artifact-registry/coder/phoenix:latest`
-- **Use Cases**: Development with observability, debugging, performance monitoring, trace analysis
 
 ### CPU K8s Template
 
@@ -215,7 +205,6 @@ For configuration details, see the [Workspace Process Logging documentation](htt
 
 | Template | Process Logging |
 |----------|-----------------|
-| Clinician K8s | Yes |
 | CPU K8s | Yes |
 | GPU K8s | Yes |
 | PHI GPU K8s | No |

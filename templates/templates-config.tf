@@ -32,16 +32,6 @@ locals {
   standard_timings = merge(local.retention, local.failure_cleanup)
 
   templates = {
-    # Named for abridgeai/completion-service, archived 2026-05-15; work moved to bilrost.
-    "k8s-completion-service" = merge({
-      display_name        = "Kubernetes Completion Service with Phoenix"
-      description         = "Kubernetes workspace with Arize Phoenix. Includes completion service, uv package manager, and gcloud CLI."
-      icon                = "/emojis/1f33c.png"
-      directory           = "./clinician-k8s"
-      environments        = ["development", "staging", "production"]
-      deprecation_message = "This template is deprecated and will be removed. Use cpu-k8s for CPU work or phi-gpu-k8s for GPU work. Existing workspaces keep running, but new ones cannot be created from this template."
-    }, local.standard_timings)
-
     "cpu-k8s" = merge({
       display_name = "Kubernetes CPU Workspace"
       description  = "Lightweight Kubernetes workspace for CPU-intensive tasks with development tools."
