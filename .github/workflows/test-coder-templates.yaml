@@ -50,13 +50,13 @@ jobs:
       should_test: ${{ steps.matrix.outputs.should_test }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
 
       - name: Get changed files
         id: changed
-        uses: tj-actions/changed-files@v47
+        uses: tj-actions/changed-files@24d32ffd492484c1d75e0c0b894501ddb9d30d62 # v47
         with:
           files: |
             templates/**
@@ -128,10 +128,10 @@ jobs:
         include: ${{ fromJSON(needs.detect-changes.outputs.matrix) }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Setup Coder CLI
-        uses: coder/setup-action@v1
+        uses: coder/setup-action@4a607a8113d4e676e2d7c34caa20a814bc88bfda # v1
         with:
           access_url: ${{ vars.CODER_ACCESS_URL }}
           coder_session_token: ${{ secrets.CODER_SESSION_TOKEN }}
@@ -150,7 +150,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Generate test summary
-        uses: actions/github-script@v9
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         with:
           script: |
             const { data: jobs } = await github.rest.actions.listJobsForWorkflowRun({

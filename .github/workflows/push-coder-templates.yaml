@@ -73,22 +73,22 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v7.0.0
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "18"
 
       - name: Set up Terraform
-        uses: hashicorp/setup-terraform@v4
+        uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4
 
       - name: Configure Git for private repos
         run: |
           git config --global url."https://${{ secrets.ABRIDGE_GH_BOT}}@github.com/".insteadOf "https://github.com/"
 
       - name: Setup Coder CLI
-        uses: coder/setup-action@v1
+        uses: coder/setup-action@4a607a8113d4e676e2d7c34caa20a814bc88bfda # v1
         with:
           access_url: ${{ vars.CODER_ACCESS_URL }}
           coder_session_token: ${{ secrets.CODER_SESSION_TOKEN }}
