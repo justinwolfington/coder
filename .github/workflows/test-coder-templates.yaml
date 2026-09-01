@@ -67,21 +67,28 @@ jobs:
 
       - name: Build matrix
         id: matrix
+        env:
+          TEMPLATE_NAME: ${{ inputs.template_name }}
+          REF_NAME: ${{ github.ref_name }}
+          EVENT_NAME: ${{ github.event_name }}
+          ANY_CHANGED: ${{ steps.changed.outputs.any_changed }}
+          CHANGED_FILES: ${{ steps.changed.outputs.all_changed_files }}
         run: |
           # Determine which templates to test
-          if [[ -n "${{ inputs.template_name }}" ]]; then
-            templates="${{ inputs.template_name }}"
-          elif [[ "${{ github.ref_name }}" == "main" ]] || \
-               [[ "${{ github.event_name }}" == "workflow_dispatch" ]] || \
-               [[ "${{ steps.changed.outputs.any_changed }}" == "true" && "${{ contains(steps.changed.outputs.all_changed_files, 'modules/') || contains(steps.changed.outputs.all_changed_files, 'tests/') || contains(steps.changed.outputs.all_changed_files, '.github/') }}" == "true" ]]; then
+          if [[ -n "$TEMPLATE_NAME" ]]; then
+            templates="$TEMPLATE_NAME"
+          elif [[ "$REF_NAME" == "main" ]] || \
+               [[ "$EVENT_NAME" == "workflow_dispatch" ]] || \
+               [[ "$ANY_CHANGED" == "true" && ( "$CHANGED_FILES" == *"modules/"* || "$CHANGED_FILES" == *"tests/"* || "$CHANGED_FILES" == *".github/"* ) ]]; then
             # Test all templates
             templates=$(ls tests/templates/*.json | xargs -n1 basename -s .json | tr '\n' ' ')
           else
             # Test only changed templates
             templates=""
-            for file in ${{ steps.changed.outputs.all_changed_files }}; do
+            read -ra changed_files <<< "$CHANGED_FILES"
+            for file in "${changed_files[@]}"; do
               if [[ $file == templates/* ]]; then
-                template=$(echo $file | cut -d'/' -f2)
+                template=$(echo "$file" | cut -d'/' -f2)
                 [[ -f "tests/templates/${template}.json" ]] && templates="$templates $template"
               fi
             done
@@ -90,7 +97,7 @@ jobs:
           # GPU scenarios each hold real accelerators for the length of the run and
           # have produced no passing result in months, so they are opt-in: only a
           # manual dispatch schedules them.
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
             scenario_query='keys[]'
           else
             scenario_query='to_entries[] | select(.value.gpu != true) | .key'
@@ -140,9 +147,11 @@ jobs:
         env:
           CODER_SESSION_TOKEN: ${{ secrets.CODER_SESSION_TOKEN }}
           CODER_ACCESS_URL: ${{ vars.CODER_ACCESS_URL }}
+          TEMPLATE: ${{ matrix.template }}
+          SCENARIO: ${{ matrix.scenario }}
         run: |
           chmod +x ./tests/test_templates.sh
-          ./tests/test_templates.sh "tests/templates/${{ matrix.template }}.json" "${{ matrix.scenario }}"
+          ./tests/test_templates.sh "tests/templates/${TEMPLATE}.json" "$SCENARIO"
 
   summary:
     needs: test-templates

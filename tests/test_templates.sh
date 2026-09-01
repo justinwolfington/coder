@@ -19,6 +19,11 @@ log_ok()    { echo -e "${GREEN}OK:   $1${NC}" >&2; }
 log_warn()  { echo -e "${YELLOW}WARN: $1${NC}" >&2; }
 log_error() { echo -e "${RED}ERROR: $1${NC}" >&2; }
 
+# The session file lands in a runner home that outlives the job, so keep it in a
+# scratch dir this run owns and deletes.
+CODER_CONFIG_DIR="$(mktemp -d)"
+export CODER_CONFIG_DIR
+
 # set -e aborts before the explicit cleanup on any bare failing command, and an
 # abandoned workspace keeps its GPUs and gets resurrected by autostart, so every
 # exit path has to reap.
@@ -29,7 +34,12 @@ reap_workspace() {
     coder delete "$CURRENT_WORKSPACE" --yes >&2 || true
     CURRENT_WORKSPACE=""
 }
-trap reap_workspace EXIT
+
+cleanup() {
+    reap_workspace
+    rm -rf "${CODER_CONFIG_DIR:?}"
+}
+trap cleanup EXIT
 
 pass() {
     echo -e "${GREEN}✅ $1${NC}"
@@ -351,7 +361,7 @@ main() {
     start_group "Setup and Configuration"
     
     log_info "Logging into Coder: $CODER_ACCESS_URL"
-    if ! coder login "$CODER_ACCESS_URL" --token "$CODER_SESSION_TOKEN" --no-open >/dev/null 2>&1; then
+    if ! coder login "$CODER_ACCESS_URL" --no-open >/dev/null 2>&1; then
         log_error "Coder login failed. Check credentials and URL."
         coder whoami # Show detailed error
         exit 1

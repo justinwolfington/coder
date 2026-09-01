@@ -19,11 +19,11 @@ jobs:
 
       - name: Create and push tag
         id: create-tag
+        env:
+          VERSION: ${{ github.event.inputs.version }}
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-
-          VERSION="${{ github.event.inputs.version }}"
 
           # Check if tag already exists on remote
           if git ls-remote --tags origin | grep -q "refs/tags/${VERSION}$"; then
@@ -31,8 +31,8 @@ jobs:
             echo "tag_created=false" >> $GITHUB_OUTPUT
           else
             # Create and push the tag
-            git tag $VERSION
-            git push origin $VERSION
+            git tag "$VERSION"
+            git push origin "$VERSION"
             echo "Created and pushed tag: $VERSION"
             echo "tag_created=true" >> $GITHUB_OUTPUT
           fi

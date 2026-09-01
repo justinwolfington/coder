@@ -33,7 +33,6 @@ on:
 
 permissions:
   contents: read
-  id-token: write
 
 jobs:
   detect-changed-images:
@@ -61,8 +60,9 @@ jobs:
 
       - name: Set matrix for changed images
         id: set-matrix
+        env:
+          FILES: ${{ steps.changed-files.outputs.all_changed_files }}
         run: |
-          FILES="${{ steps.changed-files.outputs.all_changed_files }}"
           echo "Changed files:"
           echo "$FILES"
 
@@ -98,6 +98,9 @@ jobs:
     # Run on pull_request or push event
     if: github.event_name == 'pull_request' || github.event_name == 'push'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
     strategy:
       matrix: ${{ fromJson(needs.detect-changed-images.outputs.matrix) }}
     env:
@@ -163,6 +166,9 @@ jobs:
     # Run when code is pushed to main branch (includes merged PRs)
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
     strategy:
       matrix: ${{ fromJson(needs.detect-changed-images.outputs.matrix) }}
     env:
@@ -172,9 +178,12 @@ jobs:
       # SHORT_SHA is set by the "Set SHA for push to main" step
     steps:
       - name: Set SHA for push to main
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REF: ${{ github.ref }}
+          HEAD_SHA: ${{ github.sha }}
         run: |
-          echo "Event: ${{ github.event_name }}, Ref: ${{ github.ref }}"
-          HEAD_SHA="${{ github.sha }}"
+          echo "Event: ${EVENT_NAME}, Ref: ${REF}"
           if [[ -z "$HEAD_SHA" ]]; then
             echo "Error: github.sha was empty for this push event."
             exit 1
@@ -196,20 +205,22 @@ jobs:
         uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3
 
       - name: Promote images
+        env:
+          IMAGE_NAME: ${{ matrix.image.name }}
         run: |
-          if [[ -z "${{ env.SHORT_SHA }}" ]]; then
+          if [[ -z "$SHORT_SHA" ]]; then
             echo "Error: SHORT_SHA is empty. Cannot promote."
             exit 1
           fi
 
-          SOURCE_TAG="${REGISTRY}/${PROJECT}/${REPO}/${{ matrix.image.name }}:${SHORT_SHA}"
-          TARGET_TAG="${REGISTRY}/${PROJECT}/${REPO}/${{ matrix.image.name }}:latest"
+          SOURCE_TAG="${REGISTRY}/${PROJECT}/${REPO}/${IMAGE_NAME}:${SHORT_SHA}"
+          TARGET_TAG="${REGISTRY}/${PROJECT}/${REPO}/${IMAGE_NAME}:latest"
 
           echo "Checking if image exists: $SOURCE_TAG"
           if gcloud container images describe "$SOURCE_TAG" >/dev/null 2>&1; then
-            echo "Promoting image ${{ matrix.image.name }} from tag ${{ env.SHORT_SHA }} to latest"
+            echo "Promoting image ${IMAGE_NAME} from tag ${SHORT_SHA} to latest"
             gcloud container images add-tag "$SOURCE_TAG" "$TARGET_TAG" --quiet
-            echo "Successfully promoted ${{ matrix.image.name }}"
+            echo "Successfully promoted ${IMAGE_NAME}"
           else
             echo "Warning: Image $SOURCE_TAG does not exist. Skipping promotion."
             echo "This may happen if no changes were made to this Docker image in the current push."

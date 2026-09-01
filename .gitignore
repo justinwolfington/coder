@@ -7,9 +7,11 @@ charts/charts/
 
 
 # Test files
-templates/*.tfvars
+templates/**/*.tfvars
 *.tfstate
 *.tfstate.*
+tfplan
+*.tfplan
 
 # oh-my-claudecode session state - tooling scratch, never belongs in the repo
 .omc/

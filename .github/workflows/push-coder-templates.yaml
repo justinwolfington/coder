@@ -20,7 +20,7 @@ on:
       - "modules/**"
       - ".github/workflows/push-coder-templates.yaml"
 
-  # Run on pull requests to test templates
+  # Run on pull requests to validate templates
   pull_request:
     branches:
       - main
@@ -62,11 +62,32 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # A pull request carries untrusted terraform, and plan and apply both execute
+  # code the PR author controls, so PRs get a GitHub-hosted runner and no
+  # credentials. That rules out plan as well: the coderd provider authenticates
+  # against the Coder API when terraform configures it.
+  validate-templates:
+    if: github.event_name == 'pull_request' && github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4
+
+      - name: Initialize Terraform
+        working-directory: ./templates
+        run: terraform init -backend=false
+
+      - name: Validate Terraform configuration
+        working-directory: ./templates
+        run: terraform validate
+
   push-templates:
     if: >-
       github.event_name == 'workflow_dispatch'
       || github.event_name == 'push'
-      || (github.event_name == 'pull_request' && github.event.pull_request.draft == false)
       || github.event.workflow_run.conclusion == 'success'
     runs-on: abridge-runner-${{ github.event.inputs.environment || 'development' }}
     environment: ${{ github.event.inputs.environment || 'development' }}
@@ -84,8 +105,10 @@ jobs:
         uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4
 
       - name: Configure Git for private repos
+        env:
+          GH_BOT_TOKEN: ${{ secrets.ABRIDGE_GH_BOT }}
         run: |
-          git config --global url."https://${{ secrets.ABRIDGE_GH_BOT}}@github.com/".insteadOf "https://github.com/"
+          git config --global url."https://${GH_BOT_TOKEN}@github.com/".insteadOf "https://github.com/"
 
       - name: Setup Coder CLI
         uses: coder/setup-action@4a607a8113d4e676e2d7c34caa20a814bc88bfda # v1
@@ -95,16 +118,18 @@ jobs:
 
       - name: Get short commit SHA
         id: vars
+        env:
+          EVENT_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
         run: |
-          SHA="${{ github.event_name == 'workflow_dispatch' && github.sha || github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.event.workflow_run.head_sha }}"
+          SHA="$EVENT_SHA"
           [[ -z "$SHA" ]] && SHA=$(git rev-parse HEAD)
           echo "sha_short=${SHA:0:7}" >> $GITHUB_OUTPUT
 
       - name: Check if module version provided
         id: module-version
+        env:
+          PROVIDED_VERSION: ${{ github.event.inputs.module_version }}
         run: |
-          PROVIDED_VERSION="${{ github.event.inputs.module_version }}"
-
           if [ -n "$PROVIDED_VERSION" ]; then
             echo "update_modules=true" >> $GITHUB_OUTPUT
             echo "module_version=$PROVIDED_VERSION" >> $GITHUB_OUTPUT
@@ -116,18 +141,23 @@ jobs:
 
       - name: Update module references in templates
         if: steps.module-version.outputs.update_modules == 'true'
+        env:
+          MODULE_VERSION: ${{ steps.module-version.outputs.module_version }}
         run: |
-          echo "Updating all module references to version: ${{ steps.module-version.outputs.module_version }}"
-          find templates/ -name "*.tf" -exec sed -i 's|git::https://github.com/abridgeai/coder.git//modules/\([^?]*\)?ref=[^"]*|git::https://github.com/abridgeai/coder.git//modules/\1?ref=${{ steps.module-version.outputs.module_version }}|g' {} \;
+          echo "Updating all module references to version: $MODULE_VERSION"
+          find templates/ -name "*.tf" -exec sed -i "s|\(git::https://github.com/abridgeai/coder.git//modules/[^?]*\)?ref=[^\"]*|\1?ref=${MODULE_VERSION}|g" {} \;
 
       - name: Create environment tfvars in each template directory
+        env:
+          ENVIRONMENT: ${{ github.event.inputs.environment || 'development' }}
+          CODER_ACCESS_URL: ${{ vars.CODER_ACCESS_URL }}
         run: |
           echo "Creating terraform.auto.tfvars with environment and coder_url in each template"
           for template_dir in templates/*/; do
             if [ -f "${template_dir}main.tf" ]; then
               cat > "${template_dir}terraform.auto.tfvars" <<EOF
-          environment = "${{ github.event.inputs.environment || 'development' }}"
-          coder_url   = "${{ vars.CODER_ACCESS_URL }}"
+          environment = "${ENVIRONMENT}"
+          coder_url   = "${CODER_ACCESS_URL}"
           EOF
               echo "Created tfvars in ${template_dir}"
             fi
@@ -139,13 +169,19 @@ jobs:
 
       - name: Create tfvars file
         working-directory: ./templates
+        env:
+          CODER_ACCESS_URL: ${{ vars.CODER_ACCESS_URL }}
+          CODER_TOKEN: ${{ secrets.CODER_SESSION_TOKEN }}
+          ENVIRONMENT: ${{ github.event.inputs.environment || 'development' }}
+          TEMPLATE_NAME: ${{ github.event.inputs.template_name || '' }}
+          COMMIT_SHA: ${{ steps.vars.outputs.sha_short }}
         run: |
           cat > terraform.auto.tfvars <<EOF
-          coder_url = "${{ vars.CODER_ACCESS_URL }}"
-          coder_token = "${{ secrets.CODER_SESSION_TOKEN }}"
-          environment = "${{ github.event.inputs.environment || 'development' }}"
-          template_name = "${{ github.event.inputs.template_name || '' }}"
-          commit_sha = "${{ steps.vars.outputs.sha_short }}"
+          coder_url = "${CODER_ACCESS_URL}"
+          coder_token = "${CODER_TOKEN}"
+          environment = "${ENVIRONMENT}"
+          template_name = "${TEMPLATE_NAME}"
+          commit_sha = "${COMMIT_SHA}"
           EOF
 
       - name: Import existing templates
@@ -183,8 +219,14 @@ jobs:
       - name: Clean up sensitive files
         working-directory: ./templates
         if: always()
+        env:
+          GH_BOT_TOKEN: ${{ secrets.ABRIDGE_GH_BOT }}
         run: |
           rm -f terraform.auto.tfvars
           rm -f terraform.tfstate*
+          # tfplan stores the variable values, coder_token included
+          rm -f tfplan
           # Clean up template-specific tfvars files
           find . -maxdepth 2 -name "terraform.auto.tfvars" -delete
+          # ~/.gitconfig outlives the job on a self-hosted runner
+          git config --global --unset-all "url.https://${GH_BOT_TOKEN}@github.com/.insteadOf" || true
