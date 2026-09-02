@@ -137,9 +137,14 @@ spec:
       app.kubernetes.io/name: {{ $name }}
   action: ALLOW
   rules:
+    {{- if not (and $.Values.networkPolicy ($.Values.networkPolicy.enforce | default false)) }}
     - to:
         - operation:
             paths: ["/healthz"]
+    {{- end }}
+    # Dropping the unauthenticated /healthz rule costs nothing: kubelet probes
+    # bypass authz through rewriteAppHTTPProbers, and every other legitimate
+    # caller is in-namespace and matches the rule below.
     - from:
         - source:
             namespaces: [{{ $.Release.Namespace | quote }}]

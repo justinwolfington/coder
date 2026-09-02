@@ -205,6 +205,24 @@ coder:
             # CPU scales with database I/O
             cpu: 100m
 
+# Development had no NetworkPolicy at all: workspaces here were unrestricted in
+# both directions. Dev is the first environment to flip enforce, once the Istio
+# dry-run logs are clean and the ranges below are filled in.
+networkPolicy:
+  enforce: false
+
+  internalCIDRs:
+    - 172.32.0.0/12
+    - 172.48.0.0/22
+  nodeCIDR: "10.6.0.0/16"
+
+  # Unknown: us-central1 proxy-only subnet plus 35.191.0.0/16 and
+  # 130.211.0.0/22.
+  gatewayCIDRs: []
+
+  # Unknown: private IP of client-dev-e301d:us-central1:coder-postgres-db.
+  databaseCIDR: ""
+
 # Enable PHI Istio egress controls in development
 phiIstio:
   enabled: true

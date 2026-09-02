@@ -1,5 +1,20 @@
 {{- if .Values.networkPolicy }}
-{{- if or .Values.networkPolicy.allowedServices .Values.networkPolicy.additionalEgressRules }}
+{{- $np := .Values.networkPolicy }}
+{{- $enforce := $np.enforce | default false }}
+{{- $workspaceNames := list "coder-workspace" "coder-phi-workspace" }}
+{{- if $enforce }}
+{{- if not $np.internalCIDRs }}
+{{- fail "networkPolicy.internalCIDRs must list this cluster's pod and service ranges before networkPolicy.enforce is set" }}
+{{- end }}
+{{- if not $np.nodeCIDR }}
+{{- fail "networkPolicy.nodeCIDR must be set before networkPolicy.enforce is set, otherwise workspaces keep reaching the kubelet" }}
+{{- end }}
+{{- if not $np.gatewayCIDRs }}
+{{- fail "networkPolicy.gatewayCIDRs must list the internal load balancer proxy-only subnet and the GCP health check ranges before networkPolicy.enforce is set" }}
+{{- end }}
+{{- end }}
+{{- $exceptCIDRs := concat ($np.internalCIDRs | default (list)) (compact (list ($np.nodeCIDR | default ""))) }}
+{{- if or $np.allowedServices $np.additionalEgressRules $enforce }}
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -7,12 +22,19 @@ metadata:
   namespace: coder
 spec:
   podSelector:
+    {{- if $enforce }}
+    matchExpressions:
+      - key: app.kubernetes.io/name
+        operator: In
+        values:{{ toYaml $workspaceNames | nindent 10 }}
+    {{- else }}
     matchLabels:
       app.kubernetes.io/name: coder-workspace
+    {{- end }}
   policyTypes:
     - Egress
   egress:
-    {{- range .Values.networkPolicy.allowedServices }}
+    {{- range $np.allowedServices }}
     - ports:
         - port: {{ .port }}
           protocol: TCP
@@ -26,11 +48,74 @@ spec:
               {{ $key }}: {{ $value }}
               {{- end }}
     {{- end }}
-    {{- if .Values.networkPolicy.additionalEgressRules }}
-    {{- range .Values.networkPolicy.additionalEgressRules }}
+    {{- range $np.additionalEgressRules }}
     - {{- toYaml . | nindent 6 }}
     {{- end }}
+    {{- with $np.databaseCIDR }}
+    {{- if $enforce }}
+    - ports:
+        - port: 5432
+          protocol: TCP
+      to:
+        - ipBlock:
+            cidr: {{ . | quote }}
+    {{- else }}
+    - to:
+        - ipBlock:
+            cidr: {{ . | quote }}
     {{- end }}
+    {{- end }}
+    {{- if $enforce }}
+    # Resolver only. The rule this replaces carried 53 and 443 with no "to:",
+    # which in NetworkPolicy means every destination, in-cluster addresses
+    # (including kubernetes.default.svc) included.
+    - ports:
+        - port: 53
+          protocol: TCP
+        - port: 53
+          protocol: UDP
+      to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+    - ports:
+        - port: 443
+          protocol: TCP
+      to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              {{- range $exceptCIDRs }}
+              - {{ . | quote }}
+              {{- end }}
+    # Workspaces reach coderd and the LangSmith brokers by cluster address,
+    # which the except list above removes from the internet rule.
+    - ports:
+        - port: 80
+          protocol: TCP
+        - port: 8080
+          protocol: TCP
+      to:
+        - podSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values:
+                  - coder
+                  - langsmith-proxy
+                  - langsmith-annotation-proxy
+    # In-cluster istiod. Managed ASM instead serves xDS over 443 from
+    # meshconfig.googleapis.com, which the internet rule already covers.
+    - ports:
+        - port: 15012
+          protocol: TCP
+        - port: 15014
+          protocol: TCP
+      to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: istio-system
+    {{- else }}
     - ports:
         - port: 53
           protocol: TCP
@@ -38,12 +123,118 @@ spec:
           protocol: TCP
         - port: 53
           protocol: UDP
+    {{- end }}
     # Allow access to GCE/GKE metadata servers for GCS FUSE authentication
-    # GKE DNATs metadata requests; allow entire link-local range (safe, never routed externally)
     - to:
+      {{- if $enforce }}
+        # The two addresses GKE DNATs metadata to, matching the mesh
+        # excludeOutboundIPRanges rather than the whole link-local range.
+        - ipBlock:
+            cidr: 169.254.169.254/32
+        - ipBlock:
+            cidr: 169.254.169.252/32
+        # NodeLocal DNSCache. Every workspace resolv.conf points here, so
+        # dropping this address takes pod DNS down.
+        - ipBlock:
+            cidr: 169.254.20.10/32
+      {{- else }}
+        # GKE DNATs metadata requests; allow entire link-local range
         - ipBlock:
             cidr: 169.254.0.0/16
+      {{- end }}
         - ipBlock:
             cidr: 100.100.100.100/32
+{{- end }}
+{{- if $enforce }}
+---
+# Namespace baseline. Every pod starts with no ingress and no egress; the
+# workspace and control plane policies re-open only what each one needs.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: coder-default-deny
+  namespace: coder
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+---
+# Workspace agents only ever dial out. code-server listens on 13337 with
+# --auth none, and for PHI pods the injected sidecar forwards inbound traffic
+# to 127.0.0.1, so a loopback-bound listener is otherwise network reachable.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: coder-workspace-deny-ingress
+  namespace: coder
+spec:
+  podSelector:
+    matchExpressions:
+      - key: app.kubernetes.io/name
+        operator: In
+        values:{{ toYaml $workspaceNames | nindent 10 }}
+  policyTypes:
+    - Ingress
+---
+# NotIn also matches pods carrying no app.kubernetes.io/name at all, so coderd,
+# the brokers and any sidecar workload keep the connectivity that the namespace
+# baseline above would otherwise remove.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: coder-control-plane
+  namespace: coder
+spec:
+  podSelector:
+    matchExpressions:
+      - key: app.kubernetes.io/name
+        operator: NotIn
+        values:{{ toYaml $workspaceNames | nindent 10 }}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        {{- range $np.gatewayCIDRs }}
+        - ipBlock:
+            cidr: {{ . | quote }}
+        {{- end }}
+    - from:
+        - podSelector: {}
+  egress:
+    - ports:
+        - port: 53
+          protocol: TCP
+        - port: 53
+          protocol: UDP
+      to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+    - ports:
+        - port: 443
+          protocol: TCP
+      to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+    - to:
+        - podSelector: {}
+    {{- with $np.databaseCIDR }}
+    - ports:
+        - port: 5432
+          protocol: TCP
+      to:
+        - ipBlock:
+            cidr: {{ . | quote }}
+    {{- end }}
+    - to:
+        - ipBlock:
+            cidr: 169.254.169.254/32
+        - ipBlock:
+            cidr: 169.254.169.252/32
+        # NodeLocal DNSCache, as above.
+        - ipBlock:
+            cidr: 169.254.20.10/32
 {{- end }}
 {{- end }}

@@ -92,9 +92,29 @@ spec:
       {{- range $allowedHttpHosts }}
         - ./{{ . }}
       {{- end }}
+    {{- if and .Values.networkPolicy (.Values.networkPolicy.enforce | default false) }}
+    # "./*" with no port exposed every port of every service in this namespace
+    # to PHI workspaces. These are the in-namespace destinations they call.
+    - port:
+        number: 80
+        protocol: HTTP
+        name: coder-server
+      hosts:
+        - ./coder.{{ .Release.Namespace }}.svc.cluster.local
+    - port:
+        number: 8080
+        protocol: HTTP
+        name: broker
+      hosts:
+        - ./langsmith-proxy.{{ .Release.Namespace }}.svc.cluster.local
+        - ./langsmith-annotation-proxy.{{ .Release.Namespace }}.svc.cluster.local
+    - hosts:
+        - kube-system/*
+    {{- else }}
     - hosts:
         - ./*
         - kube-system/*
+    {{- end }}
 
 {{- range $allHosts }}
 ---

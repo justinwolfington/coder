@@ -5,6 +5,32 @@ coder:
     # The autoscaler evicts coderd off shared workspace nodes; one replica blanks the NEG.
     replicaCount: 2
 
+# Deny-by-default network controls for the coder namespace.
+#
+# enforce is the single audit-to-enforce switch, set per environment. While it
+# is false nothing tightens: Kubernetes has no dry-run NetworkPolicy, so the
+# scoped rules simply are not rendered, and the Istio policies ship with
+# istio.io/dry-run so violations are logged instead of blocked. Flip it in one
+# environment at a time once the dry-run logs are clean.
+networkPolicy:
+  enforce: false
+  allowedServices: []
+  additionalEgressRules: []
+  # This cluster's pod and service ranges, excepted from the broad egress
+  # rules so "the internet" cannot also mean the API server or another
+  # tenant's pod. Required before enforce.
+  internalCIDRs: []
+  # This cluster's node range, excepted alongside internalCIDRs. Separate
+  # because it is the one that keeps workspaces off the kubelet, and it is not
+  # always known when the pod and service ranges are. Required before enforce.
+  nodeCIDR: ""
+  # Sources the internal Application Load Balancer uses to reach coderd: the
+  # region's proxy-only subnet plus the GCP health check ranges. Required
+  # before enforce, otherwise the namespace baseline blackholes the UI.
+  gatewayCIDRs: []
+  # Cloud SQL private IP. Egress to it is restricted to 5432 under enforce.
+  databaseCIDR: ""
+
 # Coder logstream configuration for Kubernetes event streaming
 coder-logstream-kube:
   enabled: false  # Disabled by default, enable per environment

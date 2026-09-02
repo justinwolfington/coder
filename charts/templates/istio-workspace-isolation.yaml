@@ -1,0 +1,39 @@
+{{- if and .Values.phiIstio .Values.phiIstio.enabled }}
+{{- $enforce := and .Values.networkPolicy (.Values.networkPolicy.enforce | default false) }}
+---
+# PeerAuthentication has no dry-run form, so PERMISSIVE is the audit setting:
+# it is the mesh default and accepts both mTLS and plaintext. Only injected
+# pods are affected; coderd sets sidecar.istio.io/inject: "false".
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: coder-namespace
+  namespace: {{ .Release.Namespace }}
+spec:
+  mtls:
+    mode: {{ if $enforce }}STRICT{{ else }}PERMISSIVE{{ end }}
+---
+# PHI workspaces are dialled by nothing: the agent opens its own tunnel to
+# coderd. Denying every in-namespace source stops workspace-to-workspace
+# traffic without naming the per-workspace ServiceAccounts. Kubelet probes are
+# not attributed to a namespace and so do not match.
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: coder-workspace-isolation
+  namespace: {{ .Release.Namespace }}
+  {{- if not $enforce }}
+  annotations:
+    istio.io/dry-run: "true"
+  {{- end }}
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: coder-phi-workspace
+  action: DENY
+  rules:
+    - from:
+        - source:
+            namespaces:
+              - {{ .Release.Namespace | quote }}
+{{- end }}

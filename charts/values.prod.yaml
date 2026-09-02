@@ -220,6 +220,20 @@ coder:
 
 # Production-specific network policy configuration
 networkPolicy:
+  # Last environment to flip; dev then staging first.
+  enforce: false
+
+  internalCIDRs:
+    - 172.32.0.0/12
+    - 172.48.0.0/22
+  nodeCIDR: "10.6.0.0/16"
+
+  # Unknown: read the us-central1 proxy-only subnet off the VPC and add it
+  # alongside the GCP health check ranges 35.191.0.0/16 and 130.211.0.0/22.
+  gatewayCIDRs: []
+
+  databaseCIDR: "10.6.0.104/32"
+
   allowedServices:
     - name: eyes
       port: 8000
@@ -236,10 +250,6 @@ networkPolicy:
 
   # Additional egress rules for general internet access
   additionalEgressRules:
-    # Allow access to internal PostgreSQL server (all ports)
-    - to:
-        - ipBlock:
-            cidr: 10.6.0.104/32
     - ports:
         - port: 80
           protocol: TCP

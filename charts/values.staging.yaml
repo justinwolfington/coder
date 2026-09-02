@@ -203,6 +203,27 @@ coder:
             # CPU scales with database I/O
             cpu: 100m
 
+# Staging had no NetworkPolicy at all: workspaces here were unrestricted in
+# both directions. Flip enforce after dev has run enforced for a week.
+networkPolicy:
+  enforce: false
+
+  internalCIDRs:
+    - 172.32.0.0/12
+    - 172.48.0.0/22
+
+  # Unknown: unlike dev and prod, nothing in this chart pins the staging node
+  # range. Left empty so enforce fails the render rather than leaving
+  # workspaces able to reach the kubelet.
+  nodeCIDR: ""
+
+  # Unknown: us-central1 proxy-only subnet plus 35.191.0.0/16 and
+  # 130.211.0.0/22.
+  gatewayCIDRs: []
+
+  # Unknown: private IP of abridge-client-staging:us-central1:coder-postgres-db.
+  databaseCIDR: ""
+
 # Enable PHI Istio egress controls in development
 phiIstio:
   enabled: true
