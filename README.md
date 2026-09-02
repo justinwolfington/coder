@@ -201,6 +201,18 @@ resource.labels.container_name="exectrace"
 
 For configuration details, see the [Workspace Process Logging documentation](https://coder.com/docs/admin/templates/extending-templates/process-logging#configuring-custom-templates-to-use-workspace-process-logging).
 
+### Private Python Packages (Artifact Registry)
+
+Workspace images ship `keyring` with the `keyrings.google-artifactregistry-auth` backend and set `UV_KEYRING_PROVIDER=subprocess`, so `uv` fetches Artifact Registry credentials on demand. Put `oauth2accesstoken` in the index URL as the username and leave the password unset:
+
+```bash
+uv pip install \
+  --index-url https://oauth2accesstoken@us-python.pkg.dev/abridge-artifact-registry/python-virtual/simple/ \
+  <package>
+```
+
+Do not export a token from `.bashrc`. A bare `gcloud auth print-access-token` there runs on every non-interactive shell, including the seven metadata scripts the workspace agent spawns every 15 seconds, which mints a fresh token about once every two seconds for the life of the workspace. The token also expires after an hour, so any shell open longer than that is left holding a dead credential.
+
 ### Feature Availability by Template
 
 | Template | Process Logging |

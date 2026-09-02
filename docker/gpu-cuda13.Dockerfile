@@ -13,7 +13,8 @@ ENV PYTHONUNBUFFERED=1 \
     PATH="/root/.local/bin:/google-cloud-sdk/bin:${PATH}"
 
 ENV UV_COMPILE_BYTECODE=1 \
-    UV_LINK_MODE=copy
+    UV_LINK_MODE=copy \
+    UV_KEYRING_PROVIDER=subprocess
 
 # Copy UV binary from official image and set up
 COPY --from=ghcr.io/astral-sh/uv:0.12.7@sha256:95f2aa1fe59274951cfe9b0cbc7972e879ff1004bc8945d130a32eb0dbd85945 /uv /bin/uv
