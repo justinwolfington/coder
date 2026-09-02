@@ -246,10 +246,6 @@ coder-logstream-kube:
   enabled: false
   url: https://coder.abridge.coffee # Must match CODER_ACCESS_URL above
 
-# SOAP Dashboard secrets for clinician-web development
-soapDashboard:
-  enabled: true
-
 # Okta OIDC login for the dev deployment (coder.abridge.coffee)
 oidcAuth:
   enabled: true
