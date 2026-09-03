@@ -55,12 +55,12 @@ coder/
 ### PHI GPU K8s Template
 
 - **Purpose**: PHI-compliant GPU-accelerated workspaces for secure healthcare ML/AI development
-- **Features**: NVIDIA GPU support, browser-only VS Code, complete network isolation, PHI compliance mode
-- **Security**: Zero egress network traffic, disabled SSH/port forwarding/desktop apps, air-gapped environment
+- **Features**: NVIDIA GPU support, browser-only VS Code, default-deny egress, PHI compliance mode
+- **Security**: Default-deny egress with an explicit allowlist, disabled SSH/port forwarding/desktop apps
 - **Resources**: 8-16 CPU cores, 16-32GB RAM, 64-1024GB storage, configurable GPUs
 - **GPU Support**: NVIDIA L4, H100 (80GB) with multi-GPU configuration
 - **Base Image**: `us-central1-docker.pkg.dev/abridge-artifact-registry/coder/phi-gpu:latest`
-- **Network Policy**: Dedicated `networkPolicyPhi` with complete egress blocking for HIPAA/PHI compliance
+- **Network Policy**: Dedicated `networkPolicyPhi` plus an Istio `REGISTRY_ONLY` sidecar. Egress is denied by default and permitted only to the hosts in `phiIstio.commonAllowedHosts` and the per-environment `phiIstio.allowedHosts`. That allowlist currently includes public package registries, model hubs and third-party APIs, so this is not an air-gapped environment.
 - **Use Cases**: Healthcare data analysis, PHI-compliant ML training, secure AI research, protected health information processing
 
 ### GCP VM Modular Template
@@ -146,7 +146,7 @@ Templates use Git tags instead of commit hashes to prevent orphaned references:
 - Verify network policies are enabled: `kubectl get networkpolicy -n coder`
 - Check `networkPolicyPhi` configuration in values files
 - Confirm PHI workspaces have `coder-phi-workspace` label
-- Ensure complete network isolation is working (no egress traffic allowed)
+- Ensure egress is default-deny: traffic to a host outside the `phiIstio` allowlist should be refused by the sidecar
 - Verify browser-only access restrictions (SSH/desktop apps disabled)
 
 **GCP VM Template Issues**

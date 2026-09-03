@@ -344,6 +344,12 @@ phiIstio:
     # from inside the Prod PHI workspace for workflow-fix generation/eval
     # harnesses.
     - bilrost-nursing.abridge.services
+  # PSC endpoints backing the baseten private DNS zones in abridge-client-prod.
+  # Must be updated alongside the baseten-psc-production-ml-* forwarding rules.
+  wildcardAddresses:
+    - 10.6.2.223/32
+    - 10.52.0.101/32
+    - 10.52.0.138/32
 
 # Enable Kubernetes event streaming for production environment
 coder-logstream-kube:

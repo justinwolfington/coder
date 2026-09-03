@@ -1,0 +1,27 @@
+{{- if .Values.admissionPolicies.podSecurityAdmission.enabled }}
+{{- $mode := .Values.admissionPolicies.mode -}}
+{{- if not (has $mode (list "Audit" "Enforce")) }}
+{{- fail (printf "admissionPolicies.mode must be Audit or Enforce, got %q" $mode) }}
+{{- end }}
+{{- if and (eq $mode "Enforce") (not .Values.admissionPolicies.podSecurityAdmission.exectraceExemptionConfigured) }}
+{{- fail "admissionPolicies.mode=Enforce requires podSecurityAdmission.exectraceExemptionConfigured: exectrace runs privileged for eBPF and restricted rejects it, so the cluster AdmissionConfiguration exemption must be in place first or non-PHI workspaces stop admitting" }}
+{{- end }}
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ .Release.Namespace }}
+  annotations:
+    helm.sh/resource-policy: keep
+  labels:
+    # Argo CD owns this namespace under a single server-side-apply field
+    # manager, so omitting the mesh label here would strip it.
+    istio-injection: enabled
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/audit-version: latest
+    pod-security.kubernetes.io/warn: restricted
+    pod-security.kubernetes.io/warn-version: latest
+    {{- if eq $mode "Enforce" }}
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: latest
+    {{- end }}
+{{- end }}

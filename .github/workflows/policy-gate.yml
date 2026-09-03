@@ -1,0 +1,55 @@
+name: Policy Gate
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions: {}
+
+jobs:
+  conftest:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        environment: [dev, staging, prod]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5
+
+      - name: Install conftest
+        env:
+          CONFTEST_VERSION: 0.69.0
+          CONFTEST_SHA256: 96fc2fbf11f0afde51256647127e6f00a64ce839a4d9a0a1aef2426c0e6f4b3f
+        run: |
+          set -euo pipefail
+          archive="${RUNNER_TEMP}/conftest.tar.gz"
+          curl -fsSL -o "${archive}" \
+            "https://github.com/open-policy-agent/conftest/releases/download/v${CONFTEST_VERSION}/conftest_${CONFTEST_VERSION}_Linux_x86_64.tar.gz"
+          echo "${CONFTEST_SHA256}  ${archive}" | sha256sum -c -
+          mkdir -p "${RUNNER_TEMP}/bin"
+          tar -xz -C "${RUNNER_TEMP}/bin" -f "${archive}" conftest
+          echo "${RUNNER_TEMP}/bin" >> "${GITHUB_PATH}"
+
+      - name: Verify policy unit tests
+        run: conftest verify --policy policy
+
+      - name: Render chart
+        env:
+          ENVIRONMENT: ${{ matrix.environment }}
+        run: |
+          cd charts
+          helm repo add coder-v2 https://helm.coder.com/v2
+          helm repo add coder-logstream-kube https://helm.coder.com/logstream-kube
+          helm dependency build
+          helm template coder . -n coder \
+            -f values.yaml -f "values.${ENVIRONMENT}.yaml" > /tmp/rendered.yaml
+
+      - name: Check rendered manifests
+        run: conftest test --policy policy /tmp/rendered.yaml

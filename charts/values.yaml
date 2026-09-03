@@ -142,9 +142,10 @@ langsmithAnnotationProxy:
 # Istio egress controls for PHI workspaces
 phiIstio:
   enabled: false
-  # List of allowed external HTTPS hosts for PHI pods
+  # Two groups, both enforced identically. The split records which hosts an
+  # internal mirror could replace and which must stay reachable.
   commonAllowedHosts:
-    # Package repositories
+    # package mirrors (candidates for an internal mirror)
     - us-central1-python.pkg.dev
     - us-python.pkg.dev
     - pypi.org
@@ -157,10 +158,18 @@ phiIstio:
     - cdn.jsdelivr.net
     - jsdelivr.com
     - unpkg.com
-    # model repositories
     - huggingface.co
     - cdn-lfs.huggingface.co
     - cdn-lfs-us-1.huggingface.co
+    - dl.google.com
+    - raw.githubusercontent.com
+    - githubusercontent.com
+    - release-assets.githubusercontent.com
+    - github-cloud.githubusercontent.com   # git-lfs object downloads (alambic/media CDN)
+    - downloads.claude.ai
+    - releases.openai.com
+
+    # service endpoints (required)
     # Google OAuth (for gcloud auth login)
     - accounts.google.com
     - oauth2.googleapis.com
@@ -175,17 +184,12 @@ phiIstio:
     - bigquery.googleapis.com
     - bigquerystorage.googleapis.com
     - cloudresourcemanager.googleapis.com
-    - dl.google.com
     # Istio/ASM mesh services
     - meshca.googleapis.com
     - meshconfig.googleapis.com
     # GitHub access
     - github.com
     - api.github.com
-    - raw.githubusercontent.com
-    - githubusercontent.com
-    - release-assets.githubusercontent.com
-    - github-cloud.githubusercontent.com   # git-lfs object downloads (alambic/media CDN)
     # internal services
     - abridge.wandb.io
     # external services for datagen/annotation
@@ -202,11 +206,26 @@ phiIstio:
     # Auth: claude.ai = subscription login, platform.claude.com = Console-account login
     - claude.ai
     - platform.claude.com
-    - downloads.claude.ai
     - chatgpt.com
-    - releases.openai.com
     - auth.openai.com
     # NOTEGEN-354: LaunchDarkly REST API - lets the notegen team's read-only
     # Reader token inspect flags (ldcli / MCP / REST) from inside PHI
     # workspaces. Read-only, so allowed in every environment.
     - app.launchdarkly.com
+
+  # Wildcard hosts cannot use DNS resolution, so their ServiceEntry falls back
+  # to original-destination passthrough. Without addresses a workspace can
+  # resolve a matching name to any IP and egress there, so this is required
+  # whenever commonAllowedHosts/allowedHosts contains a wildcard.
+  wildcardAddresses: []
+
+
+# Admission-time policy for the coder namespace. Audit records violations in
+# policy reports and PSA warnings; Enforce rejects the pod at admission.
+admissionPolicies:
+  mode: Audit
+  podSecurityAdmission:
+    enabled: true
+    # Set only once the cluster AdmissionConfiguration exempts the coder
+    # namespace, otherwise Enforce rejects the privileged exectrace sidecar.
+    exectraceExemptionConfigured: false

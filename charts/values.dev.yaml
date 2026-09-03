@@ -233,6 +233,12 @@ phiIstio:
   allowedHttpHosts:
     - deid.abridge.coffee
     - encounter-processor-api.abridge.coffee
+  # PSC endpoints backing the baseten private DNS zones in client-dev-e301d.
+  # Must be updated alongside the baseten-psc-development-ml-* forwarding rules.
+  wildcardAddresses:
+    - 10.6.0.3/32
+    - 10.75.0.48/32
+    - 10.75.0.104/32
 
 # Dev proving ground for PRODSEC-580. The proxy authenticates to the
 # LangSmith-side broker with the dedicated dev Workload Identity GSA.

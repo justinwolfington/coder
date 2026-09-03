@@ -36,10 +36,15 @@ spec:
   resolution: DNS
   location: MESH_EXTERNAL
 {{- if $wildcardHosts }}
+{{- $wildcardAddresses := .Values.phiIstio.wildcardAddresses | default (list) -}}
+{{- if not $wildcardAddresses }}
+{{- fail (printf "phiIstio.wildcardAddresses is required: %v resolve NONE, and without an address bound a workspace can point a matching name at any IP" $wildcardHosts) }}
+{{- end }}
 ---
 # Wildcard hosts need their own ServiceEntry: resolution DNS requires FQDNs
 # unless endpoints are given, so wildcards use NONE (original-destination
-# passthrough, the workspace resolves the name itself).
+# passthrough, the workspace resolves the name itself). addresses bounds the
+# destination so passthrough cannot be aimed off-network.
 apiVersion: networking.istio.io/v1beta1
 kind: ServiceEntry
 metadata:
@@ -50,6 +55,10 @@ spec:
     - "."
   hosts:
   {{- range $wildcardHosts }}
+    - {{ . | quote }}
+  {{- end }}
+  addresses:
+  {{- range $wildcardAddresses }}
     - {{ . | quote }}
   {{- end }}
   ports:

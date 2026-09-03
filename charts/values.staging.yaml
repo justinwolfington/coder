@@ -234,6 +234,12 @@ phiIstio:
   allowedHttpHosts:
     - deid.abridge.cafe
     - encounter-processor-api.abridge.cafe
+  # PSC endpoints backing the baseten private DNS zones in abridge-client-staging.
+  # Must be updated alongside the baseten-psc-staging-ml-* forwarding rules.
+  wildcardAddresses:
+    - 10.6.0.178/32
+    - 10.165.0.38/32
+    - 10.165.0.80/32
 
 # Okta OIDC login for the coder.abridge.cafe deployment
 oidcAuth:

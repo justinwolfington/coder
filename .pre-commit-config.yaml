@@ -26,4 +26,12 @@ repos:
       - id: terraform_validate
       - id: terraform_docs
       - id: terraform_tflint
-      - id: terraform_tfsec
+        args:
+          - --args=--config=__GIT_WORKING_DIR__/.tflint.hcl
+      - id: terraform_trivy
+        args:
+          - --args=--severity=HIGH,CRITICAL
+          # terraform_validate populates .terraform/modules first, and trivy
+          # would otherwise report findings from vendored module sources.
+          - --args=--misconfig-scanners=terraform
+          - --args=--tf-exclude-downloaded-modules
