@@ -52,7 +52,7 @@ jobs:
 
       - name: Get changed files
         id: changed-files
-        uses: tj-actions/changed-files@24d32ffd492484c1d75e0c0b894501ddb9d30d62 # v47
+        uses: tj-actions/changed-files@9426d40962ed5378910ee2e21d5f8c6fcbf2dd96 # v47.0.6
         with:
           files: docker/**
           # When manually triggered, compare against main branch
@@ -144,7 +144,7 @@ jobs:
       # Chainguard base images are pulled through the GAR cgr remote proxy
       # (us multi-region), which needs its own registry login.
       - name: Login to GAR (us multi-region)
-        uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.4.0
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:
           registry: us-docker.pkg.dev
           username: oauth2accesstoken
