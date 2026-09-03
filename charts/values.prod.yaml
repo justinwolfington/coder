@@ -218,6 +218,20 @@ coder:
     ingress:
       enable: false
 
+coderUserDataTransfer:
+  enabled: true
+  environment: prod
+  operationID: prodsec-1148-prod-01-plan
+  operation: transfer
+  mode: plan
+  image:
+    digest: sha256:1eb96496bb171994366838c78b18f9d2582743837e47867bd15e8c10a002112f
+  sourceUserID: "db08c2e2-311d-44b1-a404-30c3835bf119"
+  targetUserID: "38d5d0a2-95de-4f52-8c7a-bedc2a85b11e"
+  database:
+    user: coder-app@abridge-client-prod.iam
+    instanceConnectionName: abridge-client-prod:us-central1:coder-postgres-db
+
 # Production-specific network policy configuration
 networkPolicy:
   # Last environment to flip; dev then staging first.
