@@ -262,32 +262,13 @@ networkPolicy:
         app: llm-gateway-evals
         component: gateway-service
 
-  # Additional egress rules for general internet access
-  additionalEgressRules:
-    - ports:
-        - port: 80
-          protocol: TCP
-      to:
-        - ipBlock:
-            cidr: 0.0.0.0/0
-            except:
-              - 172.32.0.0/12
-              - 172.48.0.0/22
-              - 10.6.0.0/16
-    # Allow UDP/19302 egress for STUN endpoint discovery (Tailscale P2P NAT
-    # traversal). Required before CODER_BLOCK_DIRECT can be flipped to false
-    # in production. Internal CIDRs excepted to keep PHI traffic off the
-    # internet path.
-    - ports:
-        - port: 19302
-          protocol: UDP
-      to:
-        - ipBlock:
-            cidr: 0.0.0.0/0
-            except:
-              - 172.32.0.0/12
-              - 172.48.0.0/22
-              - 10.6.0.0/16
+  # HTTP package downloads and STUN endpoint discovery use the same complete
+  # Internet destination exclusions as HTTPS.
+  additionalInternetEgressPorts:
+    - port: 80
+      protocol: TCP
+    - port: 19302
+      protocol: UDP
 
 # Shared identities for legacy PHI workspaces and the UTD bucket mount. The
 # UTD identity has only the bucket-level IAM granted in infrastructure; normal

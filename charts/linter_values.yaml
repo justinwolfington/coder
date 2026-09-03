@@ -19,6 +19,17 @@ coderUserDataTransfer:
 
 # Dummy network policy configuration for linting validation
 networkPolicy:
+  enforce: true
+  internalCIDRs:
+    - 172.32.0.0/12
+    - 172.48.0.0/22
+  nodeCIDR: 10.6.0.0/16
+  gatewayCIDRs:
+    - 10.12.0.0/16
+  databaseCIDR: 10.6.0.104/32
+  additionalInternetEgressPorts:
+    - port: 80
+      protocol: TCP
   allowedServices:
     - name: example-service
       port: 80

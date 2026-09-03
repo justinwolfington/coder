@@ -2,6 +2,9 @@
 {{- $np := .Values.networkPolicy }}
 {{- $enforce := $np.enforce | default false }}
 {{- $workspaceNames := list "coder-workspace" "coder-phi-workspace" }}
+{{- $controlPlaneNames := list "coder" "coder-logstream-kube" "langsmith-proxy" "langsmith-annotation-proxy" }}
+{{- $internetExceptCIDRs := uniq (concat ($np.internetExcludedCIDRs | default (list)) ($np.internalCIDRs | default (list)) (compact (list ($np.nodeCIDR | default "")))) }}
+{{- $privateHTTPSCIDRs := uniq (concat ($np.privateHTTPSCIDRs | default (list)) (.Values.phiIstio.wildcardAddresses | default (list))) }}
 {{- if $enforce }}
 {{- if not $np.internalCIDRs }}
 {{- fail "networkPolicy.internalCIDRs must list this cluster's pod and service ranges before networkPolicy.enforce is set" }}
@@ -12,8 +15,13 @@
 {{- if not $np.gatewayCIDRs }}
 {{- fail "networkPolicy.gatewayCIDRs must list the internal load balancer proxy-only subnet and the GCP health check ranges before networkPolicy.enforce is set" }}
 {{- end }}
+{{- if not $np.databaseCIDR }}
+{{- fail "networkPolicy.databaseCIDR must be set before networkPolicy.enforce is set so coderd can reach Cloud SQL" }}
 {{- end }}
-{{- $exceptCIDRs := concat ($np.internalCIDRs | default (list)) (compact (list ($np.nodeCIDR | default ""))) }}
+{{- if not $np.internetExcludedCIDRs }}
+{{- fail "networkPolicy.internetExcludedCIDRs must list non-Internet destinations before networkPolicy.enforce is set" }}
+{{- end }}
+{{- end }}
 {{- if or $np.allowedServices $np.additionalEgressRules $enforce }}
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -51,20 +59,6 @@ spec:
     {{- range $np.additionalEgressRules }}
     - {{- toYaml . | nindent 6 }}
     {{- end }}
-    {{- with $np.databaseCIDR }}
-    {{- if $enforce }}
-    - ports:
-        - port: 5432
-          protocol: TCP
-      to:
-        - ipBlock:
-            cidr: {{ . | quote }}
-    {{- else }}
-    - to:
-        - ipBlock:
-            cidr: {{ . | quote }}
-    {{- end }}
-    {{- end }}
     {{- if $enforce }}
     # Resolver only. The rule this replaces carried 53 and 443 with no "to:",
     # which in NetworkPolicy means every destination, in-cluster addresses
@@ -81,13 +75,27 @@ spec:
     - ports:
         - port: 443
           protocol: TCP
+        {{- range $np.additionalInternetEgressPorts }}
+        - port: {{ .port }}
+          protocol: {{ .protocol }}
+        {{- end }}
       to:
         - ipBlock:
             cidr: 0.0.0.0/0
             except:
-              {{- range $exceptCIDRs }}
+              {{- range $internetExceptCIDRs }}
               - {{ . | quote }}
               {{- end }}
+    {{- range $privateHTTPSCIDRs }}
+    # Private HTTPS destinations must be named explicitly because the Internet
+    # rule above excludes internal and special-use address space.
+    - ports:
+        - port: 443
+          protocol: TCP
+      to:
+        - ipBlock:
+            cidr: {{ . | quote }}
+    {{- end }}
     # Workspaces reach coderd and the LangSmith brokers by cluster address,
     # which the except list above removes from the internet rule.
     - ports:
@@ -123,6 +131,20 @@ spec:
           protocol: TCP
         - port: 53
           protocol: UDP
+    {{- with $np.additionalInternetEgressPorts }}
+    - ports:
+        {{- range . }}
+        - port: {{ .port }}
+          protocol: {{ .protocol }}
+        {{- end }}
+      to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              {{- range $internetExceptCIDRs }}
+              - {{ . | quote }}
+              {{- end }}
+    {{- end }}
     {{- end }}
     # Allow access to GCE/GKE metadata servers for GCS FUSE authentication
     - to:
@@ -177,9 +199,8 @@ spec:
   policyTypes:
     - Ingress
 ---
-# NotIn also matches pods carrying no app.kubernetes.io/name at all, so coderd,
-# the brokers and any sidecar workload keep the connectivity that the namespace
-# baseline above would otherwise remove.
+# Only named control-plane workloads receive this broad policy. Unknown or
+# unlabeled pods remain covered solely by the namespace default deny.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -189,8 +210,8 @@ spec:
   podSelector:
     matchExpressions:
       - key: app.kubernetes.io/name
-        operator: NotIn
-        values:{{ toYaml $workspaceNames | nindent 10 }}
+        operator: In
+        values:{{ toYaml $controlPlaneNames | nindent 10 }}
   policyTypes:
     - Ingress
     - Egress
@@ -220,14 +241,6 @@ spec:
             cidr: 0.0.0.0/0
     - to:
         - podSelector: {}
-    {{- with $np.databaseCIDR }}
-    - ports:
-        - port: 5432
-          protocol: TCP
-      to:
-        - ipBlock:
-            cidr: {{ . | quote }}
-    {{- end }}
     - to:
         - ipBlock:
             cidr: 169.254.169.254/32
@@ -236,5 +249,76 @@ spec:
         # NodeLocal DNSCache, as above.
         - ipBlock:
             cidr: 169.254.20.10/32
+---
+# Database access belongs only to coderd's Cloud SQL proxy and the bounded user
+# data transfer Job. Workspace and auxiliary control-plane pods do not receive
+# this policy.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: coder-database
+  namespace: coder
+spec:
+  podSelector:
+    matchExpressions:
+      - key: app.kubernetes.io/name
+        operator: In
+        values:
+          - coder
+          - coder-user-data-transfer
+  policyTypes:
+    - Egress
+  egress:
+    - ports:
+        - port: 5432
+          protocol: TCP
+      to:
+        - ipBlock:
+            cidr: {{ $np.databaseCIDR | quote }}
+{{- if .Values.coderUserDataTransfer.enabled }}
+---
+# The migration Job needs Cloud SQL, GCS over HTTPS, DNS, and Workload Identity
+# metadata. It does not inherit the control plane's same-namespace access.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: coder-user-data-transfer
+  namespace: coder
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: coder-user-data-transfer
+  policyTypes:
+    - Egress
+  egress:
+    - ports:
+        - port: 53
+          protocol: TCP
+        - port: 53
+          protocol: UDP
+      to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+    - ports:
+        - port: 443
+          protocol: TCP
+      to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              {{- range $internetExceptCIDRs }}
+              - {{ . | quote }}
+              {{- end }}
+    - to:
+        - ipBlock:
+            cidr: 169.254.169.254/32
+        - ipBlock:
+            cidr: 169.254.169.252/32
+        - ipBlock:
+            cidr: 169.254.20.10/32
+        - ipBlock:
+            cidr: 100.100.100.100/32
+{{- end }}
 {{- end }}
 {{- end }}

@@ -32,37 +32,37 @@ locals {
   standard_timings = merge(local.retention, local.failure_cleanup)
 
   templates = {
-    "cpu-k8s" = merge({
+    "cpu-k8s" = merge(local.cpu_timings, {
       display_name = "Kubernetes CPU Workspace"
       description  = "Lightweight Kubernetes workspace for CPU-intensive tasks with development tools."
       icon         = "/emojis/1f4bb.png"
       directory    = "./cpu-k8s"
       environments = ["development", "staging", "production"]
-    }, local.cpu_timings)
+    })
 
-    "gpu-k8s" = merge({
+    "gpu-k8s" = merge(local.gpu_timings, {
       display_name = "Kubernetes GPU Workspace"
       description  = "Kubernetes workspace with GPU support for ML Scientists (no docker container support)."
       icon         = "/emojis/1f35f.png"
       directory    = "./gpu-k8s"
       environments = ["development", "staging", "production"]
-    }, local.gpu_timings)
+    })
 
-    "gcp-vm-modular" = merge({
+    "gcp-vm-modular" = merge(local.gpu_timings, {
       display_name = "GCP VM Workspace with Docker"
       description  = "GCP VM workspace with GPU support and Docker. Features ML development tools for ML Ops and Scientists."
       icon         = "/icon/gcp.png"
       directory    = "./gcp-vm-modular"
       environments = ["development", "staging"]
-    }, local.gpu_timings)
+    })
 
-    "phi-gpu-k8s" = merge({
+    "phi-gpu-k8s" = merge(local.phi_timings, {
       display_name = "Kubernetes PHI Workspace"
       description  = "Secure Kubernetes workspace with GPU support and enhanced security for PHI compliance."
       icon         = "/emojis/1f510.png"
       directory    = "./phi-gpu-k8s"
       environments = ["development", "production"]
-    }, local.phi_timings)
+    })
   }
 
   # Filter templates based on target environment

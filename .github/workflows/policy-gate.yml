@@ -4,6 +4,9 @@ on:
   pull_request:
     branches:
       - main
+  merge_group:
+    types:
+      - checks_requested
 
 permissions: {}
 
@@ -40,6 +43,122 @@ jobs:
       - name: Verify policy unit tests
         run: conftest verify --policy policy
 
+      - name: Check workspace Terraform sources
+        run: |
+          set -euo pipefail
+          shopt -s dotglob nullglob
+          approved_template_files=(
+            templates/cpu-k8s/README.md
+            templates/cpu-k8s/main.tf
+            templates/cpu-k8s/outputs.tf
+            templates/cpu-k8s/startup.tftpl
+            templates/cpu-k8s/variables.tf
+            templates/gcp-vm-modular/README.md
+            templates/gcp-vm-modular/main.tf
+            templates/gcp-vm-modular/outputs.tf
+            templates/gcp-vm-modular/startup.tftpl
+            templates/gcp-vm-modular/variables.tf
+            templates/gpu-k8s/README.md
+            templates/gpu-k8s/main.tf
+            templates/gpu-k8s/outputs.tf
+            templates/gpu-k8s/startup.tftpl
+            templates/gpu-k8s/variables.tf
+            templates/main.tf
+            templates/phi-gpu-k8s/README.md
+            templates/phi-gpu-k8s/main.tf
+            templates/phi-gpu-k8s/outputs.tf
+            templates/phi-gpu-k8s/startup.tftpl
+            templates/phi-gpu-k8s/variables.tf
+            templates/templates-config.tf
+          )
+          tracked_template_files=()
+          while IFS= read -r -d '' entry; do
+            mode="${entry%% *}"
+            path="${entry#*$'\t'}"
+            if [[ "${mode}" != 100644 ]]; then
+              printf 'Template source must be a regular, non-executable file: %q\n' "${path}"
+              exit 1
+            fi
+            tracked_template_files+=("${path}")
+          done < <(git ls-files --stage -z -- templates)
+          if (( ${#tracked_template_files[@]} != ${#approved_template_files[@]} )); then
+            printf 'Template source inventory changed; tracked paths are:\n'
+            printf '  %q\n' "${tracked_template_files[@]}"
+            exit 1
+          fi
+          for index in "${!approved_template_files[@]}"; do
+            if [[ "${tracked_template_files[index]}" != "${approved_template_files[index]}" ]]; then
+              printf 'Template source inventory changed at index %d: %q\n' \
+                "${index}" "${tracked_template_files[index]}"
+              exit 1
+            fi
+          done
+
+          publisher_unsupported=(
+            templates/*.tf.json
+            templates/*.tfvars
+            templates/*.tfvars.json
+          )
+          if (( ${#publisher_unsupported[@]} > 0 )); then
+            printf 'Unsupported publisher Terraform input file: %s\n' "${publisher_unsupported[@]}"
+            exit 1
+          fi
+          publisher_files=(templates/*.tf)
+          if (( ${#publisher_files[@]} == 0 )); then
+            printf 'No template publisher Terraform files found\n'
+            exit 1
+          fi
+          conftest test --policy policy --namespace terraform.publisher \
+            --parser hcl2 --combine "${publisher_files[@]}"
+
+          for template_dir in templates/*/; do
+            [[ -f "${template_dir}main.tf" ]] || continue
+            template="$(basename "${template_dir}")"
+            case "${template}" in
+              cpu-k8s|gcp-vm-modular|gpu-k8s|phi-gpu-k8s) ;;
+              *)
+                printf 'Unreviewed Coder template directory: %s\n' "${template_dir}"
+                exit 1
+                ;;
+            esac
+          done
+          for template in cpu-k8s gcp-vm-modular gpu-k8s phi-gpu-k8s; do
+            unsupported_files=(
+              "templates/${template}"/*.tf.json
+              "templates/${template}"/*.tfvars
+              "templates/${template}"/*.tfvars.json
+            )
+            if (( ${#unsupported_files[@]} > 0 )); then
+              printf 'Unsupported Terraform input file: %s\n' "${unsupported_files[@]}"
+              exit 1
+            fi
+          done
+
+          printf '%s  %s\n' \
+            'b4f8240d65eb32ef1ddac97f3450408fdb7edba3ac98363ef00077891fae85f1' \
+            'templates/gcp-vm-modular/main.tf' \
+            'def406059609baafa91ac5fcab2b3e625b26a63c2e92f87213706c173e473d31' \
+            'templates/gcp-vm-modular/outputs.tf' \
+            'e894763cf267f0d7211e0923d12832510735fb7b6873a4b0626bf7d625c23abf' \
+            'templates/gcp-vm-modular/variables.tf' \
+            '86f7121c9eaa54ed303e3e1a176365f5212b3ce11544c9283afe37bbaa5856b2' \
+            'templates/gcp-vm-modular/startup.tftpl' | sha256sum --check --strict
+
+          gcp_files=(templates/gcp-vm-modular/*.tf)
+          conftest test --policy policy --namespace terraform.gcp_workspace \
+            --parser hcl2 --combine "${gcp_files[@]}"
+
+          for template in cpu-k8s gpu-k8s phi-gpu-k8s; do
+            terraform_files=("templates/${template}"/*.tf)
+            if (( ${#terraform_files[@]} == 0 )); then
+              printf 'No Terraform files found for %s\n' "${template}"
+              exit 1
+            fi
+            conftest test --policy policy --namespace terraform.workspace \
+              --parser hcl2 --combine \
+              "${terraform_files[@]}"
+          done
+
       - name: Render chart
         env:
           ENVIRONMENT: ${{ matrix.environment }}
@@ -48,8 +167,37 @@ jobs:
           helm repo add coder-v2 https://helm.coder.com/v2
           helm repo add coder-logstream-kube https://helm.coder.com/logstream-kube
           helm dependency build
-          helm template coder . -n coder \
+          helm template coder . -n coder --include-crds \
             -f values.yaml -f "values.${ENVIRONMENT}.yaml" > /tmp/rendered.yaml
+          helm template coder . -n coder --include-crds \
+            -f values.yaml -f "values.${ENVIRONMENT}.yaml" \
+            --set networkPolicy.enforce=true \
+            --set-string networkPolicy.nodeCIDR=10.6.0.0/16 \
+            --set-string 'networkPolicy.gatewayCIDRs[0]=10.12.0.0/16' \
+            --set-string networkPolicy.databaseCIDR=10.6.0.104/32 \
+            > /tmp/rendered-enforced.yaml
 
       - name: Check rendered manifests
-        run: conftest test --policy policy /tmp/rendered.yaml
+        env:
+          ENVIRONMENT: ${{ matrix.environment }}
+        run: |
+          set -euo pipefail
+          conftest test --policy policy \
+            /tmp/rendered.yaml /tmp/rendered-enforced.yaml
+          conftest test --policy policy --namespace kubernetes.network \
+            --combine /tmp/rendered-enforced.yaml
+          if grep -q 'name: coder-default-deny' /tmp/rendered.yaml; then
+            conftest test --policy policy --namespace kubernetes.network \
+              --combine /tmp/rendered.yaml
+          else
+            conftest test --policy policy --namespace kubernetes.network_audit \
+              --combine /tmp/rendered.yaml
+            if [[ "${ENVIRONMENT}" != "staging" ]]; then
+              conftest test --policy policy --namespace kubernetes.network_audit_required \
+                --combine /tmp/rendered.yaml
+            fi
+            if [[ "${ENVIRONMENT}" == "prod" ]]; then
+              conftest test --policy policy --namespace kubernetes.network_audit_prod \
+                --combine /tmp/rendered.yaml
+            fi
+          fi

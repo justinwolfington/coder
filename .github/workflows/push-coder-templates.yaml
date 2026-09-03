@@ -45,10 +45,6 @@ on:
           - development
           - staging
           - production
-      module_version:
-        description: "Module version to use (optional, uses environment default if empty)"
-        required: false
-        type: string
 
 permissions:
   contents: read
@@ -123,29 +119,7 @@ jobs:
         run: |
           SHA="$EVENT_SHA"
           [[ -z "$SHA" ]] && SHA=$(git rev-parse HEAD)
-          echo "sha_short=${SHA:0:7}" >> $GITHUB_OUTPUT
-
-      - name: Check if module version provided
-        id: module-version
-        env:
-          PROVIDED_VERSION: ${{ github.event.inputs.module_version }}
-        run: |
-          if [ -n "$PROVIDED_VERSION" ]; then
-            echo "update_modules=true" >> $GITHUB_OUTPUT
-            echo "module_version=$PROVIDED_VERSION" >> $GITHUB_OUTPUT
-            echo "Will update module references to: $PROVIDED_VERSION"
-          else
-            echo "update_modules=false" >> $GITHUB_OUTPUT
-            echo "No module version provided - templates will use existing references"
-          fi
-
-      - name: Update module references in templates
-        if: steps.module-version.outputs.update_modules == 'true'
-        env:
-          MODULE_VERSION: ${{ steps.module-version.outputs.module_version }}
-        run: |
-          echo "Updating all module references to version: $MODULE_VERSION"
-          find templates/ -name "*.tf" -exec sed -i "s|\(git::https://github.com/abridgeai/coder.git//modules/[^?]*\)?ref=[^\"]*|\1?ref=${MODULE_VERSION}|g" {} \;
+          echo "sha_short=${SHA:0:7}" >> "$GITHUB_OUTPUT"
 
       - name: Create environment tfvars in each template directory
         env:

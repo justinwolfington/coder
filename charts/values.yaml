@@ -36,6 +36,30 @@ networkPolicy:
   enforce: false
   allowedServices: []
   additionalEgressRules: []
+  # Extra Internet ports receive the same destination exclusions as HTTPS.
+  # Keep private destinations in allowedServices, additionalEgressRules, or
+  # privateHTTPSCIDRs instead of weakening the shared Internet rule.
+  additionalInternetEgressPorts: []
+  # Explicit private HTTPS destinations. Baseten wildcardAddresses are added
+  # automatically so the Istio and Kubernetes layers stay aligned.
+  privateHTTPSCIDRs: []
+  # Address space that a 0.0.0.0/0 rule must not turn into lateral access.
+  # Environment-specific internalCIDRs and nodeCIDR are appended to this list.
+  internetExcludedCIDRs:
+    - 0.0.0.0/8
+    - 10.0.0.0/8
+    - 100.64.0.0/10
+    - 127.0.0.0/8
+    - 169.254.0.0/16
+    - 172.16.0.0/12
+    - 192.0.0.0/24
+    - 192.0.2.0/24
+    - 192.168.0.0/16
+    - 198.18.0.0/15
+    - 198.51.100.0/24
+    - 203.0.113.0/24
+    - 224.0.0.0/4
+    - 240.0.0.0/4
   # This cluster's pod and service ranges, excepted from the broad egress
   # rules so "the internet" cannot also mean the API server or another
   # tenant's pod. Required before enforce.
@@ -54,6 +78,8 @@ networkPolicy:
 # Coder logstream configuration for Kubernetes event streaming
 coder-logstream-kube:
   enabled: false  # Disabled by default, enable per environment
+  labels:
+    app.kubernetes.io/name: coder-logstream-kube
   # Configuration will be overridden in environment-specific values files
 
 # Shared identities retained for old template versions and UTD's bucket-only

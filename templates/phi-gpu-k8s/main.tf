@@ -33,15 +33,15 @@ data "coder_workspace_owner" "me" {}
 # SHARED MODULES
 ############################
 module "cpu_resources" {
-  source = "git::https://github.com/abridgeai/coder.git//modules/resources/cpu?ref=v1.16.0"
+  source = "git::https://github.com/abridgeai/coder.git//modules/resources/cpu?ref=63892eae6a2264dc13683c3b9e6a305036e1aeb9"
 }
 
 module "gpu_resources" {
-  source = "git::https://github.com/abridgeai/coder.git//modules/resources/gpu?ref=v1.16.0"
+  source = "git::https://github.com/abridgeai/coder.git//modules/resources/gpu?ref=63892eae6a2264dc13683c3b9e6a305036e1aeb9"
 }
 
 module "git_utilities" {
-  source       = "git::https://github.com/abridgeai/coder.git//modules/utilities/git?ref=v1.16.0"
+  source       = "git::https://github.com/abridgeai/coder.git//modules/utilities/git?ref=63892eae6a2264dc13683c3b9e6a305036e1aeb9"
   start_count  = data.coder_workspace.me.start_count
   agent_id     = coder_agent.main.id
   repo_url     = data.coder_parameter.repository_url.value
@@ -50,7 +50,7 @@ module "git_utilities" {
 }
 
 module "workspace_scripts" {
-  source       = "git::https://github.com/abridgeai/coder.git//modules/utilities/workspace-scripts?ref=v1.16.0"
+  source       = "git::https://github.com/abridgeai/coder.git//modules/utilities/workspace-scripts?ref=63892eae6a2264dc13683c3b9e6a305036e1aeb9"
   start_count  = data.coder_workspace.me.start_count
   agent_id     = coder_agent.main.id
   should_clone = local.should_clone
@@ -69,7 +69,7 @@ module "dotfiles" {
 }
 
 module "utd_bucket" {
-  source                 = "git::https://github.com/abridgeai/coder.git//modules/utilities/gcs-bucket?ref=v1.16.0"
+  source                 = "git::https://github.com/abridgeai/coder.git//modules/utilities/gcs-bucket?ref=63892eae6a2264dc13683c3b9e6a305036e1aeb9"
   environment            = var.environment
   supported_environments = ["production", "staging", "development"]
   workspace_owner_groups = data.coder_workspace_owner.me.groups
