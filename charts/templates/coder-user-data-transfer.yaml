@@ -1,0 +1,181 @@
+{{- if .Values.coderUserDataTransfer.enabled }}
+{{- $cfg := .Values.coderUserDataTransfer -}}
+{{- $environment := required "coderUserDataTransfer.environment is required" $cfg.environment -}}
+{{- if not (has $environment (list "dev" "staging" "prod")) -}}
+{{- fail "coderUserDataTransfer.environment must be dev, staging, or prod" -}}
+{{- end -}}
+{{- $operationID := required "coderUserDataTransfer.operationID is required" $cfg.operationID -}}
+{{- if not (regexMatch "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$" $operationID) -}}
+{{- fail "coderUserDataTransfer.operationID must be a DNS label" -}}
+{{- end -}}
+{{- if gt (len $operationID) 30 -}}
+{{- fail "coderUserDataTransfer.operationID must be at most 30 characters" -}}
+{{- end -}}
+{{- $operation := $cfg.operation | default "transfer" -}}
+{{- if not (has $operation (list "transfer" "login")) -}}
+{{- fail "coderUserDataTransfer.operation must be transfer or login" -}}
+{{- end -}}
+{{- if not (has $cfg.mode (list "plan" "apply")) -}}
+{{- fail "coderUserDataTransfer.mode must be plan or apply" -}}
+{{- end -}}
+{{- $planSHA256 := $cfg.planSHA256 | default "" -}}
+{{- if eq $cfg.mode "apply" -}}
+{{- if not (regexMatch "^[a-f0-9]{64}$" $planSHA256) -}}
+{{- fail "coderUserDataTransfer.planSHA256 must be a lowercase SHA-256 digest in apply mode" -}}
+{{- end -}}
+{{- else if ne $planSHA256 "" -}}
+{{- fail "coderUserDataTransfer.planSHA256 must be empty in plan mode" -}}
+{{- end -}}
+{{- $digest := required "coderUserDataTransfer.image.digest is required" $cfg.image.digest -}}
+{{- if not (regexMatch "^sha256:[a-f0-9]{64}$" $digest) -}}
+{{- fail "coderUserDataTransfer.image.digest must be an immutable SHA-256 digest" -}}
+{{- end -}}
+{{- $version := trunc 12 (trimPrefix "sha256:" $digest) -}}
+{{- $imageRepository := required "coderUserDataTransfer.image.repository is required" $cfg.image.repository -}}
+{{- if contains "@" $imageRepository -}}
+{{- fail "coderUserDataTransfer.image.repository must not contain a digest" -}}
+{{- end -}}
+{{- $sourceUserID := required "coderUserDataTransfer.sourceUserID is required" $cfg.sourceUserID -}}
+{{- $uuidPattern := "^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$" -}}
+{{- if not (regexMatch $uuidPattern $sourceUserID) -}}
+{{- fail "coderUserDataTransfer.sourceUserID must be a lowercase UUID" -}}
+{{- end -}}
+{{- $targetUserID := $cfg.targetUserID | default "" -}}
+{{- $targetEmail := $cfg.targetEmail | default "" -}}
+{{- if eq $operation "transfer" -}}
+  {{- if not (regexMatch $uuidPattern $targetUserID) -}}
+  {{- fail "coderUserDataTransfer.targetUserID must be a lowercase UUID for transfer operations" -}}
+  {{- end -}}
+  {{- if eq $sourceUserID $targetUserID -}}
+  {{- fail "coderUserDataTransfer source and target user IDs must be different" -}}
+  {{- end -}}
+  {{- if ne $targetEmail "" -}}
+  {{- fail "coderUserDataTransfer.targetEmail must be empty for transfer operations" -}}
+  {{- end -}}
+{{- else -}}
+  {{- if ne $targetUserID "" -}}
+  {{- fail "coderUserDataTransfer.targetUserID must be empty for login operations" -}}
+  {{- end -}}
+  {{- if not (regexMatch "^[a-z0-9][a-z0-9._+-]*@abridge[.]com$" $targetEmail) -}}
+  {{- fail "coderUserDataTransfer.targetEmail must be a lowercase abridge.com email for login operations" -}}
+  {{- end -}}
+{{- end -}}
+{{- $command := $cfg.mode -}}
+{{- if eq $operation "login" -}}
+{{- $command = printf "login-%s" $cfg.mode -}}
+{{- end -}}
+{{- $databaseUser := required "coderUserDataTransfer.database.user is required" $cfg.database.user -}}
+{{- $databaseName := required "coderUserDataTransfer.database.name is required" $cfg.database.name -}}
+{{- $instance := required "coderUserDataTransfer.database.instanceConnectionName is required" $cfg.database.instanceConnectionName -}}
+{{- $proxyImage := required "coderUserDataTransfer.cloudSqlProxy.image is required" $cfg.cloudSqlProxy.image -}}
+{{- if not (regexMatch "@sha256:[a-f0-9]{64}$" $proxyImage) -}}
+{{- fail "coderUserDataTransfer.cloudSqlProxy.image must use an immutable SHA-256 digest" -}}
+{{- end -}}
+{{- $serviceAccount := .Values.coder.coder.serviceAccount | default dict -}}
+{{- $serviceAccountName := $serviceAccount.name | default "coder" -}}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: coder-user-data-transfer-{{ $operationID }}
+  labels:
+    app.kubernetes.io/name: coder-user-data-transfer
+    app.kubernetes.io/component: account-migration
+    tags.datadoghq.com/env: {{ $environment | quote }}
+    tags.datadoghq.com/service: "coder-user-data-transfer"
+    tags.datadoghq.com/version: {{ $version | quote }}
+spec:
+  activeDeadlineSeconds: 300
+  backoffLimit: 0
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: coder-user-data-transfer
+        app.kubernetes.io/component: account-migration
+        tags.datadoghq.com/env: {{ $environment | quote }}
+        tags.datadoghq.com/service: "coder-user-data-transfer"
+        tags.datadoghq.com/version: {{ $version | quote }}
+      annotations:
+        sidecar.istio.io/inject: "false"
+    spec:
+      automountServiceAccountToken: false
+      restartPolicy: Never
+      serviceAccountName: {{ $serviceAccountName | quote }}
+      initContainers:
+        - name: cloud-sql-proxy
+          restartPolicy: Always
+          image: {{ $proxyImage | quote }}
+          args:
+            - --private-ip
+            - --auto-iam-authn
+            - --structured-logs
+            - --health-check
+            - --http-address=0.0.0.0
+            - --http-port=9090
+            - --port=5432
+            - {{ $instance | quote }}
+          startupProbe:
+            httpGet:
+              path: /readiness
+              port: 9090
+            failureThreshold: 30
+            periodSeconds: 1
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            seccompProfile:
+              type: RuntimeDefault
+          resources:
+            requests:
+              cpu: 10m
+              memory: 64Mi
+            limits:
+              memory: 256Mi
+      containers:
+        - name: transfer
+          image: {{ printf "%s@%s" $imageRepository $digest | quote }}
+          imagePullPolicy: IfNotPresent
+          args:
+            - {{ $command | quote }}
+          env:
+            - name: DB_USER
+              value: {{ $databaseUser | quote }}
+            - name: DB_NAME
+              value: {{ $databaseName | quote }}
+            - name: CODER_PG_CONNECTION_URL
+              value: "postgres://$(DB_USER)@localhost:5432/$(DB_NAME)?sslmode=disable"
+            - name: CODER_TRANSFER_SOURCE_USER_ID
+              value: {{ $sourceUserID | quote }}
+            {{- if eq $operation "transfer" }}
+            - name: CODER_TRANSFER_TARGET_USER_ID
+              value: {{ $targetUserID | quote }}
+            {{- else }}
+            - name: CODER_LOGIN_TARGET_EMAIL
+              value: {{ $targetEmail | quote }}
+            {{- end }}
+            {{- if eq $cfg.mode "apply" }}
+            - name: CODER_TRANSFER_PLAN_SHA256
+              value: {{ $planSHA256 | quote }}
+            {{- end }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 65532
+            runAsGroup: 65532
+            seccompProfile:
+              type: RuntimeDefault
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              memory: 128Mi
+{{- end }}

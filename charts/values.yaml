@@ -5,6 +5,26 @@ coder:
     # The autoscaler evicts coderd off shared workspace nodes; one replica blanks the NEG.
     replicaCount: 2
 
+coderUserDataTransfer:
+  enabled: false
+  environment: ""
+  operationID: ""
+  operation: transfer
+  mode: plan
+  planSHA256: ""
+  image:
+    repository: us-central1-docker.pkg.dev/abridge-artifact-registry/coder/coder-user-data-transfer
+    digest: ""
+  sourceUserID: ""
+  targetUserID: ""
+  targetEmail: ""
+  database:
+    user: ""
+    name: coder
+    instanceConnectionName: ""
+  cloudSqlProxy:
+    image: gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.22.0@sha256:fa4c7308245407157c5e9c4e16f1c0f1113899d6f29dc8f8be3e30efae86467f
+
 # Deny-by-default network controls for the coder namespace.
 #
 # enforce is the single audit-to-enforce switch, set per environment. While it

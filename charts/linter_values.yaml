@@ -2,6 +2,21 @@ coder:
   httpRoute:
     hostname: "coder.abridge.test"
 
+# Render the gated user data transfer Job during chart linting.
+coderUserDataTransfer:
+  enabled: true
+  environment: dev
+  operationID: lint-plan
+  operation: transfer
+  mode: plan
+  image:
+    digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
+  sourceUserID: "00000000-0000-4000-8000-000000000001"
+  targetUserID: "00000000-0000-4000-8000-000000000002"
+  database:
+    user: coder-app@example-project.iam
+    instanceConnectionName: example-project:us-central1:coder-postgres-db
+
 # Dummy network policy configuration for linting validation
 networkPolicy:
   allowedServices:

@@ -1,0 +1,54 @@
+name: Test Coder User Data Transfer
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/test-coder-user-data-transfer.yaml"
+      - "docker/coder-user-data-transfer.Dockerfile"
+      - "docker/coder-user-data-transfer/**"
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/test-coder-user-data-transfer.yaml"
+      - "docker/coder-user-data-transfer.Dockerfile"
+      - "docker/coder-user-data-transfer/**"
+
+permissions: {}
+
+jobs:
+  integration:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - name: Check out build configuration
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c # v6.1.0
+        with:
+          go-version: "1.26.5"
+          check-latest: false
+          cache-dependency-path: docker/coder-user-data-transfer/go.sum
+
+      - name: Check out the locked Coder schema
+        run: |
+          set -euo pipefail
+          source_dir="${RUNNER_TEMP}/coder-source"
+          git init --quiet "${source_dir}"
+          git -C "${source_dir}" fetch --no-tags --depth=1 \
+            https://github.com/coder/coder.git \
+            81add7e766144e50b4e4499b81582f997cc6a26c
+          git -C "${source_dir}" checkout --detach --quiet \
+            81add7e766144e50b4e4499b81582f997cc6a26c
+
+      - name: Run full-schema integration tests
+        run: |
+          set -euo pipefail
+          ./docker/coder-user-data-transfer/test-integration.sh \
+            "${RUNNER_TEMP}/coder-source"
